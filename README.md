@@ -158,10 +158,17 @@ Release authentication follows
 - Install the App on `pablaber/pr-desk`, granting repository Contents, Issues,
   and Pull requests read/write permissions. Ensure repository policies permit
   the App to open release PRs and create release tags.
+- In [GitHub App installation settings](https://github.com/settings/installations),
+  configure the same App to also access `pablaber/homebrew-tap`. The tap token is
+  explicitly scoped to that repository with **Contents: read/write** only. Allow
+  the App to push to the tap's default branch. No additional secret or PAT is needed.
+  Installation access must be confirmed by the repository owner; creating the tap
+  does not automatically add it to an installation limited to selected repositories.
 
 The App token allows release PRs to trigger normal CI. The workflow preserves
-`snuffboard`'s permission pattern; only artifact upload uses the ordinary Actions
-`GITHUB_TOKEN`. No Apple credentials are required.
+`snuffboard`'s permission pattern; artifact upload and release metadata verification
+use the ordinary Actions `GITHUB_TOKEN`. Tap writes use the scoped App token.
+No Apple credentials are required.
 
 Every push to `main` runs the reusable frontend, browser, and Rust checks before
 Release Please runs. Conventional commits update its release PR; merging that
@@ -172,7 +179,44 @@ that release ID with the official Tauri action. Builds target
 release may briefly exist without assets while the build runs. Inspect the
 Release Please workflow if installation reports missing assets.
 
-### Install on another Mac
+After the build/upload succeeds, the build job hashes the local DMG and verifies
+its name, release tag, published status, and uploaded asset digest via GitHub's
+release API. Only non-secret version/checksum outputs pass to `update-homebrew`,
+which requires both `release_created` and a successful build. That job mints a
+fresh GitHub App token, checks out the tap's default branch, updates only the
+version and SHA-256 stanzas in `Casks/pr-desk.rb`, validates them and Ruby syntax,
+and commits as the App bot. The URL interpolates the version. An unchanged cask
+produces no commit; a failed tap update can be retried with **Re-run failed jobs**
+on that release's workflow run after fixing installation permissions. A new push
+without a new release does not update the tap.
+
+### Install (recommended)
+
+On an Apple Silicon Mac with Homebrew:
+
+```sh
+brew install --cask pablaber/tap/pr-desk
+```
+
+This automatically adds the public [`pablaber/homebrew-tap`](https://github.com/pablaber/homebrew-tap)
+and installs `PR Desk.app` into `/Applications`. Downloading the release requires
+no GitHub authentication. To use PR Desk, install and authenticate the GitHub CLI:
+
+```sh
+brew install gh
+gh auth login --hostname github.com
+```
+
+### Upgrade
+
+Quit PR Desk, then run:
+
+```sh
+brew update
+brew upgrade --cask pr-desk
+```
+
+### Alternative: installation script
 
 On an Apple Silicon Mac with `gh` installed and authenticated to an account with
 repository access:
@@ -194,7 +238,8 @@ directory. No `sudo` is needed with the default directory.
 Builds use ad-hoc signing (`bundle.macOS.signingIdentity: "-"`). They are **not
 Developer ID signed or notarized**; signature verification checks integrity, not
 publisher identity. macOS Gatekeeper may require an explicit **Open Anyway** in
-System Settings → Privacy & Security after an attempted launch. The installer
-does not disable Gatekeeper or remove quarantine attributes. Future Developer ID
+System Settings → Privacy & Security after an attempted launch. Neither the
+Homebrew cask nor the installation script disables Gatekeeper or removes
+quarantine attributes. Future Developer ID
 signing can replace the identity and supply Apple's signing/notarization
 credentials to the existing Tauri build step. No in-app updater is configured.
