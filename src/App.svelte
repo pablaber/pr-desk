@@ -3,7 +3,8 @@
   import { isTauri } from '@tauri-apps/api/core';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { version } from '../package.json';
-  import appIcon from '../src-tauri/icons/source.svg';
+  // The app's CSP blocks data URLs, so keep the logo as a bundled file.
+  import appIcon from '../src-tauri/icons/source.svg?no-inline';
   import PRCard from './components/PRCard.svelte';
   import Settings from './components/Settings.svelte';
   import { GhGitHubService } from './lib/github/client';
