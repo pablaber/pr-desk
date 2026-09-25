@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.0](https://github.com/pablaber/pr-desk/compare/v0.3.0...v0.4.0) (2026-09-25)
+
+
+### Features
+
+* dismiss card menu on outside click and nest snooze in a submenu ([f54f393](https://github.com/pablaber/pr-desk/commit/f54f393ee8c2df1cb0c468398cd594dee09edc22))
+* dismiss PR card menu on outside click and nest snooze in a submenu ([#25](https://github.com/pablaber/pr-desk/issues/25)) ([f54f393](https://github.com/pablaber/pr-desk/commit/f54f393ee8c2df1cb0c468398cd594dee09edc22))
+* show open tracked-repository PRs under needs attention ([#26](https://github.com/pablaber/pr-desk/issues/26)) ([881d9f4](https://github.com/pablaber/pr-desk/commit/881d9f493436d723de580a450bc9f7795ff4a11f))
+* show PR author and stale badges on dashboard cards ([#22](https://github.com/pablaber/pr-desk/issues/22)) ([c6586ea](https://github.com/pablaber/pr-desk/commit/c6586ea5e49fd6cba63e5cf81b72bc92428c6b3a))
+
+
+### Bug Fixes
+
+* show the sidebar logo in production builds ([#23](https://github.com/pablaber/pr-desk/issues/23)) ([af90672](https://github.com/pablaber/pr-desk/commit/af906724c410b15eec5552210993f717d5f91e83))
+
 ## [0.3.0](https://github.com/pablaber/pr-desk/compare/v0.2.0...v0.3.0) (2026-09-25)
 
 
