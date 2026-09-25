@@ -201,7 +201,7 @@ required in branch protection for `main`.
 Push to `main` → tests → Release Please opens or updates a release PR → merging it tags
 a GitHub Release → a macOS job builds, signs and notarizes the bundles → the
 `pablaber/homebrew-tap` cask is updated. Release Please and the tap update both
-authenticate through a GitHub App (`RELEASE_PLEASE_APP_ID` /
+authenticate through a GitHub App (`RELEASE_PLEASE_APP_CLIENT_ID` /
 `RELEASE_PLEASE_APP_PRIVATE_KEY`), not a PAT. Only a real `release_created` output
 starts the build; a failed tap update can be re-run from that workflow run.
 `README.md` covers the required variables and secrets.
