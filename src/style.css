@@ -606,12 +606,43 @@ footer {
   margin-top: 8px;
 }
 .settings-section {
-  padding: 0 0 25px;
-  margin-bottom: 25px;
+  padding: 0 0 14px;
+  margin-bottom: 14px;
   border-bottom: 1px solid #e1e8db;
 }
 .settings-section h2 {
-  margin-bottom: 6px;
+  margin: 0;
+}
+.settings-section-toggle {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 11px 0;
+  margin: 0;
+  border-radius: 4px;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  color: inherit;
+}
+.settings-section-toggle .chevron {
+  display: inline-block;
+  margin-right: 8px;
+  color: #8d9a80;
+  transition: transform 0.15s ease;
+}
+.settings-section-toggle[aria-expanded='true'] .chevron {
+  transform: rotate(90deg);
+}
+.settings-section-toggle:focus-visible {
+  outline: 2px solid #3f6746;
+  outline-offset: 2px;
+}
+.settings-section-body {
+  padding: 4px 0 11px;
 }
 .settings-section p {
   font-size: 12px;

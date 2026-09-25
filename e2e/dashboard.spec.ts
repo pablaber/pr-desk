@@ -1,4 +1,10 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+// Collapsed by default: expand a Settings accordion section by its heading text before
+// interacting with controls inside it.
+async function expandSettingsSection(page: Page, heading: string) {
+  await page.getByRole('button', { name: heading }).click();
+}
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -200,13 +206,16 @@ test('snooze, ignore, restore, watch, tracked repositories and persistence', asy
   await page.getByRole('button', { name: 'Snoozed', exact: true }).click();
   await page.getByRole('button', { name: 'Restore now', exact: true }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Ignored pull requests');
   await page.getByRole('button', { name: 'Restore', exact: true }).click();
+  await expandSettingsSection(page, 'Tracked repositories');
   await page.getByRole('textbox', { name: 'Repository', exact: true }).fill('bad-repository');
   await page.getByRole('button', { name: 'Add repository' }).click();
   await expect(page.getByRole('alert')).toContainText('Use owner/repository');
   await page.getByRole('textbox', { name: 'Repository', exact: true }).fill('acme/platform');
   await page.getByRole('button', { name: 'Add repository' }).click();
   await expect(page.locator('.setting-row').filter({ hasText: 'acme/platform' })).toHaveCount(1);
+  await expandSettingsSection(page, 'Watched pull requests');
   await page
     .getByRole('textbox', { name: 'Pull request URL' })
     .fill('https://github.com/acme/platform/pull/5');
@@ -281,6 +290,7 @@ test('configured snooze options drive the card menu, capped at five with Custom 
 }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Snooze options');
   const limit = page.getByText('Five snooze options is the maximum');
   const add = page.getByRole('button', { name: 'Add snooze option', exact: true });
   await expect(limit).toBeHidden();
@@ -346,6 +356,7 @@ test('configured snooze options drive the card menu, capped at five with Custom 
 test('removing every snooze option leaves Custom date alone in the menu', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Snooze options');
   for (let remaining = 4; remaining > 0; remaining--)
     await page
       .getByRole('button', { name: /^Remove snooze option/ })
@@ -483,10 +494,13 @@ test('ignored repositories validate, persist, override tracking, and can be remo
   await page.goto('/');
   await expect(page.locator('.pr-card')).toHaveCount(4);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Tracked repositories');
   await page.getByRole('textbox', { name: 'Repository', exact: true }).fill('acme/platform');
   await page.getByRole('button', { name: 'Add repository' }).click();
+  await expandSettingsSection(page, 'Watched pull requests');
   await page.getByRole('textbox', { name: 'Pull request URL' }).fill('acme/platform#5');
   await page.getByRole('button', { name: 'Watch PR', exact: true }).click();
+  await expandSettingsSection(page, 'Ignored repositories');
   const input = page.getByRole('textbox', { name: 'Ignored repository', exact: true });
   await input.fill('invalid');
   await page.getByRole('button', { name: 'Ignore repository', exact: true }).click();
@@ -495,21 +509,73 @@ test('ignored repositories validate, persist, override tracking, and can be remo
   await page.getByRole('button', { name: 'Ignore repository', exact: true }).click();
   const section = page
     .locator('.settings-section')
-    .filter({ has: page.getByRole('heading', { name: 'Ignored repositories', exact: true }) });
+    .filter({ has: page.getByRole('heading', { name: 'Ignored repositories' }) });
   await expect(section.locator('.setting-row')).toHaveText('acme/platformRemove');
   await input.fill('acme/platform');
   await page.getByRole('button', { name: 'Ignore repository', exact: true }).click();
   await expect(input).toHaveValue('');
   await expect(section.locator('.setting-row')).toHaveCount(1);
+  await expect(
+    page.getByRole('heading', { name: 'Ignored repositories · 1', exact: true }),
+  ).toBeVisible();
   await page.screenshot({ path: '.context/ignored-repositories.png', fullPage: true });
   await page.reload();
   await expect(page.getByRole('button', { name: '↻ Refresh', exact: true })).toBeEnabled();
   await expect(page.locator('.pr-card')).toHaveCount(0);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Ignored repositories');
   await section.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(section.locator('.setting-row')).toHaveCount(0);
   await page.getByRole('button', { name: /Dashboard/ }).click();
   await expect(page.locator('.pr-card')).toHaveCount(5);
+});
+
+test('settings sections default to accordion states, expand/collapse by mouse and keyboard, and show item counts', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const section = (name: RegExp | string) =>
+    page.locator('.settings-section').filter({ has: page.getByRole('heading', { name }) });
+  // Automatic refresh is expanded by default; the management-heavy sections start collapsed.
+  await expect(section('Automatic refresh').getByRole('button')).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  for (const heading of [
+    'Snooze options · 4',
+    'Tracked repositories',
+    'Ignored repositories',
+    'Watched pull requests',
+    'Ignored pull requests',
+  ]) {
+    await expect(section(heading).getByRole('button')).toHaveAttribute('aria-expanded', 'false');
+  }
+  // Each heading button is a keyboard-operable, accessible disclosure control.
+  const trackedSummary = page.getByRole('button', { name: 'Tracked repositories' });
+  await trackedSummary.focus();
+  await expect(trackedSummary).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(trackedSummary).toHaveAttribute('aria-expanded', 'true');
+  await page.getByRole('textbox', { name: 'Repository', exact: true }).fill('acme/platform');
+  await page.getByRole('button', { name: 'Add repository' }).click();
+  await expect(
+    section('Tracked repositories').locator('.setting-row').filter({ hasText: 'acme/platform' }),
+  ).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: 'Tracked repositories · 1' })).toBeVisible();
+  // Collapsing again with the keyboard hides the section body but keeps the heading (and its
+  // count) visible.
+  await trackedSummary.focus();
+  await page.keyboard.press('Space');
+  await expect(trackedSummary).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('heading', { name: 'Tracked repositories · 1' })).toBeVisible();
+  // Mouse expand/collapse works the same way on a different section.
+  const ignoredPrSummary = page.getByRole('button', { name: 'Ignored pull requests' });
+  await ignoredPrSummary.click();
+  await expect(ignoredPrSummary).toHaveAttribute('aria-expanded', 'true');
+  await ignoredPrSummary.click();
+  await expect(ignoredPrSummary).toHaveAttribute('aria-expanded', 'false');
+  await page.screenshot({ path: '.context/settings-accordion.png', fullPage: true });
 });
 
 test('hotkeys switch screens and stay out of the way while typing', async ({ page }) => {
