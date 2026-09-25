@@ -1,7 +1,7 @@
 # PR Desk
 
 <p align="center">
-  <img src="docs/assets/pr-desk-dashboard.png" alt="PR Desk showing a dashboard of mock pull requests" width="1000">
+  <img src="docs/assets/pr-desk-dashboard.png" alt="PR Desk showing a dashboard of mock pull requests" width="700">
 </p>
 
 A compact macOS pull request dashboard. PR Desk shows what needs your attention, what
