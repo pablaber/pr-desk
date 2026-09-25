@@ -36,10 +36,13 @@
     loading = $state(false),
     saving = $state(false),
     initialized = $state(false);
+  let silentRefresh = $state(false);
+  let showLoading = $derived(loading && !silentRefresh);
   let error = $state(''),
     setupError = $state(''),
     now = $state(Date.now()),
     refreshed = $state('');
+  const refreshHotkey = hotkeyFor('refresh');
   const dashboardHotkey = hotkeyFor('open-dashboard');
   const snoozedHotkey = hotkeyFor('open-snoozed');
   const settingsHotkey = hotkeyFor('open-settings');
@@ -74,7 +77,7 @@
     const minutes = preferences.settings.automaticRefreshMinutes;
     if (!initialized || loading || saving || minutes === 0) return;
     // Reschedule after each refresh/save and cancel when settings change or the app unmounts.
-    const timer = setTimeout(() => void refresh(), minutes * 60_000);
+    const timer = setTimeout(() => void refresh(true), minutes * 60_000);
     return () => clearTimeout(timer);
   });
   async function setRefreshInterval(minutes: number) {
@@ -109,9 +112,10 @@
     }
     if (initialized) await refresh();
   }
-  async function refresh() {
+  async function refresh(silent = false) {
     if (loading || saving) return;
     loading = true;
+    silentRefresh = silent;
     error = '';
     try {
       snapshot = await refreshDashboard(service, preferences, snapshot);
@@ -122,6 +126,14 @@
     } finally {
       loading = false;
     }
+  }
+  function manualRefresh() {
+    if (loading && silentRefresh) {
+      // Reuse the in-flight request, but acknowledge the explicit refresh action.
+      silentRefresh = false;
+      return;
+    }
+    void (initialized ? refresh() : start());
   }
   async function persist(next: AppState) {
     await saveState(next);
@@ -205,13 +217,14 @@
   function handleHotkey(event: KeyboardEvent) {
     const hotkey = resolveHotkey(event, event.target as HTMLElement | null);
     if (!hotkey) return;
+    event.preventDefault();
     // While the shortcut list is up, the only shortcut that still acts is the one that
     // dismisses it; navigating behind an open dialog would leave the user lost.
     if (showHotkeys && hotkey.action !== 'toggle-shortcuts') return;
-    event.preventDefault();
     if (hotkey.action === 'open-dashboard') screen = 'dashboard';
     else if (hotkey.action === 'open-snoozed') screen = 'snoozed';
     else if (hotkey.action === 'open-settings') screen = 'settings';
+    else if (hotkey.action === 'refresh') manualRefresh();
     else if (hotkey.action === 'toggle-shortcuts') showHotkeys = !showHotkeys;
   }
   async function open(url: string) {
@@ -294,9 +307,13 @@
       >
       <div>
         {#if refreshed}<span class="refresh-time">Updated {refreshed}</span>{/if}<button
-          disabled={loading || saving}
-          onclick={() => (initialized ? refresh() : start())}
-          >{loading ? '↻ Refreshing…' : '↻ Refresh'}</button
+          disabled={showLoading || saving}
+          onclick={manualRefresh}
+          aria-keyshortcuts={refreshHotkey ? ariaKeyShortcut(refreshHotkey) : null}
+          >{showLoading ? '↻ Refreshing…' : '↻ Refresh'}
+          {#if refreshHotkey}<span class="refresh-hotkey" aria-hidden="true"
+              >{compactKeys(refreshHotkey)}</span
+            >{/if}</button
         >
       </div>
     </div>
@@ -362,7 +379,11 @@
             results shown</summary
           >{#each snapshot.warnings as warning}<p>{warning}</p>{/each}
         </details>{/if}
-      <div class="board" aria-busy={loading}>
+      <div
+        class="board"
+        class:silent-refresh={loading && silentRefresh && !saving}
+        aria-busy={showLoading}
+      >
         {#each columns as col}
           <section class="column">
             <header>
@@ -394,7 +415,7 @@
                         : '◷'}</span
                   >
                   <p>
-                    {loading
+                    {showLoading
                       ? 'Loading pull requests…'
                       : col.state === 'needs-attention'
                         ? 'All clear here'

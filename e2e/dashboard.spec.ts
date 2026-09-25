@@ -520,6 +520,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
   await page.keyboard.press('?');
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.hotkey-row dt')).toHaveText([
+    'Refresh pull requests',
     'Open settings',
     'Open the dashboard',
     'Open snoozed pull requests',
@@ -527,8 +528,15 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
   ]);
   // Each key gets its own cap, joined by a plus, and the spelled-out combination is what
   // a screen reader reads.
-  await expect(dialog.locator('.hotkey-row .key-combo')).toHaveText(['⌘+,', '⇧+D', '⇧+S', '?']);
+  await expect(dialog.locator('.hotkey-row .key-combo')).toHaveText([
+    '⌘+R',
+    '⌘+,',
+    '⇧+D',
+    '⇧+S',
+    '?',
+  ]);
   await expect(dialog.locator('.hotkey-row .visually-hidden')).toHaveText([
+    'Command plus R',
     'Command plus Comma',
     'Shift plus D',
     'Shift plus S',
@@ -642,3 +650,63 @@ test('unavailable snoozed PRs retain restore and custom rescheduling controls', 
   await row.getByRole('button', { name: 'Restore now' }).click();
   await expect(row).toHaveCount(0);
 });
+
+for (const manualTrigger of ['button', 'shortcut', 'none'] as const) {
+  test(`background refresh with manual trigger: ${manualTrigger}`, async ({ page }) => {
+    await page.clock.install();
+    await page.goto('/');
+    const refresh = page.getByRole('button', { name: '↻ Refresh', exact: true });
+    await expect(refresh).toBeEnabled();
+    await expect(refresh).toContainText('⌘R');
+    await expect(refresh).toHaveAttribute('aria-keyshortcuts', 'Meta+R');
+    await page.getByRole('button', { name: 'Watching', exact: true }).click();
+    await expect(page.locator('.empty-column')).toHaveCount(3);
+    const emptyText = await page.locator('.empty-column').allTextContents();
+    await page.evaluate(() => {
+      const w = window as any;
+      const invoke = w.__TAURI_INTERNALS__.invoke;
+      w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+        const result = await invoke(command, args);
+        if (args?.query?.includes('author:@me'))
+          await new Promise((resolve) => {
+            w.releaseRefresh = resolve;
+          });
+        if (args?.query?.includes('pullRequest(number: 1)'))
+          result.repository.pullRequest.title = 'Updated pull request title';
+        return result;
+      };
+    });
+    await page.clock.runFor(300_000);
+    await expect.poll(() => page.evaluate(() => (window as any).refreshCount)).toBe(2);
+    await expect(refresh).toBeEnabled();
+    await expect(page.locator('.board')).toHaveAttribute('aria-busy', 'false');
+    expect(await page.locator('.empty-column').allTextContents()).toEqual(emptyText);
+    await page.getByRole('button', { name: 'All', exact: true }).click();
+    await expect(page.locator('.menu-trigger').first()).toHaveCSS('opacity', '1');
+    await expect(page.getByText('Reduce cache lookup latency', { exact: true })).toBeVisible();
+    await expect(page.getByText('Updated pull request title', { exact: true })).toBeHidden();
+    await page.getByRole('button', { name: 'Watching', exact: true }).click();
+    await page.clock.fastForward(600_000);
+    expect(await page.evaluate(() => (window as any).refreshCount)).toBe(2);
+    if (manualTrigger !== 'none') {
+      if (manualTrigger === 'button') await refresh.click();
+      else await page.keyboard.press('Meta+r');
+      await expect(page.getByRole('button', { name: '↻ Refreshing…', exact: true })).toBeDisabled();
+      await expect(page.getByText('Loading pull requests…')).toHaveCount(3);
+      await page.keyboard.press('Meta+r');
+      expect(await page.evaluate(() => (window as any).refreshCount)).toBe(2);
+    }
+    await page.evaluate(() => (window as any).releaseRefresh());
+    await expect(refresh).toBeEnabled();
+    await page.getByRole('button', { name: 'All', exact: true }).click();
+    await expect(page.getByText('Updated pull request title', { exact: true })).toBeVisible();
+    if (manualTrigger === 'none') return;
+    // A manual refresh from idle starts a new request with loading indicators too.
+    if (manualTrigger === 'button') await refresh.click();
+    else await page.keyboard.press('Meta+r');
+    await expect(page.locator('.board')).toHaveAttribute('aria-busy', 'true');
+    await expect.poll(() => page.evaluate(() => (window as any).refreshCount)).toBe(3);
+    await page.evaluate(() => (window as any).releaseRefresh());
+    await expect(refresh).toBeEnabled();
+  });
+}
