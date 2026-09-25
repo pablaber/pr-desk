@@ -116,6 +116,9 @@ test('dashboard classification, source filters, browser action, and screenshot',
   page,
 }) => {
   await page.goto('/');
+  const brandMark = page.locator('img.brand-mark');
+  await expect(brandMark).toBeVisible();
+  await expect(brandMark).toHaveJSProperty('naturalWidth', 1024);
   await expect(page.locator('.pr-card')).toHaveCount(4);
   await expect(page.locator('.column').nth(0).locator('.pr-card')).toHaveCount(1);
   await expect(page.locator('.column').nth(1).locator('.pr-card')).toHaveCount(2);

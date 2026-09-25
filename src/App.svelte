@@ -3,6 +3,7 @@
   import { isTauri } from '@tauri-apps/api/core';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { version } from '../package.json';
+  import appIcon from '../src-tauri/icons/source.svg';
   import PRCard from './components/PRCard.svelte';
   import Settings from './components/Settings.svelte';
   import { GhGitHubService } from './lib/github/client';
@@ -199,7 +200,8 @@
 <div class="app-shell">
   <aside>
     <div class="brand">
-      <span class="brand-mark">⑂</span> PR Desk <span class="version">v{version}</span>
+      <img class="brand-mark" src={appIcon} alt="" width="32" height="32" />
+      <span>PR Desk</span>
     </div>
     <div class="nav-label">WORKSPACE</div>
     <nav aria-label="Main navigation">
@@ -215,6 +217,7 @@
       <span class="connection-dot" class:connected={initialized}></span>{login
         ? `@${login}`
         : 'GitHub CLI'}<small>One place for your pull requests.</small>
+      <span class="version">v{version}</span>
     </div>
   </aside>
   <main>
