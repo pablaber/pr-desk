@@ -13,12 +13,13 @@
     preferences: AppState;
     now: number;
     busy: boolean;
-    onadd: (kind: 'repo' | 'pr', value: string) => Promise<boolean>;
-    onremove: (kind: 'repo' | 'pr', value: string) => void;
+    onadd: (kind: 'repo' | 'pr' | 'ignored-repo', value: string) => Promise<boolean>;
+    onremove: (kind: 'repo' | 'pr' | 'ignored-repo', value: string) => void;
     onrestore: (kind: 'ignored' | 'snoozed', id: string) => void;
     onrefreshinterval: (minutes: number) => Promise<void>;
   } = $props();
-  let repository = $state(''),
+  let ignoredRepository = $state(''),
+    repository = $state(''),
     pr = $state('');
 </script>
 
@@ -57,6 +58,32 @@
           >Remove</button
         >
       </div>{:else}<p class="empty-setting">No repositories tracked yet.</p>{/each}
+  </section>
+  <section class="settings-section">
+    <h2>Ignored repositories</h2>
+    <p>
+      Hide all PRs from these repositories, including your own, review requests, tracked and watched
+      PRs. Remove a repository here to show its PRs again.
+    </p>
+    <form
+      onsubmit={async (e) => {
+        e.preventDefault();
+        if (await onadd('ignored-repo', ignoredRepository)) ignoredRepository = '';
+      }}
+    >
+      <input
+        aria-label="Ignored repository"
+        placeholder="owner/repository"
+        bind:value={ignoredRepository}
+        required
+      />
+      <button class="primary-button" disabled={busy}>Ignore repository</button>
+    </form>
+    {#each preferences.ignoredRepositories as repo}<div class="setting-row">
+        <code>{repo}</code><button disabled={busy} onclick={() => onremove('ignored-repo', repo)}
+          >Remove</button
+        >
+      </div>{:else}<p class="empty-setting">No repositories ignored.</p>{/each}
   </section>
   <section class="settings-section">
     <h2>Watched pull requests</h2>

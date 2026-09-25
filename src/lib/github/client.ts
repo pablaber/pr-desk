@@ -16,7 +16,11 @@ export class GhGitHubService implements GitHubService {
       await this.query<{ viewer: { login: string } }>('query DeskViewer { viewer { login } }')
     ).viewer.login;
   }
-  private async search(search: string): Promise<string[]> {
+  private async search(search: string, ignoredRepositories: string[]): Promise<string[]> {
+    search = [
+      search,
+      ...[...new Set(ignoredRepositories.map(parseRepository))].map((repo) => `-repo:${repo}`),
+    ].join(' ');
     const urls: string[] = [];
     let cursor: string | null = null;
     do {
@@ -33,11 +37,11 @@ export class GhGitHubService implements GitHubService {
     } while (cursor);
     return urls;
   }
-  getOwnedPullRequests() {
-    return this.search('is:pr is:open author:@me');
+  getOwnedPullRequests(ignoredRepositories: string[] = []) {
+    return this.search('is:pr is:open author:@me', ignoredRepositories);
   }
-  getDirectReviewRequests() {
-    return this.search('is:pr is:open user-review-requested:@me');
+  getDirectReviewRequests(ignoredRepositories: string[] = []) {
+    return this.search('is:pr is:open user-review-requested:@me', ignoredRepositories);
   }
   async validateRepository(repo: string) {
     const data = await this.query<{ repository: unknown }>(

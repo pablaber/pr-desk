@@ -37,7 +37,7 @@ it('defaults to five minutes and migrates reserved v1 settings without losing pr
     settings: { automaticRefreshMinutes: 0 },
   };
   expect(migrateState(legacy)).toMatchObject({
-    schemaVersion: 2,
+    schemaVersion: 3,
     watchedPullRequests: ['acme/api#1'],
     settings: { automaticRefreshMinutes: 5 },
   });
@@ -56,5 +56,37 @@ it('preserves Never and all valid intervals, and repairs invalid stored interval
         .automaticRefreshMinutes,
     ).toBe(5);
   }
-  expect(() => migrateState({ ...defaultState(), schemaVersion: 3 })).toThrow('Unsupported');
+  expect(() => migrateState({ ...defaultState(), schemaVersion: 4 })).toThrow('Unsupported');
+});
+
+it('migrates older preferences and validates ignored repositories', () => {
+  for (const schemaVersion of [1, 2]) {
+    const { ignoredRepositories: _, ...legacy } = defaultState();
+    expect(
+      migrateState({
+        ...legacy,
+        schemaVersion,
+        trackedRepositories: ['acme/api'],
+        settings: { automaticRefreshMinutes: 0 },
+      }),
+    ).toMatchObject({
+      schemaVersion: 3,
+      ignoredRepositories: [],
+      trackedRepositories: ['acme/api'],
+      settings: { automaticRefreshMinutes: schemaVersion === 1 ? 5 : 0 },
+    });
+  }
+  expect(
+    migrateState({ ...defaultState(), ignoredRepositories: [' Acme/API ', 'acme/api'] })
+      .ignoredRepositories,
+  ).toEqual(['acme/api']);
+  for (const ignoredRepositories of [
+    undefined,
+    null,
+    'acme/api',
+    [42],
+    ['invalid'],
+    ['acme/api is:closed'],
+  ])
+    expect(() => migrateState({ ...defaultState(), ignoredRepositories })).toThrow();
 });

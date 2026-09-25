@@ -11,6 +11,7 @@ export function classify(
 ) {
   if (
     pr.state !== 'OPEN' ||
+    local.ignoredRepositories.some((repo) => repo.toLowerCase() === pr.repository.toLowerCase()) ||
     local.ignoredPullRequests[pr.id] ||
     Date.parse(local.snoozedPullRequests[pr.id]?.until ?? '') > now
   )

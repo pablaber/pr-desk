@@ -33,8 +33,8 @@ export interface RawPR {
 export interface GitHubService {
   authenticate(): Promise<void>;
   getCurrentUser(): Promise<string>;
-  getOwnedPullRequests(): Promise<string[]>;
-  getDirectReviewRequests(): Promise<string[]>;
+  getOwnedPullRequests(ignoredRepositories?: string[]): Promise<string[]>;
+  getDirectReviewRequests(ignoredRepositories?: string[]): Promise<string[]>;
   getRepositoryPullRequests(repo: string): Promise<string[]>;
   validateRepository(repo: string): Promise<void>;
   getPullRequest(id: string): Promise<PullRequest>;

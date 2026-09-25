@@ -15,14 +15,20 @@ export async function refreshDashboard(
   const warnings: string[] = [],
     sources: Record<string, string[]> = {},
     staleIds: string[] = [];
+  const ignored = new Set(local.ignoredRepositories.map((repo) => repo.toLowerCase()));
+  const include = (id: string) => !ignored.has(id.split('#')[0].toLowerCase());
   const jobs: { key: string; reason: TrackingReason; run: () => Promise<string[]> }[] = [
-    { key: 'owned', reason: 'owned', run: () => service.getOwnedPullRequests() },
+    {
+      key: 'owned',
+      reason: 'owned',
+      run: () => service.getOwnedPullRequests(local.ignoredRepositories),
+    },
     {
       key: 'reviews',
       reason: 'direct-review-request',
-      run: () => service.getDirectReviewRequests(),
+      run: () => service.getDirectReviewRequests(local.ignoredRepositories),
     },
-    ...local.trackedRepositories.map((repo) => ({
+    ...local.trackedRepositories.filter(include).map((repo) => ({
       key: repo,
       reason: 'tracked-repository' as const,
       run: () => service.getRepositoryPullRequests(repo),
@@ -40,9 +46,9 @@ export async function refreshDashboard(
   }
   await pool(jobs, async (job) => {
     try {
-      sources[job.key] = await job.run();
+      sources[job.key] = (await job.run()).filter(include);
     } catch (e) {
-      sources[job.key] = previous?.sources[job.key] ?? [];
+      sources[job.key] = (previous?.sources[job.key] ?? []).filter(include);
       warnings.push(`${job.key}: ${String(e)} Previous results retained.`);
       staleIds.push(...sources[job.key]);
     }

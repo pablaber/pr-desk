@@ -279,3 +279,38 @@ test('refresh slider and numeric input stay synchronized and validate exact valu
   await expect(number).toHaveValue('37');
   await page.screenshot({ path: '.context/refresh-settings.png', fullPage: true });
 });
+
+test('ignored repositories validate, persist, override tracking, and can be removed', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Repository', exact: true }).fill('acme/platform');
+  await page.getByRole('button', { name: 'Add repository' }).click();
+  await page.getByRole('textbox', { name: 'Pull request URL' }).fill('acme/platform#5');
+  await page.getByRole('button', { name: 'Watch PR', exact: true }).click();
+  const input = page.getByRole('textbox', { name: 'Ignored repository', exact: true });
+  await input.fill('invalid');
+  await page.getByRole('button', { name: 'Ignore repository', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Use owner/repository');
+  await input.fill(' Acme/Platform ');
+  await page.getByRole('button', { name: 'Ignore repository', exact: true }).click();
+  const section = page
+    .locator('.settings-section')
+    .filter({ has: page.getByRole('heading', { name: 'Ignored repositories', exact: true }) });
+  await expect(section.locator('.setting-row')).toHaveText('acme/platformRemove');
+  await input.fill('acme/platform');
+  await page.getByRole('button', { name: 'Ignore repository', exact: true }).click();
+  await expect(input).toHaveValue('');
+  await expect(section.locator('.setting-row')).toHaveCount(1);
+  await page.screenshot({ path: '.context/ignored-repositories.png', fullPage: true });
+  await page.reload();
+  await expect(page.getByRole('button', { name: '↻ Refresh', exact: true })).toBeEnabled();
+  await expect(page.locator('.pr-card')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await section.getByRole('button', { name: 'Remove', exact: true }).click();
+  await expect(section.locator('.setting-row')).toHaveCount(0);
+  await page.getByRole('button', { name: /Dashboard/ }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(5);
+});
