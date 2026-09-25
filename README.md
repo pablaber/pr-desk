@@ -103,8 +103,6 @@ Automatic GitHub refresh defaults to five minutes while the app is running. Sett
 
 ## Verification
 
-The [Tests workflow](.github/workflows/tests.yml) runs automatically on pull requests targeting `main`. It installs locked npm dependencies on Node.js 24, checks Svelte and TypeScript, runs the unit tests, builds the frontend, and runs the Playwright suite in Chromium. Browser tests mock the Tauri/GitHub boundary and require no GitHub credentials. New commits cancel any older CI run for the same PR.
-
 ```sh
 npm run check
 npm test
