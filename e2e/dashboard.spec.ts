@@ -161,6 +161,7 @@ test('snooze, ignore, restore, watch, tracked repositories and persistence', asy
   await page
     .getByRole('button', { name: 'Actions for Refresh session token handling', exact: true })
     .click();
+  await page.getByRole('button', { name: 'Snooze', exact: true }).click();
   await page.getByRole('button', { name: '1 hour', exact: true }).click();
   await expect(page.locator('.pr-card')).toHaveCount(3);
   await page
@@ -189,6 +190,55 @@ test('snooze, ignore, restore, watch, tracked repositories and persistence', asy
   const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
   expect(Object.keys(persisted)).not.toContain('prs');
   expect(persisted.watchedPullRequests).toEqual(['acme/platform#5']);
+});
+
+test('the card menu dismisses on an outside click and nests snooze choices', async ({ page }) => {
+  await page.goto('/');
+  const trigger = page.getByRole('button', {
+    name: 'Actions for Refresh session token handling',
+    exact: true,
+  });
+  const actions = page.getByRole('group', { name: 'PR actions' });
+  const snoozeOptions = page.getByRole('group', { name: 'Snooze options' });
+  const snooze = page.getByRole('button', { name: 'Snooze', exact: true });
+  const cardBody = page.getByRole('button', {
+    name: 'Open Refresh session token handling on GitHub',
+    exact: true,
+  });
+  // A real click lands on whatever is topmost, so drive the mouse instead of the element.
+  const clickOver = async (locator: typeof snooze) => {
+    const box = (await locator.boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  };
+  await trigger.click();
+  await expect(actions).toBeVisible();
+  await expect(snoozeOptions).toBeHidden();
+  await expect(page.getByRole('button', { name: '1 hour', exact: true })).toBeHidden();
+  await snooze.click();
+  await expect(snoozeOptions).toBeVisible();
+  // Clicking inside the popup or its submenu must not dismiss anything.
+  await snoozeOptions.getByText('Snooze for').click();
+  await expect(snoozeOptions).toBeVisible();
+  await snooze.click();
+  await expect(snoozeOptions).toBeHidden();
+  await expect(actions).toBeVisible();
+  await snooze.click();
+  // One click outside closes the popup and the submenu, without opening the PR.
+  await clickOver(page.getByRole('heading', { name: 'Pull requests', exact: true }));
+  await expect(actions).toBeHidden();
+  await expect(snoozeOptions).toBeHidden();
+  expect(await page.evaluate(() => (window as any).opened)).toEqual([]);
+  // A click on the card body behind the popup dismisses it instead of opening GitHub.
+  await trigger.click();
+  await clickOver(cardBody);
+  await expect(actions).toBeHidden();
+  expect(await page.evaluate(() => (window as any).opened)).toEqual([]);
+  // The submenu does not stay open across reopens.
+  await trigger.click();
+  await expect(actions).toBeVisible();
+  await expect(snoozeOptions).toBeHidden();
+  await trigger.click();
+  await expect(actions).toBeHidden();
 });
 
 test('auto refresh defaults to five minutes, reschedules, and persists Never', async ({ page }) => {
