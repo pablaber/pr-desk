@@ -268,6 +268,75 @@ test('the card menu dismisses on an outside click and nests snooze choices', asy
   await expect(actions).toBeHidden();
 });
 
+test('configured snooze options drive the card menu, capped at five with Custom date last', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const limit = page.getByText('Five snooze options is the maximum');
+  const add = page.getByRole('button', { name: 'Add snooze option', exact: true });
+  await expect(limit).toBeHidden();
+  // A fifth option fills the list; the add row is replaced by the limit message.
+  await page.getByRole('spinbutton', { name: 'New snooze option amount' }).fill('2');
+  await add.click();
+  await expect(limit).toBeVisible();
+  await expect(add).toBeHidden();
+  // Re-adding the same duration is rejected without disturbing the saved list.
+  await page.getByRole('button', { name: 'Remove snooze option 2 hours' }).click();
+  await page.getByRole('spinbutton', { name: 'New snooze option amount' }).fill('4');
+  await add.click();
+  await expect(page.getByRole('alert')).toContainText('already configured');
+  // Editing in place: the first option becomes an anchored day instead of a duration.
+  await page.getByRole('combobox', { name: 'Snooze option 1 kind' }).selectOption('next');
+  await page.getByRole('combobox', { name: 'Snooze option 1 day' }).selectOption('monday');
+  await page.getByRole('combobox', { name: 'Snooze option 1 hour' }).selectOption('9');
+  await page.getByRole('button', { name: 'Save', exact: true }).first().click();
+  await expect(
+    page.getByRole('button', { name: 'Remove snooze option Until Monday, 9 AM' }),
+  ).toBeVisible();
+  await page.screenshot({ path: '.context/snooze-options-settings.png', fullPage: true });
+  await page.reload();
+  await page.getByRole('button', { name: /Dashboard/ }).click();
+  await page
+    .getByRole('button', { name: 'Actions for Refresh session token handling', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Snooze', exact: true }).click();
+  const options = page.getByRole('group', { name: 'Snooze options' });
+  await expect(options.getByRole('button')).toHaveText([
+    'Until Monday, 9 AM',
+    '4 hours',
+    '1 day',
+    '1 week',
+    'Snooze until custom date',
+  ]);
+  await page.screenshot({ path: '.context/snooze-options-menu.png', fullPage: true });
+  await options.getByRole('button', { name: '1 week', exact: true }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(3);
+  const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
+  expect(persisted.settings.snoozeOptions[0]).toEqual({ kind: 'next', day: 'monday', hour: 9 });
+});
+
+test('removing every snooze option leaves Custom date alone in the menu', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  for (let remaining = 4; remaining > 0; remaining--)
+    await page
+      .getByRole('button', { name: /^Remove snooze option/ })
+      .first()
+      .click();
+  await expect(page.getByText('No snooze options configured')).toBeVisible();
+  await page.screenshot({ path: '.context/snooze-options-empty.png', fullPage: true });
+  await page.reload();
+  await page.getByRole('button', { name: /Dashboard/ }).click();
+  await page
+    .getByRole('button', { name: 'Actions for Refresh session token handling', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Snooze', exact: true }).click();
+  const options = page.getByRole('group', { name: 'Snooze options' });
+  await expect(options.getByText('Snooze for')).toBeHidden();
+  await expect(options.getByRole('button')).toHaveText(['Snooze until custom date']);
+});
+
 test('auto refresh defaults to five minutes, reschedules, and persists Never', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');

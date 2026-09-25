@@ -653,6 +653,33 @@ footer {
 .empty-setting {
   padding: 12px 0;
 }
+.snooze-option-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 0;
+  border-top: 1px solid #edf0e8;
+}
+.snooze-option-row select,
+.snooze-option-row input {
+  font-size: 12px;
+  padding: 4px 6px;
+}
+.snooze-option-row input {
+  /* .settings-section inputs stretch; these sit in a row of controls instead. */
+  flex: 0 0 auto;
+  width: 72px;
+}
+.snooze-option-row button {
+  font-size: 11px;
+}
+.snooze-option-row.add {
+  margin-top: 4px;
+}
+.snooze-limit {
+  padding: 12px 0 0;
+  color: #8d9a80;
+}
 .settings-note {
   font-size: 10px;
 }

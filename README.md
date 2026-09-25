@@ -68,7 +68,7 @@ Tauri Store writes `preferences.json` to the app data directory (on macOS, `~/Li
 
 ```json
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "trackedRepositories": ["owner/repository"],
   "watchedPullRequests": ["owner/repository#123"],
   "ignoredRepositories": [],
@@ -78,7 +78,13 @@ Tauri Store writes `preferences.json` to the app data directory (on macOS, `~/Li
   "snoozedPullRequests": {
     "owner/repository#789": { "until": "2026-09-25T13:00:00Z" }
   },
-  "settings": { "automaticRefreshMinutes": 5 }
+  "settings": {
+    "automaticRefreshMinutes": 5,
+    "snoozeOptions": [
+      { "kind": "duration", "amount": 1, "unit": "hours" },
+      { "kind": "next", "day": "monday", "hour": 9 }
+    ]
+  }
 }
 ```
 
@@ -86,7 +92,7 @@ No PR titles, GitHub status, or credentials are persisted. Repository and PR ide
 
 Settings also lets you ignore entire repositories using `owner/repository`. Ignoring overrides all sources, including your own PRs, review requests, tracked repositories, and watched PRs. GitHub discovery searches exclude these repositories with `-repo:` qualifiers, and refresh skips their repository and PR detail requests. Removing an ignore restores normal tracking without losing tracked or watched preferences. Existing preferences migrate with no ignored repositories.
 
-Snoozes offer one hour, four hours, tomorrow at 9 AM, next Monday at 9 AM, and a custom local date/time. An in-memory clock checks expiry every 15 seconds. Settings exposes snoozed and ignored PRs for restoration.
+Snooze choices are configurable. Settings holds up to five options, each either a duration (a whole number of minutes, hours, days or weeks, counted from when you pick it) or a `Next` anchor (tomorrow or a named weekday, at a chosen whole hour; a weekday that is today means the following one, so `Next Monday` on a Monday is a week out). Options can be added, edited in place and removed, and the card menu always ends with a custom local date/time that does not count toward the five and cannot be removed. New and pre-version-4 preferences start with one hour, four hours, one day and one week. An in-memory clock checks expiry every 15 seconds. Settings exposes snoozed and ignored PRs for restoration.
 
 ## Rules and sorting
 
@@ -121,7 +127,7 @@ cargo check --manifest-path src-tauri/Cargo.toml
 cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 ```
 
-Unit tests cover every attention rule, ready/waiting states, team versus individual requests, multiple matching rules, ignored/snoozed/closed PRs, sorting, normalization, detail/discovery pagination, de-duplication, partial failures, input validation, and snooze dates. Playwright exercises the real Svelte UI with a mocked Tauri boundary, including source filters, opening GitHub, settings validation, watch/track, snooze/ignore/restoration, and persistence across reloads. Mock fixtures never ship in the app.
+Unit tests cover every attention rule, ready/waiting states, team versus individual requests, multiple matching rules, ignored/snoozed/closed PRs, sorting, normalization, detail/discovery pagination, de-duplication, partial failures, input validation, snooze option validation and migration, and snooze dates. Playwright exercises the real Svelte UI with a mocked Tauri boundary, including source filters, opening GitHub, settings validation, watch/track, snooze option configuration, snooze/ignore/restoration, and persistence across reloads. Mock fixtures never ship in the app.
 
 ## Current limits
 
