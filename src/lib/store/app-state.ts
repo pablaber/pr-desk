@@ -1,21 +1,34 @@
 import { load } from '@tauri-apps/plugin-store';
+export type SnoozeUnit = 'minutes' | 'hours' | 'days' | 'weeks';
+export type SnoozeDay =
+  'tomorrow' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+export type SnoozeOption =
+  | { kind: 'duration'; amount: number; unit: SnoozeUnit }
+  | { kind: 'next'; day: SnoozeDay; hour: number };
 export interface AppState {
-  schemaVersion: 3;
+  schemaVersion: 4;
   trackedRepositories: string[];
   ignoredRepositories: string[];
   watchedPullRequests: string[];
   ignoredPullRequests: Record<string, { ignoredAt: string }>;
   snoozedPullRequests: Record<string, { until: string }>;
-  settings: { automaticRefreshMinutes: number };
+  settings: { automaticRefreshMinutes: number; snoozeOptions: SnoozeOption[] };
 }
+export const MAX_SNOOZE_OPTIONS = 5;
+export const defaultSnoozeOptions = (): SnoozeOption[] => [
+  { kind: 'duration', amount: 1, unit: 'hours' },
+  { kind: 'duration', amount: 4, unit: 'hours' },
+  { kind: 'duration', amount: 1, unit: 'days' },
+  { kind: 'duration', amount: 1, unit: 'weeks' },
+];
 export const defaultState = (): AppState => ({
-  schemaVersion: 3,
+  schemaVersion: 4,
   trackedRepositories: [],
   ignoredRepositories: [],
   watchedPullRequests: [],
   ignoredPullRequests: {},
   snoozedPullRequests: {},
-  settings: { automaticRefreshMinutes: 5 },
+  settings: { automaticRefreshMinutes: 5, snoozeOptions: defaultSnoozeOptions() },
 });
 export async function loadState(): Promise<AppState> {
   const store = await load('preferences.json', { autoSave: false, defaults: {} });
@@ -26,7 +39,7 @@ export async function loadState(): Promise<AppState> {
 export function migrateState(value: unknown): AppState {
   if (!value) return defaultState();
   const stored = value as Omit<AppState, 'schemaVersion'> & { schemaVersion: number };
-  if (stored.schemaVersion !== 1 && stored.schemaVersion !== 2 && stored.schemaVersion !== 3)
+  if (![1, 2, 3, 4].includes(stored.schemaVersion))
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
@@ -38,7 +51,7 @@ export function migrateState(value: unknown): AppState {
   )
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
   if (
-    stored.schemaVersion === 3 &&
+    stored.schemaVersion >= 3 &&
     (!Array.isArray(stored.ignoredRepositories) ||
       stored.ignoredRepositories.some((repo) => typeof repo !== 'string'))
   )
@@ -48,21 +61,90 @@ export function migrateState(value: unknown): AppState {
   return {
     ...defaultState(),
     ...stored,
-    schemaVersion: 3,
+    schemaVersion: 4,
     ignoredRepositories:
-      stored.schemaVersion === 3
+      stored.schemaVersion >= 3
         ? [...new Set(stored.ignoredRepositories.map(parseRepository))]
         : [],
     settings: {
       automaticRefreshMinutes:
         stored.schemaVersion !== 1 && isRefreshInterval(minutes) ? minutes : 5,
+      snoozeOptions:
+        stored.schemaVersion === 4
+          ? readStoredSnoozeOptions(stored.settings?.snoozeOptions)
+          : defaultSnoozeOptions(),
     },
   };
+}
+// A saved file that no longer validates must never be silently rewritten with defaults. An
+// absent list is different from an empty one: only the empty list means "the user removed them".
+function readStoredSnoozeOptions(value: unknown): SnoozeOption[] {
+  if (value === undefined) return defaultSnoozeOptions();
+  try {
+    return parseSnoozeOptions(value);
+  } catch {
+    throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
+  }
 }
 export function isRefreshInterval(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 60;
 }
-
+const SNOOZE_UNITS: SnoozeUnit[] = ['minutes', 'hours', 'days', 'weeks'];
+const SNOOZE_DAYS: SnoozeDay[] = [
+  'tomorrow',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+];
+export function parseSnoozeOptions(value: unknown): SnoozeOption[] {
+  if (!Array.isArray(value)) throw new Error('Invalid snooze option.');
+  if (value.length > MAX_SNOOZE_OPTIONS) throw new Error('Keep at most five snooze options.');
+  const options = value.map(parseSnoozeOption);
+  if (new Set(options.map(snoozeOptionKey)).size !== options.length)
+    throw new Error('That snooze option is already configured.');
+  return options;
+}
+function parseSnoozeOption(value: unknown): SnoozeOption {
+  const option = value as Partial<SnoozeOption> | null;
+  if (option?.kind === 'duration') {
+    const { amount, unit } = option as { amount: unknown; unit: unknown };
+    if (typeof amount !== 'number' || !Number.isInteger(amount) || amount < 1 || amount > 999)
+      throw new Error('Enter a whole number from 1 to 999.');
+    if (!SNOOZE_UNITS.includes(unit as SnoozeUnit)) throw new Error('Invalid snooze option.');
+    return { kind: 'duration', amount, unit: unit as SnoozeUnit };
+  }
+  if (option?.kind === 'next') {
+    const { day, hour } = option as { day: unknown; hour: unknown };
+    if (!SNOOZE_DAYS.includes(day as SnoozeDay)) throw new Error('Invalid snooze option.');
+    if (typeof hour !== 'number' || !Number.isInteger(hour) || hour < 0 || hour > 23)
+      throw new Error('Invalid snooze option.');
+    return { kind: 'next', day: day as SnoozeDay, hour };
+  }
+  throw new Error('Invalid snooze option.');
+}
+export function snoozeOptionKey(option: SnoozeOption): string {
+  return option.kind === 'duration'
+    ? `duration:${option.amount}:${option.unit}`
+    : `next:${option.day}:${option.hour}`;
+}
+export function snoozeOptionLabel(option: SnoozeOption): string {
+  if (option.kind === 'duration') {
+    const unit = option.amount === 1 ? option.unit.slice(0, -1) : option.unit;
+    return `${option.amount} ${unit}`;
+  }
+  const day = option.day === 'tomorrow' ? 'tomorrow' : capitalize(option.day);
+  return `Until ${day}, ${formatHour(option.hour)}`;
+}
+function capitalize(value: string): string {
+  return value[0].toUpperCase() + value.slice(1);
+}
+function formatHour(hour: number): string {
+  return `${hour % 12 || 12} ${hour < 12 ? 'AM' : 'PM'}`;
+}
 export async function saveState(state: AppState) {
   const store = await load('preferences.json', { autoSave: false, defaults: {} });
   await store.set('state', state);
@@ -82,13 +164,23 @@ export function parsePullRequest(input: string): string {
   if (!match) throw new Error('Enter a GitHub PR URL or owner/repository#123.');
   return `${parseRepository(match[1])}#${Number(match[2])}`;
 }
-export function snoozeUntil(option: string, now = new Date()): string {
+const MINUTES_PER_UNIT: Record<SnoozeUnit, number> = {
+  minutes: 1,
+  hours: 60,
+  days: 60 * 24,
+  weeks: 60 * 24 * 7,
+};
+export function snoozeUntil(option: SnoozeOption, now = new Date()): string {
   const date = new Date(now);
-  if (option === '1h' || option === '4h')
-    date.setHours(date.getHours() + (option === '1h' ? 1 : 4));
-  else {
-    date.setDate(date.getDate() + (option === 'monday' ? (8 - date.getDay()) % 7 || 7 : 1));
-    date.setHours(9, 0, 0, 0);
+  if (option.kind === 'duration') {
+    date.setMinutes(date.getMinutes() + option.amount * MINUTES_PER_UNIT[option.unit]);
+    return date.toISOString();
   }
+  // A weekday that is today means the next one, matching how "Until Monday" reads on a Monday.
+  const target = SNOOZE_DAYS.indexOf(option.day) % 7;
+  date.setDate(
+    date.getDate() + (option.day === 'tomorrow' ? 1 : (target - date.getDay() + 7) % 7 || 7),
+  );
+  date.setHours(option.hour, 0, 0, 0);
   return date.toISOString();
 }

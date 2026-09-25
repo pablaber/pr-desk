@@ -1,6 +1,7 @@
 <script lang="ts">
   import RefreshInterval from './RefreshInterval.svelte';
-  import type { AppState } from '../lib/store/app-state';
+  import SnoozeOptions from './SnoozeOptions.svelte';
+  import type { AppState, SnoozeOption } from '../lib/store/app-state';
   let {
     preferences,
     now,
@@ -9,6 +10,7 @@
     onremove,
     onrestore,
     onrefreshinterval,
+    onsnoozeoptions,
   }: {
     preferences: AppState;
     now: number;
@@ -17,6 +19,7 @@
     onremove: (kind: 'repo' | 'pr' | 'ignored-repo', value: string) => void;
     onrestore: (kind: 'ignored' | 'snoozed', id: string) => void;
     onrefreshinterval: (minutes: number) => Promise<void>;
+    onsnoozeoptions: (options: SnoozeOption[]) => Promise<void>;
   } = $props();
   let ignoredRepository = $state(''),
     repository = $state(''),
@@ -36,6 +39,14 @@
       {busy}
       onsave={onrefreshinterval}
     />
+  </section>
+  <section class="settings-section">
+    <h2>Snooze options</h2>
+    <p>
+      Choose up to five snooze choices for the PR card menu. Custom date is always offered and does
+      not count toward the five.
+    </p>
+    <SnoozeOptions options={preferences.settings.snoozeOptions} {busy} onsave={onsnoozeoptions} />
   </section>
   <section class="settings-section">
     <h2>Tracked repositories</h2>

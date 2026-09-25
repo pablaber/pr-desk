@@ -1,10 +1,16 @@
 <script lang="ts">
   import { cardViewModel } from '../lib/pr/card-view-model';
   import type { ClassifiedPR } from '../lib/pr/classify';
-  import { snoozeUntil } from '../lib/store/app-state';
+  import {
+    snoozeUntil,
+    snoozeOptionKey,
+    snoozeOptionLabel,
+    type SnoozeOption,
+  } from '../lib/store/app-state';
   let {
     item,
     now,
+    snoozeOptions,
     stale,
     watching,
     busy,
@@ -13,6 +19,7 @@
   }: {
     item: ClassifiedPR;
     now: number;
+    snoozeOptions: SnoozeOption[];
     stale: boolean;
     watching: boolean;
     busy: boolean;
@@ -107,17 +114,19 @@
             role="group"
             aria-label="Snooze options"
           >
-            <span class="menu-label">Snooze for</span>
-            {#each [['1h', '1 hour'], ['4h', '4 hours'], ['tomorrow', 'Until tomorrow, 9 AM'], ['monday', 'Until Monday, 9 AM']] as [value, label]}
-              <button onclick={() => act('snooze', snoozeUntil(value))}>{label}</button>
+            {#if snoozeOptions.length}<span class="menu-label">Snooze for</span>{/if}
+            {#each snoozeOptions as option (snoozeOptionKey(option))}
+              <button onclick={() => act('snooze', snoozeUntil(option))}
+                >{snoozeOptionLabel(option)}</button
+              >
             {/each}
             <label class="custom-label"
-              >Custom time<input type="datetime-local" bind:value={custom} /></label
+              >Custom date<input type="datetime-local" bind:value={custom} /></label
             >
             <button
               disabled={!custom || new Date(custom).getTime() <= now}
               onclick={() => act('snooze', new Date(custom).toISOString())}
-              >Snooze until custom time</button
+              >Snooze until custom date</button
             >
           </div>
         {/if}

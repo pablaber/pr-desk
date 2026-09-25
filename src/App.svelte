@@ -17,7 +17,9 @@
     parseRepository,
     parsePullRequest,
     isRefreshInterval,
+    parseSnoozeOptions,
     type AppState,
+    type SnoozeOption,
   } from './lib/store/app-state';
   import { classify, sortPullRequests } from './lib/pr/classify';
   import { hotkeyFor, resolveHotkey } from './lib/hotkeys/match';
@@ -80,6 +82,12 @@
     if (!isRefreshInterval(minutes)) return;
     await change((next) => {
       next.settings.automaticRefreshMinutes = minutes;
+    });
+  }
+  async function setSnoozeOptions(options: SnoozeOption[]) {
+    const validated = parseSnoozeOptions(options);
+    await change((next) => {
+      next.settings.snoozeOptions = validated;
     });
   }
   async function start() {
@@ -294,6 +302,7 @@
         onremove={remove}
         onrestore={restore}
         onrefreshinterval={setRefreshInterval}
+        onsnoozeoptions={setSnoozeOptions}
       />
     {:else}
       <div class="dashboard-heading">
@@ -344,6 +353,7 @@
               {#each visible.filter((p) => p.state === col.state) as item (item.pr.id)}<PRCard
                   {item}
                   {now}
+                  snoozeOptions={preferences.settings.snoozeOptions}
                   busy={saving || loading}
                   stale={snapshot.staleIds.includes(item.pr.id)}
                   watching={preferences.watchedPullRequests.includes(item.pr.id)}
