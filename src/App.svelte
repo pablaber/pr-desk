@@ -267,8 +267,7 @@
       </div>
       <div class="summary">
         {#each columns as col}<span
-            ><i class={col.state}></i><b>{classified.filter((p) => p.state === col.state).length}</b
-            >
+            ><i class={col.state}></i><b>{visible.filter((p) => p.state === col.state).length}</b>
             {col.title}</span
           >{/each}
       </div>

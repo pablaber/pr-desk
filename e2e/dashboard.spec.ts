@@ -132,9 +132,14 @@ test('dashboard classification, source filters, browser action, and screenshot',
   expect(await page.evaluate(() => (window as any).opened)).toEqual([
     'https://github.com/acme/platform/pull/1',
   ]);
+  const summaryCounts = page.locator('.summary b');
+  await expect(summaryCounts).toHaveText(['1', '2', '1']);
   await page.getByRole('button', { name: 'Review requests', exact: true }).click();
   await expect(page.locator('.pr-card')).toHaveCount(1);
+  // The summary reads the filtered board, so it always matches the column counts below it.
+  await expect(summaryCounts).toHaveText(['0', '1', '0']);
   await page.getByRole('button', { name: 'All', exact: true }).click();
+  await expect(summaryCounts).toHaveText(['1', '2', '1']);
   await page.screenshot({ path: '.context/dashboard.png', fullPage: true });
 });
 
