@@ -46,6 +46,10 @@ CI but not part of this local pre-push list — agents should skip it and let CI
 unless the change includes significant UI-visible changes or touches `e2e/` directly,
 in which case run it locally too before pushing.
 
+For UI changes reflected on the main home dashboard screen, run
+`npm run screenshot:readme` before pushing to refresh `docs/assets/pr-desk-dashboard.png`.
+Inspect the generated screenshot and include the updated image in the change.
+
 ## Layout
 
 | Path                                | What lives there                                                                                                      |
