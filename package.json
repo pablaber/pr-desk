@@ -10,6 +10,7 @@
     "test": "vitest run src",
     "tauri": "tauri",
     "test:e2e": "playwright test",
+    "screenshot:readme": "node scripts/capture-readme-screenshot.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
