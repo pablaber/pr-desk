@@ -415,3 +415,26 @@ test('ignored repositories validate, persist, override tracking, and can be remo
   await page.getByRole('button', { name: /Dashboard/ }).click();
   await expect(page.locator('.pr-card')).toHaveCount(5);
 });
+
+test('hotkeys switch screens and stay out of the way while typing', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
+  await page.keyboard.press('Meta+,');
+  await expect(page.getByRole('heading', { name: 'Tracked repositories' })).toBeVisible();
+  await page.keyboard.press('d');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  // A plain-key hotkey must not steal keystrokes from a field.
+  await page.keyboard.press('Meta+,');
+  const input = page.getByRole('textbox', { name: 'Repository', exact: true });
+  await input.fill('');
+  await input.press('d');
+  await expect(input).toHaveValue('d');
+  await expect(page.getByRole('heading', { name: 'Tracked repositories' })).toBeVisible();
+  // ⌘, still works from inside a field.
+  await page.getByRole('button', { name: /Dashboard/ }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Repository', exact: true }).press('Meta+,');
+  await expect(page.getByRole('heading', { name: 'Tracked repositories' })).toBeVisible();
+});

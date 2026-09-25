@@ -19,6 +19,7 @@
     type AppState,
   } from './lib/store/app-state';
   import { classify, sortPullRequests } from './lib/pr/classify';
+  import { hotkeyFor, resolveHotkey } from './lib/hotkeys/match';
   import type { DashboardState, TrackingReason } from './lib/pr/types';
   const service = new GhGitHubService();
   let preferences = $state<AppState>(defaultState());
@@ -33,6 +34,8 @@
     setupError = $state(''),
     now = $state(Date.now()),
     refreshed = $state('');
+  const dashboardHotkey = hotkeyFor('open-dashboard');
+  const settingsHotkey = hotkeyFor('open-settings');
   const columns: { state: DashboardState; title: string; subtitle: string }[] = [
     { state: 'ready-to-merge', title: 'Ready to merge', subtitle: 'The finish line' },
     { state: 'needs-attention', title: 'Needs attention', subtitle: 'Your next move' },
@@ -188,6 +191,13 @@
     });
     await refresh();
   }
+  function handleHotkey(event: KeyboardEvent) {
+    const hotkey = resolveHotkey(event, event.target as HTMLElement | null);
+    if (!hotkey) return;
+    event.preventDefault();
+    if (hotkey.action === 'open-dashboard') screen = 'dashboard';
+    else if (hotkey.action === 'open-settings') screen = 'settings';
+  }
   async function open(url: string) {
     try {
       await openUrl(url);
@@ -198,6 +208,7 @@
 </script>
 
 <svelte:head><title>PR Desk</title></svelte:head>
+<svelte:window onkeydown={handleHotkey} />
 <div class="app-shell">
   <aside>
     <div class="brand">
@@ -208,10 +219,16 @@
     <nav aria-label="Main navigation">
       <button class:active={screen === 'dashboard'} onclick={() => (screen = 'dashboard')}
         ><span aria-hidden="true">▦</span> Dashboard
-        <span class="nav-count">{classified.length}</span></button
+        <span class="nav-count">{classified.length}</span>{#if dashboardHotkey}<span
+            class="nav-hotkey"
+            aria-hidden="true">{dashboardHotkey.label}</span
+          >{/if}</button
       >
       <button class:active={screen === 'settings'} onclick={() => (screen = 'settings')}
-        ><span aria-hidden="true">⚙</span> Settings</button
+        ><span aria-hidden="true">⚙</span> Settings{#if settingsHotkey}<span
+            class="nav-hotkey"
+            aria-hidden="true">{settingsHotkey.label}</span
+          >{/if}</button
       >
     </nav>
     <div class="sidebar-bottom">

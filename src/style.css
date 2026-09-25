@@ -133,6 +133,18 @@ nav button.active {
   margin-left: auto;
   font-size: 11px;
 }
+.nav-hotkey {
+  margin-left: auto;
+  font-size: 10px;
+  color: #939b8f;
+  border: 1px solid #dde3d8;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+/* The count already claims the free space on rows that have one. */
+.nav-count + .nav-hotkey {
+  margin-left: 0;
+}
 .sidebar-bottom {
   margin-top: auto;
   padding: 12px 8px 0;
