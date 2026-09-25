@@ -39,7 +39,7 @@
   </section>
   <section class="settings-section">
     <h2>Tracked repositories</h2>
-    <p>Show all open PRs from these repositories.</p>
+    <p>Show all open PRs from these repositories under Needs attention. Drafts stay in Waiting.</p>
     <form
       onsubmit={async (e) => {
         e.preventDefault();

@@ -24,7 +24,7 @@ export function classify(
     state: primary.state,
     priority: primary.priority,
     primary: primary.getLabel(signals),
-    statuses: matches.filter((r) => r.id !== 'waiting').map((r) => r.getLabel(signals)),
+    statuses: matches.filter((r) => r.showAsStatus !== false).map((r) => r.getLabel(signals)),
   };
 }
 export type ClassifiedPR = NonNullable<ReturnType<typeof classify>>;

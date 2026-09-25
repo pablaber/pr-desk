@@ -6,6 +6,9 @@ export interface DashboardRule {
   priority: number;
   matches(s: PullRequestSignals): boolean;
   getLabel(s: PullRequestSignals): string;
+  // Catch-all rules describe why a PR is on the desk, not something to act on, so they
+  // never join the secondary status list.
+  showAsStatus?: boolean;
 }
 export const dashboardRules: DashboardRule[] = [
   {
@@ -51,10 +54,19 @@ export const dashboardRules: DashboardRule[] = [
     getLabel: () => 'Ready to merge',
   },
   {
+    id: 'tracked-repository',
+    state: 'needs-attention',
+    priority: 10,
+    matches: (s) => s.trackedRepository && !s.pr.draft,
+    getLabel: () => 'Open in a tracked repository',
+    showAsStatus: false,
+  },
+  {
     id: 'waiting',
     state: 'waiting',
     priority: 0,
     matches: () => true,
+    showAsStatus: false,
     getLabel: (s) =>
       s.pr.draft
         ? 'Draft'

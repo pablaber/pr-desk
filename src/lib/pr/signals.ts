@@ -6,6 +6,7 @@ export function deriveSignals(pr: PullRequest, login: string) {
     pr,
     owned,
     directReviewRequested: pr.directReviewers.some((r) => r.toLowerCase() === login.toLowerCase()),
+    trackedRepository: pr.reasons.includes('tracked-repository'),
     activeThreads: pr.activeUnresolvedThreads,
     changesRequested: pr.reviewDecision === 'CHANGES_REQUESTED',
     failedRequiredChecks: required.filter((c) => c.state === 'failed').length,
