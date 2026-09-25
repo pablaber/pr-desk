@@ -302,6 +302,25 @@ test('configured snooze options drive the card menu, capped at five with Custom 
   await expect(
     page.getByRole('button', { name: 'Remove snooze option Until Monday, 9 AM' }),
   ).toBeVisible();
+  // The Next row (option 1) and a Duration row (option 2) share a column layout even
+  // though their controls differ, so their kind, Save, and Remove columns line up.
+  const rows = page.locator('.snooze-option-row');
+  const nextKindBox = await rows.nth(0).getByRole('combobox').first().boundingBox();
+  const durationKindBox = await rows.nth(1).getByRole('combobox').first().boundingBox();
+  expect(nextKindBox!.x).toBeCloseTo(durationKindBox!.x, 0);
+  expect(nextKindBox!.width).toBeCloseTo(durationKindBox!.width, 0);
+  const nextSaveBox = await rows.nth(0).getByRole('button', { name: 'Save' }).boundingBox();
+  const durationSaveBox = await rows.nth(1).getByRole('button', { name: 'Save' }).boundingBox();
+  expect(nextSaveBox!.x).toBeCloseTo(durationSaveBox!.x, 0);
+  const nextRemoveBox = await rows
+    .nth(0)
+    .getByRole('button', { name: /Remove/ })
+    .boundingBox();
+  const durationRemoveBox = await rows
+    .nth(1)
+    .getByRole('button', { name: /Remove/ })
+    .boundingBox();
+  expect(nextRemoveBox!.x).toBeCloseTo(durationRemoveBox!.x, 0);
   await page.screenshot({ path: '.context/snooze-options-settings.png', fullPage: true });
   await page.reload();
   await page.getByRole('button', { name: /Dashboard/ }).click();

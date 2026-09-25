@@ -649,7 +649,11 @@ footer {
   padding: 12px 0;
 }
 .snooze-option-row {
-  display: flex;
+  display: grid;
+  /* Shared across Duration and Next rows so the kind, second and third
+     controls, Save and Remove columns line up regardless of which
+     control type a row renders. */
+  grid-template-columns: minmax(100px, 1fr) minmax(80px, 1fr) minmax(80px, 1fr) auto auto;
   align-items: center;
   gap: 8px;
   padding: 11px 0;
@@ -657,19 +661,29 @@ footer {
 }
 .snooze-option-row select,
 .snooze-option-row input {
+  width: 100%;
+  box-sizing: border-box;
   font-size: 12px;
   padding: 4px 6px;
-}
-.snooze-option-row input {
-  /* .settings-section inputs stretch; these sit in a row of controls instead. */
-  flex: 0 0 auto;
-  width: 72px;
 }
 .snooze-option-row button {
   font-size: 11px;
 }
 .snooze-option-row.add {
   margin-top: 4px;
+}
+.snooze-option-row.add button {
+  /* The add row has no Remove button; span the Save+Remove columns so its
+     button still lands in the shared button-column area. */
+  grid-column: 4 / span 2;
+}
+@media (max-width: 640px) {
+  .snooze-option-row {
+    grid-template-columns: 1fr 1fr;
+  }
+  .snooze-option-row.add button {
+    grid-column: 1 / span 2;
+  }
 }
 .snooze-limit {
   padding: 12px 0 0;
