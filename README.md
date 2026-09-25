@@ -25,7 +25,7 @@ npm run tauri build
 # App: src-tauri/target/release/bundle/macos/PR Desk.app
 ```
 
-This produces an ad-hoc signed local app; Developer ID signing and notarization are not configured. `npm run tauri build -- --debug` creates a faster development bundle under `src-tauri/target/debug/bundle/macos/`.
+This produces an ad-hoc signed local app; Developer ID signing and notarization run only in the release workflow. `npm run tauri build -- --debug` creates a faster development bundle under `src-tauri/target/debug/bundle/macos/`.
 
 ## Architecture
 
@@ -168,7 +168,31 @@ Release authentication follows
 The App token allows release PRs to trigger normal CI. The workflow preserves
 `snuffboard`'s permission pattern; artifact upload and release metadata verification
 use the ordinary Actions `GITHUB_TOKEN`. Tap writes use the scoped App token.
-No Apple credentials are required.
+
+#### Apple signing credentials
+
+Release builds are Developer ID signed and notarized, so the macOS build job also
+needs Apple credentials. All of these are read by Tauri's built-in macOS signing
+support; the workflow fails early with a named error if any is missing.
+
+- Repository **variable** `APPLE_SIGNING_IDENTITY`: the full certificate common
+  name, `Developer ID Application: <Name> (<Team ID>)`. Not sensitive; it is
+  embedded in every signed binary. It overrides `bundle.macOS.signingIdentity`
+  from `tauri.conf.json`, which stays `"-"` so local builds remain ad-hoc signed.
+- Repository **secret** `APPLE_CERTIFICATE`: the Developer ID Application
+  certificate _and its private key_, exported from Keychain Access as a `.p12`
+  and base64 encoded.
+- Repository **secret** `APPLE_CERTIFICATE_PASSWORD`: the password chosen when
+  exporting that `.p12`.
+- Repository **secret** `APPLE_API_KEY`: the App Store Connect API **Key ID**.
+- Repository **secret** `APPLE_API_ISSUER`: the App Store Connect **Issuer ID**.
+- Repository **secret** `APPLE_API_KEY_BASE64`: the base64-encoded `.p8` private
+  key downloaded once when the App Store Connect key was created. The workflow
+  decodes it to `$RUNNER_TEMP/AuthKey.p8`, points `APPLE_API_KEY_PATH` at it, and
+  deletes it when the job ends.
+
+No keychain password secret is needed: Tauri creates and tears down its own
+temporary keychain when `APPLE_CERTIFICATE` is present.
 
 Every push to `main` runs the reusable frontend, browser, and Rust checks before
 Release Please runs. Conventional commits update its release PR; merging that
@@ -178,6 +202,19 @@ that release ID with the official Tauri action. Builds target
 `aarch64-apple-darwin` and produce a `.dmg` and an `.app.tar.gz` archive. The
 release may briefly exist without assets while the build runs. Inspect the
 Release Please workflow if installation reports missing assets.
+
+Tauri signs the app with the Developer ID Application certificate under the
+hardened runtime and a secure timestamp, submits it to Apple's notary service,
+staples the ticket into the bundle, then signs the DMG that carries it.
+`scripts/notarize-macos.sh` then notarizes and staples the DMG itself, because
+Tauri only notarizes the app, and re-verifies both artifacts: stapled ticket,
+valid signature, `spctl` reporting `source=Notarized Developer ID`, a Developer
+ID authority, a secure timestamp, and the hardened runtime flag. That explicit
+check matters because Tauri only logs a warning when notarization credentials
+are missing, which would otherwise ship a signed but unnotarized build. The
+stapled DMG replaces the uploaded asset before the checksum is computed, so the
+Homebrew cask always points at the notarized bytes, and any notarization or
+verification failure fails the build job and leaves the tap untouched.
 
 After the build/upload succeeds, the build job hashes the local DMG and verifies
 its name, release tag, published status, and uploaded asset digest via GitHub's
@@ -235,11 +272,16 @@ The old installation is retained until replacement succeeds; app preferences are
 preserved. Set `PR_DESK_INSTALL_DIR` to choose another writable application
 directory. No `sudo` is needed with the default directory.
 
-Builds use ad-hoc signing (`bundle.macOS.signingIdentity: "-"`). They are **not
-Developer ID signed or notarized**; signature verification checks integrity, not
-publisher identity. macOS Gatekeeper may require an explicit **Open Anyway** in
-System Settings → Privacy & Security after an attempted launch. Neither the
-Homebrew cask nor the installation script disables Gatekeeper or removes
-quarantine attributes. Future Developer ID
-signing can replace the identity and supply Apple's signing/notarization
-credentials to the existing Tauri build step. No in-app updater is configured.
+Published releases are Developer ID signed and notarized by Apple, with the
+notarization ticket stapled into both the app and the DMG, so they launch without
+a Gatekeeper prompt and work offline. Neither the Homebrew cask nor the
+installation script disables Gatekeeper or removes quarantine attributes. Local
+`npm run tauri build` output is still ad-hoc signed
+(`bundle.macOS.signingIdentity: "-"`) and will show the usual warning. To check a
+published build yourself:
+
+```sh
+spctl --assess --type execute --verbose=4 "/Applications/PR Desk.app"
+```
+
+It should report `source=Notarized Developer ID`. No in-app updater is configured.
