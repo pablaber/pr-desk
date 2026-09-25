@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/pablaber/pr-desk/compare/v0.2.0...v0.3.0) (2026-09-25)
+
+
+### Features
+
+* add ignored repositories ([#14](https://github.com/pablaber/pr-desk/issues/14)) ([43012bf](https://github.com/pablaber/pr-desk/commit/43012bf2f9bb1a4dc1544c420fde49652b8be554))
+
+
+### Bug Fixes
+
+* match sidebar logo to Dock icon and move version to footer ([#15](https://github.com/pablaber/pr-desk/issues/15)) ([b695bca](https://github.com/pablaber/pr-desk/commit/b695bca144b75b809a9a75ab2bf0b23429b86175))
+* show actual app version in sidebar ([#11](https://github.com/pablaber/pr-desk/issues/11)) ([41c87ea](https://github.com/pablaber/pr-desk/commit/41c87eaf673809c0fdad26bdb229185f13ae80e3))
+
 ## [0.2.0](https://github.com/pablaber/pr-desk/compare/v0.1.0...v0.2.0) (2026-09-25)
 
 
