@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/pablaber/pr-desk/compare/v0.6.0...v0.7.0) (2026-09-25)
+
+
+### Features
+
+* add silent background refresh and command-r shortcut ([#38](https://github.com/pablaber/pr-desk/issues/38)) ([653e973](https://github.com/pablaber/pr-desk/commit/653e973173d88f698d37c20677893ea62fb7dda8))
+* close stale pull requests with confirmation ([#40](https://github.com/pablaber/pr-desk/issues/40)) ([eb06999](https://github.com/pablaber/pr-desk/commit/eb06999ed5ac19abd224ed24d405118b37d25c2f))
+* organize settings into collapsible sections ([#48](https://github.com/pablaber/pr-desk/issues/48)) ([4840b2f](https://github.com/pablaber/pr-desk/commit/4840b2f5175714f9bc2501703acc9c1560bb1801))
+
+
+### Bug Fixes
+
+* align controls in the settings snooze-options editor ([#46](https://github.com/pablaber/pr-desk/issues/46)) ([d234479](https://github.com/pablaber/pr-desk/commit/d2344797ca1e70f9a72a82bca5a00c49d1a4ea14))
+
 ## [0.6.0](https://github.com/pablaber/pr-desk/compare/v0.5.0...v0.6.0) (2026-09-25)
 
 
