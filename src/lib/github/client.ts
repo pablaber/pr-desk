@@ -8,6 +8,10 @@ export class GhGitHubService implements GitHubService {
   constructor(
     private query: QueryRunner = (query) => invoke('github', { operation: 'graphql', query }),
   ) {}
+  async closeStalePullRequest(input: string) {
+    const [repository, number] = parsePullRequest(input).split('#');
+    await invoke('close_stale_pr', { url: `https://github.com/${repository}/pull/${number}` });
+  }
   async authenticate() {
     await invoke('github', { operation: 'auth' });
   }

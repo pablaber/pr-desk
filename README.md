@@ -55,8 +55,9 @@ PR Desk has no in-app updater.
 - Filters by source and supports snoozing or ignoring PRs and entire repositories.
 - Offers configurable automatic refresh while keeping failed refresh results visible
   and clearly marked as stale.
-- Stores preferences locally and uses your existing GitHub CLI authentication for
-  read-only GitHub access.
+- Stores preferences locally and uses your existing GitHub CLI authentication.
+- Closes PRs with red staleness (over 28 days) after confirmation, leaving an automated
+  comment with their inactivity in days. Enter confirms; Escape cancels.
 
 ## GitHub access
 
