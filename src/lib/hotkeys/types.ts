@@ -32,6 +32,5 @@ export interface Hotkey {
   // Plain-key hotkeys stay out of the way while the user types in a field; set this for
   // bindings that should fire anyway, like the system-standard ⌘,.
   whileTyping?: boolean;
-  label: string;
   description: string;
 }

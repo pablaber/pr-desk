@@ -451,7 +451,18 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'Open the dashboard',
     'Show keyboard shortcuts',
   ]);
-  await expect(dialog.locator('.hotkey-row kbd')).toHaveText(['⌘,', 'D', '?']);
+  // Each key gets its own cap, joined by a plus, and the spelled-out combination is what
+  // a screen reader reads.
+  await expect(dialog.locator('.hotkey-row .key-combo')).toHaveText(['⌘+,', 'D', '?']);
+  await expect(dialog.locator('.hotkey-row .visually-hidden')).toHaveText([
+    'Command plus Comma',
+    'D',
+    'Question mark',
+  ]);
+  await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveAttribute(
+    'aria-keyshortcuts',
+    'Meta+,',
+  );
   // Shortcuts behind the dialog stay inert, so ⌘, cannot navigate out from under it.
   await page.keyboard.press('Meta+,');
   await expect(dialog).toBeVisible();

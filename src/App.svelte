@@ -21,6 +21,7 @@
   } from './lib/store/app-state';
   import { classify, sortPullRequests } from './lib/pr/classify';
   import { hotkeyFor, resolveHotkey } from './lib/hotkeys/match';
+  import { ariaKeyShortcut, compactKeys } from './lib/hotkeys/format';
   import type { DashboardState, TrackingReason } from './lib/pr/types';
   const service = new GhGitHubService();
   let preferences = $state<AppState>(defaultState());
@@ -224,23 +225,33 @@
     </div>
     <div class="nav-label">WORKSPACE</div>
     <nav aria-label="Main navigation">
-      <button class:active={screen === 'dashboard'} onclick={() => (screen = 'dashboard')}
+      <button
+        class:active={screen === 'dashboard'}
+        onclick={() => (screen = 'dashboard')}
+        aria-keyshortcuts={dashboardHotkey ? ariaKeyShortcut(dashboardHotkey) : null}
         ><span aria-hidden="true">▦</span> Dashboard
         <span class="nav-count">{classified.length}</span>{#if dashboardHotkey}<span
             class="nav-hotkey"
-            aria-hidden="true">{dashboardHotkey.label}</span
+            aria-hidden="true">{compactKeys(dashboardHotkey)}</span
           >{/if}</button
       >
-      <button class:active={screen === 'settings'} onclick={() => (screen = 'settings')}
+      <button
+        class:active={screen === 'settings'}
+        onclick={() => (screen = 'settings')}
+        aria-keyshortcuts={settingsHotkey ? ariaKeyShortcut(settingsHotkey) : null}
         ><span aria-hidden="true">⚙</span> Settings{#if settingsHotkey}<span
             class="nav-hotkey"
-            aria-hidden="true">{settingsHotkey.label}</span
+            aria-hidden="true">{compactKeys(settingsHotkey)}</span
           >{/if}</button
       >
     </nav>
     {#if shortcutsHotkey}
-      <button class="shortcuts-button" onclick={() => (showHotkeys = true)}
-        >Keyboard shortcuts<span class="nav-hotkey" aria-hidden="true">{shortcutsHotkey.label}</span
+      <button
+        class="shortcuts-button"
+        onclick={() => (showHotkeys = true)}
+        aria-keyshortcuts={ariaKeyShortcut(shortcutsHotkey)}
+        >Keyboard shortcuts<span class="nav-hotkey" aria-hidden="true"
+          >{compactKeys(shortcutsHotkey)}</span
         ></button
       >
     {/if}

@@ -8,13 +8,11 @@ export const hotkeys: Hotkey[] = [
     key: ',',
     meta: true,
     whileTyping: true,
-    label: '⌘,',
     description: 'Open settings',
   },
   {
     action: 'open-dashboard',
     key: 'd',
-    label: 'D',
     description: 'Open the dashboard',
   },
   {
@@ -22,7 +20,6 @@ export const hotkeys: Hotkey[] = [
     action: 'toggle-shortcuts',
     key: '?',
     shift: 'any',
-    label: '?',
     description: 'Show keyboard shortcuts',
   },
 ];

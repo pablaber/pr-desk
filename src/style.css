@@ -833,7 +833,13 @@ footer {
   font-size: 11px;
   color: #939b8f;
 }
-.hotkey-help-panel kbd {
+.key-combo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: inherit;
+}
+.key-combo kbd {
   font-family: inherit;
   font-size: 11px;
   color: #4a574a;
@@ -841,4 +847,18 @@ footer {
   border: 1px solid #dde3d8;
   border-radius: 4px;
   padding: 2px 7px;
+  min-width: 22px;
+  text-align: center;
+}
+.key-plus {
+  font-size: 10px;
+  color: #939b8f;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

@@ -70,7 +70,7 @@ describe('hotkeys', () => {
     const actions = hotkeys.map((h) => h.action);
     expect(new Set(actions).size).toBe(actions.length);
     for (const action of actions) expect(hotkeyFor(action)?.action).toBe(action);
-    expect(hotkeyFor('open-dashboard')?.label).toBe('D');
-    expect(hotkeyFor('toggle-shortcuts')?.label).toBe('?');
+    expect(hotkeyFor('open-dashboard')?.key).toBe('d');
+    expect(hotkeyFor('toggle-shortcuts')?.key).toBe('?');
   });
 });
