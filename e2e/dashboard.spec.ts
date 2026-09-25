@@ -601,6 +601,7 @@ test('hotkeys switch screens and stay out of the way while typing', async ({ pag
   await page.getByRole('button', { name: /Dashboard/ }).click();
   await expect(page.locator('.pr-card')).toHaveCount(4);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Tracked repositories');
   await page.getByRole('textbox', { name: 'Repository', exact: true }).press('Meta+,');
   await expect(page.getByRole('heading', { name: 'Tracked repositories' })).toBeVisible();
 });
