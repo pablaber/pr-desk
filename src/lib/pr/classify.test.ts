@@ -17,14 +17,31 @@ describe('dashboard rules', () => {
   });
   it('direct requests apply regardless of ownership and ignore case', () =>
     expect(run({ author: 'other', directReviewers: ['ME'] }).state).toBe('needs-attention'));
-  it('team requests and source badges do not classify as attention', () =>
+  it('team requests alone do not classify as attention', () =>
+    expect(
+      run({ author: 'other', reasons: ['direct-review-request'], directReviewers: [] }).state,
+    ).toBe('waiting'));
+  it('open PRs in a tracked repository need attention, except drafts', () => {
+    const tracked: Partial<PullRequest> = { author: 'other', reasons: ['tracked-repository'] };
+    expect(run(tracked)).toMatchObject({
+      state: 'needs-attention',
+      primary: 'Open in a tracked repository',
+      statuses: [],
+    });
+    expect(run({ ...tracked, draft: true }).state).toBe('waiting');
+  });
+  it('tracked repositories do not override readiness or higher-priority attention', () => {
     expect(
       run({
-        author: 'other',
-        reasons: ['direct-review-request', 'tracked-repository'],
-        directReviewers: [],
+        reasons: ['owned', 'tracked-repository'],
+        reviewDecision: 'APPROVED',
+        checks: [{ name: 'CI', required: true, state: 'passing' }],
       }).state,
-    ).toBe('waiting'));
+    ).toBe('ready-to-merge');
+    expect(run({ reasons: ['tracked-repository'], directReviewers: ['me'] }).primary).toBe(
+      'Review requested',
+    );
+  });
   it('readiness requires owned, approved, passing, mergeable and not draft', () => {
     const ready: Partial<PullRequest> = {
       reviewDecision: 'APPROVED',

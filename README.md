@@ -98,9 +98,10 @@ Edit `src/lib/pr/dashboard-rules.ts` to change priorities, predicates, destinati
 4. Failed required checks on an owned PR.
 5. Merge conflicts on an owned PR.
 6. Owned, non-draft, approved, required checks passing, mergeable, and a compatible GitHub merge state → Ready to Merge.
-7. Waiting fallback.
+7. Any other non-draft PR from a tracked repository → Needs Attention, labelled “Open in a tracked repository”.
+8. Waiting fallback.
 
-Unknown, blocked, behind, draft, and otherwise non-ready merge states prevent Ready to Merge. Optional failures may be displayed without creating attention. Source badges are independent of classification.
+Unknown, blocked, behind, draft, and otherwise non-ready merge states prevent Ready to Merge. Tracked-repository and waiting are catch-alls (`showAsStatus: false`): they never appear in a card’s secondary status list. Optional failures may be displayed without creating attention. Source badges are independent of classification.
 
 Sorting is centralized in `classify.ts`: attention priority then oldest update; ready oldest update; waiting newest update. GitHub does not provide when a PR entered these derived states, so `updatedAt` approximates “oldest attention/ready” in v1.
 

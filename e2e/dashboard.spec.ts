@@ -187,6 +187,14 @@ test('snooze, ignore, restore, watch, tracked repositories and persistence', asy
   await expect(page.locator('.setting-row').filter({ hasText: 'acme/platform#5' })).toHaveCount(1);
   await page.reload();
   await expect(page.locator('.pr-card')).toHaveCount(5);
+  // Tracking the repository moves its open PRs to Needs attention; the watched PR stays waiting.
+  await expect(page.locator('.column').nth(0).locator('.pr-card')).toHaveCount(1);
+  await expect(page.locator('.column').nth(1).locator('.pr-card')).toHaveCount(3);
+  await expect(page.locator('.column').nth(2).locator('.pr-card')).toHaveCount(1);
+  await expect(
+    page.locator('.pr-card').filter({ hasText: 'Add audit event retention' }),
+  ).toContainText('Open in a tracked repository');
+  await page.screenshot({ path: '.context/tracked-repository.png', fullPage: true });
   const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
   expect(Object.keys(persisted)).not.toContain('prs');
   expect(persisted.watchedPullRequests).toEqual(['acme/platform#5']);
