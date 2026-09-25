@@ -155,9 +155,12 @@ breaking changes. Intermediate branch commits need not follow this convention.
 Release authentication follows
 [`snuffboard`'s Release Please workflow](https://github.com/pablaber/snuffboard/blob/main/.github/workflows/release-please.yml):
 `actions/create-github-app-token` generates an installation token and passes it to
-`googleapis/release-please-action`, using the same pinned revisions and names:
+`googleapis/release-please-action`, using the pinned revisions in the workflow:
 
-- Repository **variable** `RELEASE_PLEASE_APP_ID`: GitHub App ID.
+- Repository **variable** `RELEASE_PLEASE_APP_CLIENT_ID`: the GitHub App’s **Client ID**
+  (starts with `Iv23li`), copied from the
+  [`shipit-please` App settings](https://github.com/settings/apps/shipit-please).
+  This is a public identifier, so store it as a variable.
 - Repository **secret** `RELEASE_PLEASE_APP_PRIVATE_KEY`: the App's PEM private key.
 - Install the App on `pablaber/pr-desk`, granting repository Contents, Issues,
   and Pull requests read/write permissions. Ensure repository policies permit

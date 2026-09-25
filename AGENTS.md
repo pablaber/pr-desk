@@ -56,7 +56,7 @@ Rust is pinned to 1.94.0 by `rust-toolchain.toml`. Node 22.12+ or 24+.
 Push to `main` → tests → Release Please opens or updates a release PR → merging it
 tags a GitHub Release → a macOS job builds, signs and notarizes the bundles → the
 `pablaber/homebrew-tap` cask is updated. Release Please and the tap update both
-authenticate through a GitHub App (`RELEASE_PLEASE_APP_ID` /
+authenticate through a GitHub App (`RELEASE_PLEASE_APP_CLIENT_ID` /
 `RELEASE_PLEASE_APP_PRIVATE_KEY`), not a PAT.
 
 **Read [`docs/macos-signing.md`](docs/macos-signing.md) before touching anything
