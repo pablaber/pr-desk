@@ -403,6 +403,15 @@ i.waiting {
   padding: 4px;
   font-size: 12px;
 }
+/* Keep the trigger clickable above the backdrop so it still toggles the menu shut. */
+.menu-trigger[aria-expanded='true'] {
+  z-index: 6;
+}
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+}
 .card-menu {
   position: absolute;
   right: 6px;
@@ -421,6 +430,25 @@ i.waiting {
   text-align: left;
   border: 0;
   font-size: 11px;
+}
+.submenu-anchor {
+  position: relative;
+  display: grid;
+}
+.submenu-anchor > button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.chevron {
+  color: #9aa393;
+  font-size: 9px;
+}
+.card-submenu {
+  right: calc(100% + 8px);
+  top: -6px;
 }
 .menu-label {
   font-size: 9px;

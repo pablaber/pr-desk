@@ -20,18 +20,31 @@
     onaction: (id: string, action: string, until?: string) => void;
   } = $props();
   let menu = $state(false),
+    submenu = $state(false),
     custom = $state('');
   let card = $derived(cardViewModel(item, now));
+  function close() {
+    menu = false;
+    submenu = false;
+  }
   function act(action: string, until?: string) {
     if (busy) return;
-    menu = false;
+    close();
     onaction(card.pr.id, action, until);
+  }
+  // The submenu opens beside its row, so cards low on the board would push it past the
+  // window; lift it by however much it overflows.
+  function keepInView(node: HTMLElement) {
+    const overflow = node.getBoundingClientRect().bottom - (window.innerHeight - 8);
+    if (overflow > 0) node.style.top = `${-6 - overflow}px`;
   }
 </script>
 
 <svelte:window
   onkeydown={(e) => {
-    if (e.key === 'Escape') menu = false;
+    if (e.key !== 'Escape') return;
+    if (submenu) submenu = false;
+    else close();
   }}
 />
 <article class="pr-card">
@@ -61,33 +74,49 @@
     class="menu-trigger"
     aria-label={`Actions for ${card.pr.title}`}
     aria-expanded={menu}
-    onclick={() => (menu = !menu)}>•••</button
+    onclick={() => (menu ? close() : (menu = true))}>•••</button
   >
   {#if menu}
+    <!-- The backdrop swallows the dismissing click so it cannot also open the PR behind it. -->
+    <div class="menu-backdrop" onclick={close} role="presentation"></div>
     <div class="card-menu" role="group" aria-label="PR actions">
       <button
         onclick={() => {
-          menu = false;
+          close();
           onopen(card.pr.url);
         }}>Open on GitHub ↗</button
       >
       <button onclick={() => act(watching ? 'unwatch' : 'watch')}
         >{watching ? 'Stop watching' : 'Watch PR'}</button
       >
-      <span class="menu-label">Snooze for</span>
-      {#each [['1h', '1 hour'], ['4h', '4 hours'], ['tomorrow', 'Until tomorrow, 9 AM'], ['monday', 'Until Monday, 9 AM']] as [value, label]}
-        <button onclick={() => act('snooze', snoozeUntil(value))}>{label}</button>
-      {/each}
-      <label class="custom-label"
-        >Custom time<input type="datetime-local" bind:value={custom} /></label
-      >
-      <button
-        disabled={!custom || new Date(custom).getTime() <= now}
-        onclick={() => act('snooze', new Date(custom).toISOString())}
-        >Snooze until custom time</button
-      >
+      <div class="submenu-anchor">
+        <button aria-expanded={submenu} onclick={() => (submenu = !submenu)}
+          >Snooze<span class="chevron" aria-hidden="true">{submenu ? '▾' : '▸'}</span></button
+        >
+        {#if submenu}
+          <div
+            use:keepInView
+            class="card-menu card-submenu"
+            role="group"
+            aria-label="Snooze options"
+          >
+            <span class="menu-label">Snooze for</span>
+            {#each [['1h', '1 hour'], ['4h', '4 hours'], ['tomorrow', 'Until tomorrow, 9 AM'], ['monday', 'Until Monday, 9 AM']] as [value, label]}
+              <button onclick={() => act('snooze', snoozeUntil(value))}>{label}</button>
+            {/each}
+            <label class="custom-label"
+              >Custom time<input type="datetime-local" bind:value={custom} /></label
+            >
+            <button
+              disabled={!custom || new Date(custom).getTime() <= now}
+              onclick={() => act('snooze', new Date(custom).toISOString())}
+              >Snooze until custom time</button
+            >
+          </div>
+        {/if}
+      </div>
       <button class="danger" onclick={() => act('ignore')}>Ignore PR</button>
-      <button onclick={() => (menu = false)}>Close menu</button>
+      <button onclick={close}>Close menu</button>
     </div>
   {/if}
 </article>
