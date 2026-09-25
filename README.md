@@ -25,7 +25,11 @@ npm run tauri build
 # App: src-tauri/target/release/bundle/macos/PR Desk.app
 ```
 
-This produces an ad-hoc signed local app; Developer ID signing and notarization run only in the release workflow. `npm run tauri build -- --debug` creates a faster development bundle under `src-tauri/target/debug/bundle/macos/`.
+This produces an ad-hoc signed local app; Developer ID signing and notarization run only in the release workflow (see [`docs/macos-signing.md`](docs/macos-signing.md)). `npm run tauri build -- --debug` creates a faster development bundle under `src-tauri/target/debug/bundle/macos/`.
+
+Contributors and agents should also read [`AGENTS.md`](AGENTS.md) for working
+conventions, and [`docs/macos-signing.md`](docs/macos-signing.md) before changing
+anything related to code signing.
 
 ## Architecture
 
@@ -174,6 +178,8 @@ use the ordinary Actions `GITHUB_TOKEN`. Tap writes use the scoped App token.
 Release builds are Developer ID signed and notarized, so the macOS build job also
 needs Apple credentials. All of these are read by Tauri's built-in macOS signing
 support; the workflow fails early with a named error if any is missing.
+[`docs/macos-signing.md`](docs/macos-signing.md) covers creating, verifying,
+renewing and troubleshooting them in detail.
 
 - Repository **variable** `APPLE_SIGNING_IDENTITY`: the full certificate common
   name, `Developer ID Application: <Name> (<Team ID>)`. Not sensitive; it is
@@ -284,4 +290,6 @@ published build yourself:
 spctl --assess --type execute --verbose=4 "/Applications/PR Desk.app"
 ```
 
-It should report `source=Notarized Developer ID`. No in-app updater is configured.
+It should report `source=Notarized Developer ID`. See
+[`docs/macos-signing.md`](docs/macos-signing.md) for how signing and notarization
+work and how to debug them. No in-app updater is configured.
