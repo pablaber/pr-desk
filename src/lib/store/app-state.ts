@@ -1,15 +1,17 @@
 import { load } from '@tauri-apps/plugin-store';
 export interface AppState {
-  schemaVersion: 2;
+  schemaVersion: 3;
   trackedRepositories: string[];
+  ignoredRepositories: string[];
   watchedPullRequests: string[];
   ignoredPullRequests: Record<string, { ignoredAt: string }>;
   snoozedPullRequests: Record<string, { until: string }>;
   settings: { automaticRefreshMinutes: number };
 }
 export const defaultState = (): AppState => ({
-  schemaVersion: 2,
+  schemaVersion: 3,
   trackedRepositories: [],
+  ignoredRepositories: [],
   watchedPullRequests: [],
   ignoredPullRequests: {},
   snoozedPullRequests: {},
@@ -24,7 +26,7 @@ export async function loadState(): Promise<AppState> {
 export function migrateState(value: unknown): AppState {
   if (!value) return defaultState();
   const stored = value as Omit<AppState, 'schemaVersion'> & { schemaVersion: number };
-  if (stored.schemaVersion !== 1 && stored.schemaVersion !== 2)
+  if (stored.schemaVersion !== 1 && stored.schemaVersion !== 2 && stored.schemaVersion !== 3)
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
@@ -35,15 +37,25 @@ export function migrateState(value: unknown): AppState {
     !stored.snoozedPullRequests
   )
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
+  if (
+    stored.schemaVersion === 3 &&
+    (!Array.isArray(stored.ignoredRepositories) ||
+      stored.ignoredRepositories.some((repo) => typeof repo !== 'string'))
+  )
+    throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
   // Version 1 reserved zero before polling existed; it was not a user choice of Never.
   const minutes = stored.settings?.automaticRefreshMinutes;
   return {
     ...defaultState(),
     ...stored,
-    schemaVersion: 2,
+    schemaVersion: 3,
+    ignoredRepositories:
+      stored.schemaVersion === 3
+        ? [...new Set(stored.ignoredRepositories.map(parseRepository))]
+        : [],
     settings: {
       automaticRefreshMinutes:
-        stored.schemaVersion === 2 && isRefreshInterval(minutes) ? minutes : 5,
+        stored.schemaVersion !== 1 && isRefreshInterval(minutes) ? minutes : 5,
     },
   };
 }

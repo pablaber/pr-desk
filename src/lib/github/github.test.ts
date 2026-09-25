@@ -121,3 +121,43 @@ describe('GitHub adapter', () => {
     expect((await refreshDashboard(api, local, previous)).prs).toEqual([]);
   });
 });
+
+it.each(['getOwnedPullRequests', 'getDirectReviewRequests'] as const)(
+  'excludes repositories on every %s search page',
+  async (method) => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ search: { ...connection([], true), issueCount: 0 } })
+      .mockResolvedValueOnce({ search: { ...connection([]), issueCount: 0 } });
+    await new GhGitHubService(query as QueryRunner)[method]([
+      ' Acme/NOISE ',
+      'acme/other',
+      'acme/noise',
+    ]);
+    for (const [text] of query.mock.calls) {
+      expect(text).toContain('-repo:acme/noise -repo:acme/other');
+      expect(text.match(/-repo:acme\/noise/g)).toHaveLength(1);
+    }
+    expect(query.mock.calls[1][0]).toContain('after: "next"');
+  },
+);
+it('skips ignored tracked repos and details, including watched and failed cached sources', async () => {
+  const api = service(),
+    local = defaultState();
+  local.trackedRepositories = ['acme/api'];
+  local.watchedPullRequests = ['acme/api#1'];
+  const previous = await refreshDashboard(api, local);
+  local.ignoredRepositories = ['ACME/API'];
+  vi.mocked(api.getRepositoryPullRequests).mockClear();
+  vi.mocked(api.getPullRequest).mockClear();
+  vi.mocked(api.getOwnedPullRequests).mockRejectedValue(new Error('offline'));
+  const result = await refreshDashboard(api, local, previous);
+  expect(result.prs).toEqual([]);
+  expect(result.staleIds).toEqual([]);
+  expect(Object.values(result.sources).flat()).toEqual([]);
+  expect(api.getRepositoryPullRequests).not.toHaveBeenCalled();
+  expect(api.getPullRequest).not.toHaveBeenCalled();
+  expect(api.getDirectReviewRequests).toHaveBeenLastCalledWith(['ACME/API']);
+  local.ignoredRepositories = [];
+  expect((await refreshDashboard(api, local, result)).prs).toHaveLength(1);
+});

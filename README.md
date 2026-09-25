@@ -68,9 +68,10 @@ Tauri Store writes `preferences.json` to the app data directory (on macOS, `~/Li
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "trackedRepositories": ["owner/repository"],
   "watchedPullRequests": ["owner/repository#123"],
+  "ignoredRepositories": [],
   "ignoredPullRequests": {
     "owner/repository#456": { "ignoredAt": "2026-09-24T12:00:00Z" }
   },
@@ -82,6 +83,8 @@ Tauri Store writes `preferences.json` to the app data directory (on macOS, `~/Li
 ```
 
 No PR titles, GitHub status, or credentials are persisted. Repository and PR identifiers are canonicalized to lowercase. Unsupported storage versions stop loading without overwriting the file. Closed/merged PRs disappear from the board; local preferences for closed/deleted/inaccessible PRs remain available for manual removal/restoration. This avoids losing user intent after a temporary access failure.
+
+Settings also lets you ignore entire repositories using `owner/repository`. Ignoring overrides all sources, including your own PRs, review requests, tracked repositories, and watched PRs. GitHub discovery searches exclude these repositories with `-repo:` qualifiers, and refresh skips their repository and PR detail requests. Removing an ignore restores normal tracking without losing tracked or watched preferences. Existing preferences migrate with no ignored repositories.
 
 Snoozes offer one hour, four hours, tomorrow at 9 AM, next Monday at 9 AM, and a custom local date/time. An in-memory clock checks expiry every 15 seconds. Settings exposes snoozed and ignored PRs for restoration.
 

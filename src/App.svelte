@@ -125,13 +125,16 @@
       saving = false;
     }
   }
-  async function add(kind: 'repo' | 'pr', value: string): Promise<boolean> {
+  async function add(kind: 'repo' | 'pr' | 'ignored-repo', value: string): Promise<boolean> {
     if (saving || loading) return false;
     saving = true;
     error = '';
     try {
       const next = structuredClone($state.snapshot(preferences));
-      if (kind === 'repo') {
+      if (kind === 'ignored-repo') {
+        const repo = parseRepository(value);
+        next.ignoredRepositories = [...new Set([...next.ignoredRepositories, repo])];
+      } else if (kind === 'repo') {
         const repo = parseRepository(value);
         await service.validateRepository(repo);
         next.trackedRepositories = [...new Set([...next.trackedRepositories, repo])];
@@ -153,9 +156,11 @@
       saving = false;
     }
   }
-  async function remove(kind: 'repo' | 'pr', value: string) {
+  async function remove(kind: 'repo' | 'pr' | 'ignored-repo', value: string) {
     await change((next) => {
-      if (kind === 'repo')
+      if (kind === 'ignored-repo')
+        next.ignoredRepositories = next.ignoredRepositories.filter((r) => r !== value);
+      else if (kind === 'repo')
         next.trackedRepositories = next.trackedRepositories.filter((r) => r !== value);
       else next.watchedPullRequests = next.watchedPullRequests.filter((p) => p !== value);
     });

@@ -110,3 +110,16 @@ describe('dashboard rules', () => {
     expect([readyNew, readyOld].sort(sortPullRequests)[0]).toBe(readyOld);
   });
 });
+
+it('hides ignored repositories immediately regardless of tracking reason', () => {
+  const preferences = defaultState();
+  preferences.ignoredRepositories = ['ACME/API'];
+  expect(
+    classify(
+      pr({ reasons: ['owned', 'watched', 'tracked-repository', 'direct-review-request'] }),
+      'me',
+      preferences,
+    ),
+  ).toBeNull();
+  expect(classify(pr({ repository: 'acme/other' }), 'me', preferences)).not.toBeNull();
+});
