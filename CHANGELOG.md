@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0](https://github.com/pablaber/pr-desk/compare/v0.4.0...v0.5.0) (2026-09-25)
+
+
+### Features
+
+* add keyboard shortcuts for dashboard and settings ([#30](https://github.com/pablaber/pr-desk/issues/30)) ([b1950b8](https://github.com/pablaber/pr-desk/commit/b1950b842cbc81b4d60eb98a31c13b8de43720d9))
+* add pull request review status badges ([#28](https://github.com/pablaber/pr-desk/issues/28)) ([e92ef4f](https://github.com/pablaber/pr-desk/commit/e92ef4f565942d53b67eee313f2239fdfd65bd38))
+* configure up to five snooze options ([#32](https://github.com/pablaber/pr-desk/issues/32)) ([fb22e12](https://github.com/pablaber/pr-desk/commit/fb22e1283efaf1635c7e651f7e7a9a6bfca540c4))
+
+
+### Bug Fixes
+
+* dashboard summary counts respect active filter ([#27](https://github.com/pablaber/pr-desk/issues/27)) ([0812fd2](https://github.com/pablaber/pr-desk/commit/0812fd2d51329031f20af7313c256d39602aba40))
+* hide other authors' draft PRs from every dashboard column ([#31](https://github.com/pablaber/pr-desk/issues/31)) ([202fa3d](https://github.com/pablaber/pr-desk/commit/202fa3d90b0e8b5ad3c599db7f4487c977b7e857))
+
 ## [0.4.0](https://github.com/pablaber/pr-desk/compare/v0.3.0...v0.4.0) (2026-09-25)
 
 
