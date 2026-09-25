@@ -38,6 +38,12 @@ export function cardViewModel(item: ClassifiedPR, now: number) {
   return {
     ...item,
     badges: item.pr.reasons.map((r) => sourceLabels[r]),
+    reviewBadge:
+      item.pr.reviewDecision === 'APPROVED'
+        ? { label: 'Approved', tone: 'approved' }
+        : item.pr.reviewDecision === 'CHANGES_REQUESTED'
+          ? { label: 'Changes requested', tone: 'changes-requested' }
+          : null,
     staleness: stalenessLevel(item.pr.updatedAt, now),
     age,
     secondary: secondary.join(' · '),

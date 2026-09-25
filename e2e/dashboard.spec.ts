@@ -77,7 +77,7 @@ test.beforeEach(async ({ page }) => {
               updatedAt: new Date(
                 Date.now() - ([1 / 24, 10, 20, 30][number - 1] ?? 1 / 24) * 86400000,
               ).toISOString(),
-              reviewDecision: number === 1 ? 'APPROVED' : null,
+              reviewDecision: number === 1 ? 'APPROVED' : number === 2 ? 'CHANGES_REQUESTED' : null,
               mergeable: 'MERGEABLE',
               mergeStateStatus: 'CLEAN',
               reviewRequests: connection(
@@ -159,6 +159,20 @@ test('cards show the author and the most severe stale badge', async ({ page }) =
     await expect(badge).toHaveClass(`badge staleness ${level}`);
   }
   await page.screenshot({ path: '.context/stale-badges.png', fullPage: true });
+});
+
+test('cards show green approval and red changes-requested badges', async ({ page }) => {
+  await page.goto('/');
+  const card = (title: string) => page.locator('.pr-card').filter({ hasText: title });
+  const approved = card('Reduce cache lookup latency').locator('.badge.review');
+  await expect(approved).toHaveText('Approved');
+  await expect(approved).toHaveCSS('color', 'rgb(50, 100, 67)');
+  const changes = card('Refresh session token handling').locator('.badge.review');
+  await expect(changes).toHaveText('Changes requested');
+  await expect(changes).toHaveCSS('color', 'rgb(163, 58, 47)');
+  await expect(card('Add audit event retention').locator('.badge.review')).toHaveCount(0);
+  await expect(card('Simplify deployment configuration').locator('.badge.review')).toHaveCount(0);
+  await page.screenshot({ path: '.context/review-badges.png', fullPage: true });
 });
 
 test('snooze, ignore, restore, watch, tracked repositories and persistence', async ({ page }) => {
