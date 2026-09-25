@@ -14,6 +14,10 @@ gh auth login --hostname github.com
 npm run tauri dev
 ```
 
+Run these commands from the repository root. `npm run tauri dev` starts Vite and opens a native PR Desk window. Svelte, TypeScript, and CSS edits update automatically; Rust edits trigger a rebuild and restart. Stop the development session with `Ctrl+C` in the terminal.
+
+To verify your existing GitHub sign-in, run `gh auth status --hostname github.com`. The development app uses your real GitHub account and shares saved preferences with the packaged app; it does not use separate demo data or storage.
+
 `npm run dev` runs the frontend alone and displays a native-app setup message. GitHub access and persistence require Tauri.
 
 ```sh
