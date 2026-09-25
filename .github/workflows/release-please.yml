@@ -122,7 +122,8 @@ jobs:
           APPLE_API_KEY_PATH: ${{ steps.apple.outputs.api_key_path }}
         with:
           releaseId: ${{ needs.release-please.outputs.release_id }}
-          args: --target aarch64-apple-darwin --bundles app,dmg
+          args: --target aarch64-apple-darwin --bundles app,dmg --verbose
+          retryAttempts: 1
           includeUpdaterJson: false
       - name: Notarize the DMG and verify Gatekeeper acceptance
         env:
