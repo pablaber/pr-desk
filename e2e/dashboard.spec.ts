@@ -31,6 +31,13 @@ test.beforeEach(async ({ page }) => {
           w.opened.push(args.url);
           return;
         }
+        if (command === 'close_stale_pr') {
+          const calls = JSON.parse(localStorage.getItem('closeCalls') ?? '[]');
+          calls.push(args.url);
+          localStorage.setItem('closeCalls', JSON.stringify(calls));
+          if (localStorage.getItem('closeFailure')) throw new Error('Repository access denied');
+          return;
+        }
         if (command !== 'github') throw new Error(`Unexpected command ${command}`);
         if (args.operation === 'auth') return null;
         const query = args.query as string;
@@ -641,4 +648,49 @@ test('unavailable snoozed PRs retain restore and custom rescheduling controls', 
   ]);
   await row.getByRole('button', { name: 'Restore now' }).click();
   await expect(row).toHaveCount(0);
+});
+
+test('close as stale requires confirmation, supports Escape and Enter, and removes the card', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Actions for Refresh session token handling' }).click();
+  await expect(page.getByRole('button', { name: 'Close as stale…', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  const actions = page.getByRole('button', {
+    name: 'Actions for Simplify deployment configuration',
+  });
+  await actions.click();
+  await page.getByRole('button', { name: 'Close as stale…', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Close as stale?' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("hasn't been updated in 30 days.");
+  await expect(dialog.getByRole('button', { name: 'Close as stale', exact: true })).toBeFocused();
+  await page.screenshot({ path: '.context/close-stale.png' });
+  await page.keyboard.press('Escape');
+  await expect(dialog).not.toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('closeCalls'))).toBeNull();
+  await actions.click();
+  await page.getByRole('button', { name: 'Close as stale…', exact: true }).click();
+  await page.keyboard.press('Enter');
+  await expect(dialog).not.toBeVisible();
+  await expect(actions).toHaveCount(0);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('closeCalls')!))).toEqual([
+    'https://github.com/acme/platform/pull/4',
+  ]);
+});
+
+test('close as stale keeps the PR and displays failures', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => localStorage.setItem('closeFailure', 'true'));
+  const actions = page.getByRole('button', {
+    name: 'Actions for Simplify deployment configuration',
+  });
+  await actions.click();
+  await page.getByRole('button', { name: 'Close as stale…', exact: true }).click();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Close as stale?' });
+  await expect(dialog.getByRole('alert')).toContainText('Repository access denied');
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(actions).toBeVisible();
 });

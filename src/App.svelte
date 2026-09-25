@@ -5,6 +5,9 @@
   import { version } from '../package.json';
   // The app's CSP blocks data URLs, so keep the logo as a bundled file.
   import appIcon from '../src-tauri/icons/source.svg?no-inline';
+  import CloseStale from './components/CloseStale.svelte';
+  import { stalenessLevel } from './lib/pr/card-view-model';
+  import type { PullRequest } from './lib/pr/types';
   import PRCard from './components/PRCard.svelte';
   import Snoozed from './components/Snoozed.svelte';
   import Settings from './components/Settings.svelte';
@@ -31,6 +34,8 @@
   let snapshot = $state<DashboardSnapshot>({ prs: [], sources: {}, warnings: [], staleIds: [] });
   let login = $state(''),
     screen = $state<'dashboard' | 'snoozed' | 'settings'>('dashboard');
+  let closingPR = $state<PullRequest | null>(null);
+  let closeError = $state('');
   let showHotkeys = $state(false);
   let filter = $state<TrackingReason | 'all'>('all'),
     loading = $state(false),
@@ -183,6 +188,15 @@
     await refresh();
   }
   async function action(id: string, action: string, until?: string) {
+    if (action === 'close-stale') {
+      if (saving || loading) return;
+      const pr = snapshot.prs.find((pr) => pr.id === id);
+      if (pr && stalenessLevel(pr.updatedAt, Date.now()) === 'high') {
+        closeError = '';
+        closingPR = pr;
+      }
+      return;
+    }
     await change((next) => {
       if (action === 'watch')
         next.watchedPullRequests = [...new Set([...next.watchedPullRequests, id])];
@@ -195,6 +209,21 @@
     });
     if (action === 'watch' || action === 'unwatch') await refresh();
   }
+  async function confirmClose() {
+    if (!closingPR || saving || loading) return;
+    const pr = closingPR;
+    saving = true;
+    closeError = '';
+    try {
+      await service.closeStalePullRequest(pr.id);
+      snapshot.prs = snapshot.prs.filter((item) => item.id !== pr.id);
+      closingPR = null;
+    } catch (e) {
+      closeError = String(e);
+    } finally {
+      saving = false;
+    }
+  }
   async function restore(kind: 'ignored' | 'snoozed', id: string) {
     await change((next) => {
       if (kind === 'ignored') delete next.ignoredPullRequests[id];
@@ -203,6 +232,7 @@
     await refresh();
   }
   function handleHotkey(event: KeyboardEvent) {
+    if (closingPR) return;
     const hotkey = resolveHotkey(event, event.target as HTMLElement | null);
     if (!hotkey) return;
     // While the shortcut list is up, the only shortcut that still acts is the one that
@@ -421,3 +451,13 @@
   </main>
 </div>
 <HotkeyHelp open={showHotkeys} onclose={() => (showHotkeys = false)} />
+
+<CloseStale
+  pr={closingPR}
+  busy={saving || loading}
+  error={closeError}
+  onconfirm={confirmClose}
+  oncancel={() => {
+    if (!saving) closingPR = null;
+  }}
+/>

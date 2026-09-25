@@ -98,6 +98,9 @@
           </div>
         {/if}
       </div>
+      {#if card.staleness === 'high'}
+        <button class="danger" onclick={() => act('close-stale')}>Close as stale…</button>
+      {/if}
       <button class="danger" onclick={() => act('ignore')}>Ignore PR</button>
       <button onclick={close}>Close menu</button>
     </div>
