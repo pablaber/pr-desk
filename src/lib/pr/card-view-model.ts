@@ -6,6 +6,17 @@ export const sourceLabels: Record<TrackingReason, string> = {
   'tracked-repository': 'Tracked repo',
   watched: 'Watching',
 };
+export type StalenessLevel = 'low' | 'medium' | 'high';
+const stalenessThresholds: [days: number, level: StalenessLevel][] = [
+  [28, 'high'],
+  [14, 'medium'],
+  [7, 'low'],
+];
+// Ordered most severe first, so the first threshold the PR is past is the only badge shown.
+export function stalenessLevel(updatedAt: string, now: number): StalenessLevel | null {
+  const days = (now - Date.parse(updatedAt)) / 86400000;
+  return stalenessThresholds.find(([threshold]) => days > threshold)?.[1] ?? null;
+}
 export function cardViewModel(item: ClassifiedPR, now: number) {
   const minutes = Math.max(0, Math.floor((now - Date.parse(item.pr.updatedAt)) / 60000));
   const age =
@@ -27,6 +38,7 @@ export function cardViewModel(item: ClassifiedPR, now: number) {
   return {
     ...item,
     badges: item.pr.reasons.map((r) => sourceLabels[r]),
+    staleness: stalenessLevel(item.pr.updatedAt, now),
     age,
     secondary: secondary.join(' · '),
   };
