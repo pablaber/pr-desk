@@ -588,6 +588,7 @@ test('hotkeys switch screens and stay out of the way while typing', async ({ pag
   await expect(page.locator('.pr-card')).toHaveCount(4);
   // A plain-key hotkey must not steal keystrokes from a field.
   await page.keyboard.press('Meta+,');
+  await expandSettingsSection(page, 'Tracked repositories');
   const input = page.getByRole('textbox', { name: 'Repository', exact: true });
   await input.fill('');
   await input.press('d');
