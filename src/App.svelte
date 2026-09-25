@@ -7,6 +7,7 @@
   import appIcon from '../src-tauri/icons/source.svg?no-inline';
   import PRCard from './components/PRCard.svelte';
   import Settings from './components/Settings.svelte';
+  import HotkeyHelp from './components/HotkeyHelp.svelte';
   import { GhGitHubService } from './lib/github/client';
   import { refreshDashboard, type DashboardSnapshot } from './lib/github/refresh';
   import {
@@ -19,12 +20,15 @@
     type AppState,
   } from './lib/store/app-state';
   import { classify, sortPullRequests } from './lib/pr/classify';
+  import { hotkeyFor, resolveHotkey } from './lib/hotkeys/match';
+  import { ariaKeyShortcut, compactKeys } from './lib/hotkeys/format';
   import type { DashboardState, TrackingReason } from './lib/pr/types';
   const service = new GhGitHubService();
   let preferences = $state<AppState>(defaultState());
   let snapshot = $state<DashboardSnapshot>({ prs: [], sources: {}, warnings: [], staleIds: [] });
   let login = $state(''),
     screen = $state<'dashboard' | 'settings'>('dashboard');
+  let showHotkeys = $state(false);
   let filter = $state<TrackingReason | 'all'>('all'),
     loading = $state(false),
     saving = $state(false),
@@ -33,6 +37,9 @@
     setupError = $state(''),
     now = $state(Date.now()),
     refreshed = $state('');
+  const dashboardHotkey = hotkeyFor('open-dashboard');
+  const settingsHotkey = hotkeyFor('open-settings');
+  const shortcutsHotkey = hotkeyFor('toggle-shortcuts');
   const columns: { state: DashboardState; title: string; subtitle: string }[] = [
     { state: 'ready-to-merge', title: 'Ready to merge', subtitle: 'The finish line' },
     { state: 'needs-attention', title: 'Needs attention', subtitle: 'Your next move' },
@@ -188,6 +195,17 @@
     });
     await refresh();
   }
+  function handleHotkey(event: KeyboardEvent) {
+    const hotkey = resolveHotkey(event, event.target as HTMLElement | null);
+    if (!hotkey) return;
+    // While the shortcut list is up, the only shortcut that still acts is the one that
+    // dismisses it; navigating behind an open dialog would leave the user lost.
+    if (showHotkeys && hotkey.action !== 'toggle-shortcuts') return;
+    event.preventDefault();
+    if (hotkey.action === 'open-dashboard') screen = 'dashboard';
+    else if (hotkey.action === 'open-settings') screen = 'settings';
+    else if (hotkey.action === 'toggle-shortcuts') showHotkeys = !showHotkeys;
+  }
   async function open(url: string) {
     try {
       await openUrl(url);
@@ -198,6 +216,7 @@
 </script>
 
 <svelte:head><title>PR Desk</title></svelte:head>
+<svelte:window onkeydown={handleHotkey} />
 <div class="app-shell">
   <aside>
     <div class="brand">
@@ -206,14 +225,36 @@
     </div>
     <div class="nav-label">WORKSPACE</div>
     <nav aria-label="Main navigation">
-      <button class:active={screen === 'dashboard'} onclick={() => (screen = 'dashboard')}
+      <button
+        class:active={screen === 'dashboard'}
+        onclick={() => (screen = 'dashboard')}
+        aria-keyshortcuts={dashboardHotkey ? ariaKeyShortcut(dashboardHotkey) : null}
         ><span aria-hidden="true">▦</span> Dashboard
-        <span class="nav-count">{classified.length}</span></button
+        <span class="nav-count">{classified.length}</span>{#if dashboardHotkey}<span
+            class="nav-hotkey"
+            aria-hidden="true">{compactKeys(dashboardHotkey)}</span
+          >{/if}</button
       >
-      <button class:active={screen === 'settings'} onclick={() => (screen = 'settings')}
-        ><span aria-hidden="true">⚙</span> Settings</button
+      <button
+        class:active={screen === 'settings'}
+        onclick={() => (screen = 'settings')}
+        aria-keyshortcuts={settingsHotkey ? ariaKeyShortcut(settingsHotkey) : null}
+        ><span aria-hidden="true">⚙</span> Settings{#if settingsHotkey}<span
+            class="nav-hotkey"
+            aria-hidden="true">{compactKeys(settingsHotkey)}</span
+          >{/if}</button
       >
     </nav>
+    {#if shortcutsHotkey}
+      <button
+        class="shortcuts-button"
+        onclick={() => (showHotkeys = true)}
+        aria-keyshortcuts={ariaKeyShortcut(shortcutsHotkey)}
+        >Keyboard shortcuts<span class="nav-hotkey" aria-hidden="true"
+          >{compactKeys(shortcutsHotkey)}</span
+        ></button
+      >
+    {/if}
     <div class="sidebar-bottom">
       <span class="connection-dot" class:connected={initialized}></span>{login
         ? `@${login}`
@@ -343,3 +384,4 @@
     {/if}
   </main>
 </div>
+<HotkeyHelp open={showHotkeys} onclose={() => (showHotkeys = false)} />

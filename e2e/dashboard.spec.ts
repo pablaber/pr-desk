@@ -415,3 +415,67 @@ test('ignored repositories validate, persist, override tracking, and can be remo
   await page.getByRole('button', { name: /Dashboard/ }).click();
   await expect(page.locator('.pr-card')).toHaveCount(5);
 });
+
+test('hotkeys switch screens and stay out of the way while typing', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
+  await page.keyboard.press('Meta+,');
+  await expect(page.getByRole('heading', { name: 'Tracked repositories' })).toBeVisible();
+  await page.keyboard.press('d');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  // A plain-key hotkey must not steal keystrokes from a field.
+  await page.keyboard.press('Meta+,');
+  const input = page.getByRole('textbox', { name: 'Repository', exact: true });
+  await input.fill('');
+  await input.press('d');
+  await expect(input).toHaveValue('d');
+  await expect(page.getByRole('heading', { name: 'Tracked repositories' })).toBeVisible();
+  // ⌘, still works from inside a field.
+  await page.getByRole('button', { name: /Dashboard/ }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Repository', exact: true }).press('Meta+,');
+  await expect(page.getByRole('heading', { name: 'Tracked repositories' })).toBeVisible();
+});
+
+test('the shortcut list opens with ?, lists every hotkey, and closes again', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(dialog).toBeHidden();
+  await page.keyboard.press('?');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.hotkey-row dt')).toHaveText([
+    'Open settings',
+    'Open the dashboard',
+    'Show keyboard shortcuts',
+  ]);
+  // Each key gets its own cap, joined by a plus, and the spelled-out combination is what
+  // a screen reader reads.
+  await expect(dialog.locator('.hotkey-row .key-combo')).toHaveText(['⌘+,', 'D', '?']);
+  await expect(dialog.locator('.hotkey-row .visually-hidden')).toHaveText([
+    'Command plus Comma',
+    'D',
+    'Question mark',
+  ]);
+  await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveAttribute(
+    'aria-keyshortcuts',
+    'Meta+,',
+  );
+  // Shortcuts behind the dialog stay inert, so ⌘, cannot navigate out from under it.
+  await page.keyboard.press('Meta+,');
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.screenshot({ path: '.context/hotkeys.png', fullPage: true });
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  // The same list is reachable without the keyboard, and ? toggles it shut.
+  await page.getByRole('button', { name: 'Keyboard shortcuts', exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('?');
+  await expect(dialog).toBeHidden();
+  await page.getByRole('button', { name: 'Keyboard shortcuts', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Close keyboard shortcuts' }).click();
+  await expect(dialog).toBeHidden();
+});

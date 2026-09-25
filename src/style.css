@@ -133,6 +133,18 @@ nav button.active {
   margin-left: auto;
   font-size: 11px;
 }
+.nav-hotkey {
+  margin-left: auto;
+  font-size: 10px;
+  color: #939b8f;
+  border: 1px solid #dde3d8;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+/* The count already claims the free space on rows that have one. */
+.nav-count + .nav-hotkey {
+  margin-left: 0;
+}
 .sidebar-bottom {
   margin-top: auto;
   padding: 12px 8px 0;
@@ -744,4 +756,109 @@ footer {
 .settings-section .refresh-validation {
   color: #a15f4c;
   margin-top: 5px;
+}
+.shortcuts-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 16px;
+  border: 0;
+  background: transparent;
+  color: #6e7a6c;
+  font-size: 12px;
+  padding: 8px 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+.shortcuts-button:hover {
+  background: #eef2ec;
+}
+.hotkey-help {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  max-width: 420px;
+  width: calc(100% - 32px);
+}
+.hotkey-help::backdrop {
+  background: rgba(30, 41, 35, 0.35);
+}
+.hotkey-help-panel {
+  background: #fff;
+  border: 1px solid #dce2dc;
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: 0 18px 40px rgba(30, 41, 35, 0.18);
+}
+.hotkey-help-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.hotkey-help-panel h2 {
+  font-size: 15px;
+  margin: 0;
+}
+.hotkey-help-panel header button {
+  border: 0;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 8px;
+  color: #6e7a6c;
+}
+.hotkey-help-panel dl {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+}
+.hotkey-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 0;
+  border-top: 1px solid #f0f3ef;
+}
+.hotkey-row:first-child {
+  border-top: 0;
+}
+.hotkey-row dd {
+  margin: 0;
+}
+.hotkey-help-panel p {
+  margin: 16px 0 0;
+  font-size: 11px;
+  color: #939b8f;
+}
+.key-combo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: inherit;
+}
+.key-combo kbd {
+  font-family: inherit;
+  font-size: 11px;
+  color: #4a574a;
+  background: #f4f7f3;
+  border: 1px solid #dde3d8;
+  border-radius: 4px;
+  padding: 2px 7px;
+  min-width: 22px;
+  text-align: center;
+}
+.key-plus {
+  font-size: 10px;
+  color: #939b8f;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
