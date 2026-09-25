@@ -28,7 +28,18 @@ describe('dashboard rules', () => {
       primary: 'Open in a tracked repository',
       statuses: [],
     });
-    expect(run({ ...tracked, draft: true }).state).toBe('waiting');
+    expect(classify(pr({ ...tracked, draft: true }), 'me', local)).toBeNull();
+  });
+  it('hides draft PRs authored by someone else from every column, tracked or not', () => {
+    expect(classify(pr({ author: 'other', draft: true }), 'me', local)).toBeNull();
+    expect(
+      classify(pr({ author: 'other', draft: true, reasons: ['tracked-repository'] }), 'me', local),
+    ).toBeNull();
+    expect(classify(pr({ author: 'OTHER', draft: true }), 'me', local)).toBeNull();
+  });
+  it('keeps the signed-in user’s own draft PRs eligible under the existing column rules', () => {
+    expect(run({ draft: true }).state).toBe('waiting');
+    expect(run({ draft: true, directReviewers: ['me'] }).state).toBe('needs-attention');
   });
   it('tracked repositories do not override readiness or higher-priority attention', () => {
     expect(

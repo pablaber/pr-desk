@@ -16,6 +16,7 @@ export function classify(
     Date.parse(local.snoozedPullRequests[pr.id]?.until ?? '') > now
   )
     return null;
+  if (pr.draft && pr.author.toLowerCase() !== login.toLowerCase()) return null;
   const signals = deriveSignals(pr, login);
   const matches = rules.filter((r) => r.matches(signals)).sort((a, b) => b.priority - a.priority);
   const primary = matches[0];
