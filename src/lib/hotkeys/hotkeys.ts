@@ -4,6 +4,13 @@ import type { Hotkey } from './types';
 // matching and the hints shown in the UI follow from it.
 export const hotkeys: Hotkey[] = [
   {
+    action: 'refresh',
+    key: 'r',
+    meta: true,
+    whileTyping: true,
+    description: 'Refresh pull requests',
+  },
+  {
     action: 'open-settings',
     key: ',',
     meta: true,
