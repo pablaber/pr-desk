@@ -35,13 +35,16 @@ npm run check          # svelte-check + TypeScript
 npm test               # vitest, src only
 node --test scripts/update-homebrew.test.mjs
 npm run build          # vite build
-npx playwright install chromium   # first time only
-npm run test:e2e       # playwright
 
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
 cargo clippy --locked --manifest-path src-tauri/Cargo.toml -- -D warnings
 cargo test --locked --manifest-path src-tauri/Cargo.toml
 ```
+
+Playwright (`npx playwright install chromium` once, then `npm run test:e2e`) is part of
+CI but not part of this local pre-push list — agents should skip it and let CI run it,
+unless the change includes significant UI-visible changes or touches `e2e/` directly,
+in which case run it locally too before pushing.
 
 ## Layout
 
