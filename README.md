@@ -64,7 +64,7 @@ Tauri Store writes `preferences.json` to the app data directory (on macOS, `~/Li
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "trackedRepositories": ["owner/repository"],
   "watchedPullRequests": ["owner/repository#123"],
   "ignoredPullRequests": {
@@ -73,7 +73,7 @@ Tauri Store writes `preferences.json` to the app data directory (on macOS, `~/Li
   "snoozedPullRequests": {
     "owner/repository#789": { "until": "2026-09-25T13:00:00Z" }
   },
-  "settings": { "automaticRefreshMinutes": 0 }
+  "settings": { "automaticRefreshMinutes": 5 }
 }
 ```
 
@@ -97,6 +97,10 @@ Unknown, blocked, behind, draft, and otherwise non-ready merge states prevent Re
 
 Sorting is centralized in `classify.ts`: attention priority then oldest update; ready oldest update; waiting newest update. GitHub does not provide when a PR entered these derived states, so `updatedAt` approximates “oldest attention/ready” in v1.
 
+## Refresh behavior
+
+Automatic GitHub refresh defaults to five minutes while the app is running. Settings accepts any whole-minute interval from 1 to 60, or Never (stored as zero). Each interval starts after the previous refresh finishes; manual refresh and setting changes restart the timer, and requests never overlap. Version 1 preferences migrate to the five-minute default because its reserved zero was not a user-selected Never. Version 2 preserves an explicit Never choice. The separate 15-second clock updates ages and snooze visibility.
+
 ## Verification
 
 ```sh
@@ -114,7 +118,6 @@ Unit tests cover every attention rule, ready/waiting states, team versus individ
 ## Current limits
 
 - One active GitHub.com account; no Enterprise hostname/account selector.
-- Manual network refresh only. `automaticRefreshMinutes` is reserved and defaults to zero; the clock only updates ages and snooze visibility.
 - Detail queries run per unique PR. Very large dashboards may need batching or incremental refresh to reduce API cost.
 - Search indexing and GitHub mergeability computation can lag. Refresh again for updated results.
 - Previously loaded cards remain visible and explicitly marked stale when refresh fails; inspect GitHub before acting on stale readiness.

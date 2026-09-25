@@ -612,3 +612,16 @@ footer {
     display: none;
   }
 }
+
+select {
+  font: inherit;
+  color: inherit;
+  background: white;
+  border: 1px solid #d7dfd8;
+  border-radius: 6px;
+  padding: 8px 11px;
+}
+select:focus-visible {
+  outline: 2px solid #488066;
+  outline-offset: 3px;
+}

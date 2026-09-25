@@ -1,6 +1,6 @@
 import { load } from '@tauri-apps/plugin-store';
 export interface AppState {
-  schemaVersion: 1;
+  schemaVersion: 2;
   trackedRepositories: string[];
   watchedPullRequests: string[];
   ignoredPullRequests: Record<string, { ignoredAt: string }>;
@@ -8,30 +8,49 @@ export interface AppState {
   settings: { automaticRefreshMinutes: number };
 }
 export const defaultState = (): AppState => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   trackedRepositories: [],
   watchedPullRequests: [],
   ignoredPullRequests: {},
   snoozedPullRequests: {},
-  settings: { automaticRefreshMinutes: 0 },
+  settings: { automaticRefreshMinutes: 5 },
 });
 export async function loadState(): Promise<AppState> {
   const store = await load('preferences.json', { autoSave: false, defaults: {} });
   const value = await store.get<AppState>('state');
+  return migrateState(value);
+}
+
+export function migrateState(value: unknown): AppState {
   if (!value) return defaultState();
-  if (value.schemaVersion !== 1)
+  const stored = value as Omit<AppState, 'schemaVersion'> & { schemaVersion: number };
+  if (stored.schemaVersion !== 1 && stored.schemaVersion !== 2)
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
   if (
-    !Array.isArray(value.trackedRepositories) ||
-    !Array.isArray(value.watchedPullRequests) ||
-    !value.ignoredPullRequests ||
-    !value.snoozedPullRequests
+    !Array.isArray(stored.trackedRepositories) ||
+    !Array.isArray(stored.watchedPullRequests) ||
+    !stored.ignoredPullRequests ||
+    !stored.snoozedPullRequests
   )
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
-  return { ...defaultState(), ...value };
+  // Version 1 reserved zero before polling existed; it was not a user choice of Never.
+  const minutes = stored.settings?.automaticRefreshMinutes;
+  return {
+    ...defaultState(),
+    ...stored,
+    schemaVersion: 2,
+    settings: {
+      automaticRefreshMinutes:
+        stored.schemaVersion === 2 && isRefreshInterval(minutes) ? minutes : 5,
+    },
+  };
 }
+export function isRefreshInterval(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 60;
+}
+
 export async function saveState(state: AppState) {
   const store = await load('preferences.json', { autoSave: false, defaults: {} });
   await store.set('state', state);

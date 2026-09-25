@@ -7,6 +7,7 @@
     onadd,
     onremove,
     onrestore,
+    onrefreshinterval,
   }: {
     preferences: AppState;
     now: number;
@@ -14,6 +15,7 @@
     onadd: (kind: 'repo' | 'pr', value: string) => Promise<boolean>;
     onremove: (kind: 'repo' | 'pr', value: string) => void;
     onrestore: (kind: 'ignored' | 'snoozed', id: string) => void;
+    onrefreshinterval: (minutes: number) => Promise<void>;
   } = $props();
   let repository = $state(''),
     pr = $state('');
@@ -24,6 +26,31 @@
     <h1>Settings</h1>
     <p>Choose what belongs on your desk.</p>
   </header>
+  <section class="settings-section">
+    <h2>Automatic refresh</h2>
+    <p>Refresh GitHub data while the app is running. Manual refresh is always available.</p>
+    <div class="setting-row">
+      <label for="refresh-interval">Refresh interval</label>
+      <select
+        id="refresh-interval"
+        value={preferences.settings.automaticRefreshMinutes}
+        disabled={busy}
+        onchange={async (event) => {
+          const select = event.currentTarget;
+          await onrefreshinterval(Number(select.value));
+          select.value = String(preferences.settings.automaticRefreshMinutes);
+        }}
+      >
+        <option value={0}>Never</option>
+        {#each Array.from({ length: 60 }, (_, i) => i + 1) as minutes}
+          <option value={minutes}
+            >Every {minutes}
+            {minutes === 1 ? 'minute' : 'minutes'}{minutes === 5 ? ' (default)' : ''}</option
+          >
+        {/each}
+      </select>
+    </div>
+  </section>
   <section class="settings-section">
     <h2>Tracked repositories</h2>
     <p>Show all open PRs from these repositories.</p>

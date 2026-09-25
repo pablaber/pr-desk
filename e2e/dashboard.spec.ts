@@ -6,8 +6,10 @@ test.beforeEach(async ({ page }) => {
       __TAURI_INTERNALS__: unknown;
       isTauri: boolean;
       opened: string[];
+      refreshCount: number;
     };
     w.opened = [];
+    w.refreshCount = 0;
     w.isTauri = true;
     const connection = (nodes: unknown[]) => ({
       nodes,
@@ -33,6 +35,7 @@ test.beforeEach(async ({ page }) => {
         if (args.operation === 'auth') return null;
         const query = args.query as string;
         if (query.includes('DeskViewer')) return { viewer: { login: 'alex' } };
+        if (query.includes('author:@me')) w.refreshCount++;
         if (query.includes('DeskSearch'))
           return {
             search: {
@@ -162,4 +165,79 @@ test('snooze, ignore, restore, watch, tracked repositories and persistence', asy
   const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
   expect(Object.keys(persisted)).not.toContain('prs');
   expect(persisted.watchedPullRequests).toEqual(['acme/platform#5']);
+});
+
+test('auto refresh defaults to five minutes, reschedules, and persists Never', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  const count = () => page.evaluate(() => (window as any).refreshCount);
+  const refresh = page.getByRole('button', { name: '↻ Refresh', exact: true });
+  await expect(refresh).toBeEnabled();
+  expect(await count()).toBe(1);
+  await page.clock.runFor(299_000);
+  expect(await count()).toBe(1);
+  await page.clock.runFor(1_000);
+  await expect.poll(count).toBe(2);
+  await expect(refresh).toBeEnabled();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const interval = page.getByLabel('Refresh interval');
+  await expect(interval).toHaveValue('5');
+  await interval.selectOption('1');
+  await expect(interval).toBeEnabled();
+  await page.clock.runFor(60_000);
+  await expect.poll(count).toBe(3);
+  await expect(refresh).toBeEnabled();
+  await page.clock.runFor(30_000);
+  await refresh.click();
+  await expect.poll(count).toBe(4);
+  await expect(refresh).toBeEnabled();
+  await page.clock.runFor(30_000);
+  expect(await count()).toBe(4);
+  await page.clock.runFor(30_000);
+  await expect.poll(count).toBe(5);
+  await expect(interval).toBeEnabled();
+  await interval.selectOption('60');
+  await expect(interval).toBeEnabled();
+  await page.clock.fastForward(59 * 60_000);
+  expect(await count()).toBe(5);
+  await page.clock.runFor(60_000);
+  await expect.poll(count).toBe(6);
+  await expect(interval).toBeEnabled();
+  await interval.selectOption('0');
+  await expect(interval).toBeEnabled();
+  await page.clock.fastForward(2 * 60 * 60_000);
+  expect(await count()).toBe(6);
+  await page.reload();
+  await expect(refresh).toBeEnabled();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(interval).toHaveValue('0');
+  await page.clock.fastForward(2 * 60 * 60_000);
+  expect(await count()).toBe(1);
+  await refresh.click();
+  await expect.poll(count).toBe(2);
+});
+
+test('automatic refresh does not overlap a slow manual refresh', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  const refresh = page.getByRole('button', { name: '↻ Refresh', exact: true });
+  await expect(refresh).toBeEnabled();
+  await page.evaluate(() => {
+    const w = window as any;
+    const invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      const result = await invoke(command, args);
+      if (args?.query?.includes('author:@me'))
+        await new Promise((resolve) => {
+          w.releaseRefresh = resolve;
+        });
+      return result;
+    };
+  });
+  await refresh.click();
+  await expect(page.getByRole('button', { name: '↻ Refreshing…' })).toBeDisabled();
+  await page.clock.fastForward(10 * 60_000);
+  expect(await page.evaluate(() => (window as any).refreshCount)).toBe(2);
+  await page.evaluate(() => (window as any).releaseRefresh());
+  await expect(refresh).toBeEnabled();
 });

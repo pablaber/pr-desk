@@ -12,6 +12,7 @@
     saveState,
     parseRepository,
     parsePullRequest,
+    isRefreshInterval,
     type AppState,
   } from './lib/store/app-state';
   import { classify, sortPullRequests } from './lib/pr/classify';
@@ -58,6 +59,19 @@
     const timer = setInterval(() => (now = Date.now()), 15000);
     return () => clearInterval(timer);
   });
+  $effect(() => {
+    const minutes = preferences.settings.automaticRefreshMinutes;
+    if (!initialized || loading || saving || minutes === 0) return;
+    // Reschedule after each refresh/save and cancel when settings change or the app unmounts.
+    const timer = setTimeout(() => void refresh(), minutes * 60_000);
+    return () => clearTimeout(timer);
+  });
+  async function setRefreshInterval(minutes: number) {
+    if (!isRefreshInterval(minutes)) return;
+    await change((next) => {
+      next.settings.automaticRefreshMinutes = minutes;
+    });
+  }
   async function start() {
     if (loading) return;
     setupError = '';
@@ -228,6 +242,7 @@
         onadd={add}
         onremove={remove}
         onrestore={restore}
+        onrefreshinterval={setRefreshInterval}
       />
     {:else}
       <div class="dashboard-heading">
