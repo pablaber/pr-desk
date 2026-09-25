@@ -376,8 +376,19 @@ i.waiting {
   color: #7c8876;
   background: #f8faf5;
 }
-.badge.staleness {
+.badge.staleness,
+.badge.review {
   font-weight: 600;
+}
+.badge.review.approved {
+  color: #326443;
+  border-color: #b8d8bf;
+  background: #eaf5ed;
+}
+.badge.review.changes-requested {
+  color: #a33a2f;
+  border-color: #eeb2ab;
+  background: #fdeae7;
 }
 .badge.staleness.low {
   color: #8a6d1f;

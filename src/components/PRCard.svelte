@@ -60,7 +60,9 @@
     <strong>{card.pr.title}</strong>
     <span class="badges"
       >{#each card.badges as badge}<span class="badge">{badge}</span
-        >{/each}{#if card.staleness}<span class="badge staleness {card.staleness}">Stale</span
+        >{/each}{#if card.reviewBadge}<span class="badge review {card.reviewBadge.tone}"
+          >{card.reviewBadge.label}</span
+        >{/if}{#if card.staleness}<span class="badge staleness {card.staleness}">Stale</span
         >{/if}</span
     >
     <span class="status {card.state}"

@@ -5,6 +5,31 @@ import { defaultState } from '../store/app-state';
 import { pr } from '../../test/fixtures';
 const now = Date.parse('2026-09-20T10:00:00Z');
 const daysAgo = (days: number) => new Date(now - days * 86400000).toISOString();
+describe('review badges', () => {
+  it.each([
+    ['APPROVED', { label: 'Approved', tone: 'approved' }],
+    ['CHANGES_REQUESTED', { label: 'Changes requested', tone: 'changes-requested' }],
+    ['REVIEW_REQUIRED', null],
+    [null, null],
+    ['UNKNOWN', null],
+  ] as const)('represents review decision %s', (reviewDecision, expected) => {
+    const item = classify(pr({ reviewDecision }), 'me', defaultState(), now)!;
+    expect(cardViewModel(item, now).reviewBadge).toEqual(expected);
+  });
+  it('shows approval even when checks prevent merging', () => {
+    const item = classify(
+      pr({
+        reviewDecision: 'APPROVED',
+        checks: [{ name: 'CI', required: true, state: 'pending' }],
+      }),
+      'me',
+      defaultState(),
+      now,
+    )!;
+    expect(item.state).not.toBe('ready-to-merge');
+    expect(cardViewModel(item, now).reviewBadge?.label).toBe('Approved');
+  });
+});
 describe('staleness', () => {
   it.each([
     [0, null],
