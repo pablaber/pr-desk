@@ -97,6 +97,19 @@ jobs:
             exit 1
           fi
           echo "api_key_path=$key_path" >> "$GITHUB_OUTPUT"
+      - name: Install Apple's Developer ID G2 intermediate certificate
+        run: |
+          # Keychain Access does not bundle the issuing chain into an exported .p12,
+          # and codesign only warns when it cannot build a chain to a trusted root:
+          # it then embeds an incomplete chain that Apple's notary service rejects.
+          cer="$RUNNER_TEMP/DeveloperIDG2CA.cer"
+          curl -fsSL https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer -o "$cer"
+          if ! openssl x509 -inform DER -in "$cer" -noout -subject | grep -q 'OU *= *G2'; then
+            echo 'Downloaded certificate is not the Developer ID G2 intermediate.' >&2
+            exit 1
+          fi
+          # A duplicate import is not an error; the post-build checks catch a broken chain.
+          security import "$cer" || echo 'Intermediate already present in the default keychain.'
       - name: Build, sign, notarize and attach macOS bundles to the existing release
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
