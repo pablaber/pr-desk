@@ -613,15 +613,70 @@ footer {
   }
 }
 
-select {
-  font: inherit;
-  color: inherit;
-  background: white;
-  border: 1px solid #d7dfd8;
-  border-radius: 6px;
-  padding: 8px 11px;
+.refresh-control {
+  margin-top: 18px;
+  max-width: 460px;
 }
-select:focus-visible {
-  outline: 2px solid #488066;
-  outline-offset: 3px;
+.refresh-control-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.never-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.never-option input {
+  margin: 0;
+  accent-color: #3f6746;
+}
+.refresh-inputs {
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+}
+.refresh-slider {
+  flex: 1;
+  min-width: 0;
+  padding-top: 7px;
+}
+.refresh-slider input {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  accent-color: #3f6746;
+}
+.slider-limits {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #79827b;
+}
+.refresh-number {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.refresh-number input {
+  width: 68px;
+  padding: 7px 8px;
+}
+.refresh-number span {
+  color: #79827b;
+  font-size: 12px;
+}
+.refresh-inputs.inactive {
+  opacity: 0.5;
+}
+.refresh-help {
+  margin-top: 12px;
+}
+.settings-section .refresh-validation {
+  color: #a15f4c;
+  margin-top: 5px;
 }

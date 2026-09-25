@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RefreshInterval from './RefreshInterval.svelte';
   import type { AppState } from '../lib/store/app-state';
   let {
     preferences,
@@ -29,27 +30,11 @@
   <section class="settings-section">
     <h2>Automatic refresh</h2>
     <p>Refresh GitHub data while the app is running. Manual refresh is always available.</p>
-    <div class="setting-row">
-      <label for="refresh-interval">Refresh interval</label>
-      <select
-        id="refresh-interval"
-        value={preferences.settings.automaticRefreshMinutes}
-        disabled={busy}
-        onchange={async (event) => {
-          const select = event.currentTarget;
-          await onrefreshinterval(Number(select.value));
-          select.value = String(preferences.settings.automaticRefreshMinutes);
-        }}
-      >
-        <option value={0}>Never</option>
-        {#each Array.from({ length: 60 }, (_, i) => i + 1) as minutes}
-          <option value={minutes}
-            >Every {minutes}
-            {minutes === 1 ? 'minute' : 'minutes'}{minutes === 5 ? ' (default)' : ''}</option
-          >
-        {/each}
-      </select>
-    </div>
+    <RefreshInterval
+      minutes={preferences.settings.automaticRefreshMinutes}
+      {busy}
+      onsave={onrefreshinterval}
+    />
   </section>
   <section class="settings-section">
     <h2>Tracked repositories</h2>

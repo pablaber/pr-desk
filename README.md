@@ -99,7 +99,7 @@ Sorting is centralized in `classify.ts`: attention priority then oldest update; 
 
 ## Refresh behavior
 
-Automatic GitHub refresh defaults to five minutes while the app is running. Settings accepts any whole-minute interval from 1 to 60, or Never (stored as zero). Each interval starts after the previous refresh finishes; manual refresh and setting changes restart the timer, and requests never overlap. Version 1 preferences migrate to the five-minute default because its reserved zero was not a user-selected Never. Version 2 preserves an explicit Never choice. The separate 15-second clock updates ages and snooze visibility.
+Automatic GitHub refresh defaults to five minutes while the app is running. Settings pairs a slider with a numeric input and stepper for whole-minute intervals from 1 to 60. A separate Never checkbox disables automatic refresh (stored as zero). Slider changes save on release; typed values save on Enter or leaving the field. Each interval starts after the previous refresh finishes; manual refresh and setting changes restart the timer, and requests never overlap. Version 1 preferences migrate to the five-minute default because its reserved zero was not a user-selected Never. Version 2 preserves an explicit Never choice. The separate 15-second clock updates ages and snooze visibility.
 
 ## Verification
 

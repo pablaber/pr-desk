@@ -180,9 +180,10 @@ test('auto refresh defaults to five minutes, reschedules, and persists Never', a
   await expect.poll(count).toBe(2);
   await expect(refresh).toBeEnabled();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  const interval = page.getByLabel('Refresh interval');
+  const interval = page.getByRole('spinbutton', { name: 'Refresh interval in minutes' });
   await expect(interval).toHaveValue('5');
-  await interval.selectOption('1');
+  await interval.fill('1');
+  await interval.press('Enter');
   await expect(interval).toBeEnabled();
   await page.clock.runFor(60_000);
   await expect.poll(count).toBe(3);
@@ -196,21 +197,23 @@ test('auto refresh defaults to five minutes, reschedules, and persists Never', a
   await page.clock.runFor(30_000);
   await expect.poll(count).toBe(5);
   await expect(interval).toBeEnabled();
-  await interval.selectOption('60');
+  await interval.fill('60');
+  await interval.press('Enter');
   await expect(interval).toBeEnabled();
   await page.clock.fastForward(59 * 60_000);
   expect(await count()).toBe(5);
   await page.clock.runFor(60_000);
   await expect.poll(count).toBe(6);
   await expect(interval).toBeEnabled();
-  await interval.selectOption('0');
-  await expect(interval).toBeEnabled();
+  await page.getByLabel('Never', { exact: true }).check();
+  await expect(interval).toBeDisabled();
   await page.clock.fastForward(2 * 60 * 60_000);
   expect(await count()).toBe(6);
   await page.reload();
   await expect(refresh).toBeEnabled();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expect(interval).toHaveValue('0');
+  await expect(page.getByLabel('Never', { exact: true })).toBeChecked();
+  await expect(interval).toBeDisabled();
   await page.clock.fastForward(2 * 60 * 60_000);
   expect(await count()).toBe(1);
   await refresh.click();
@@ -240,4 +243,39 @@ test('automatic refresh does not overlap a slow manual refresh', async ({ page }
   expect(await page.evaluate(() => (window as any).refreshCount)).toBe(2);
   await page.evaluate(() => (window as any).releaseRefresh());
   await expect(refresh).toBeEnabled();
+});
+
+test('refresh slider and numeric input stay synchronized and validate exact values', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const slider = page.getByRole('slider', { name: 'Refresh interval', exact: true });
+  const number = page.getByRole('spinbutton', { name: 'Refresh interval in minutes' });
+  await expect(number).toHaveValue('5');
+  await slider.focus();
+  await slider.press('ArrowRight');
+  await expect(number).toHaveValue('6');
+  await expect(number).toBeEnabled();
+  await number.fill('37');
+  await number.press('Enter');
+  await expect(slider).toHaveValue('37');
+  await expect(number).toBeEnabled();
+  for (const invalid of ['61', '0', '1.5', '']) {
+    await number.fill(invalid);
+    await number.press('Enter');
+    await expect(page.getByRole('alert')).toContainText('whole number from 1 to 60');
+    await expect(number).toHaveValue('37');
+  }
+  await page.getByLabel('Never', { exact: true }).check();
+  await expect(slider).toBeDisabled();
+  await expect(number).toBeDisabled();
+  await expect(page.getByLabel('Never', { exact: true })).toBeEnabled();
+  await page.getByLabel('Never', { exact: true }).uncheck();
+  await expect(number).toBeEnabled();
+  await expect(number).toHaveValue('37');
+  await page.reload();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(number).toHaveValue('37');
+  await page.screenshot({ path: '.context/refresh-settings.png', fullPage: true });
 });
