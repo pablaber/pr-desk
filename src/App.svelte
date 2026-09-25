@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { isTauri } from '@tauri-apps/api/core';
   import { openUrl } from '@tauri-apps/plugin-opener';
+  import { version } from '../package.json';
   import PRCard from './components/PRCard.svelte';
   import Settings from './components/Settings.svelte';
   import { GhGitHubService } from './lib/github/client';
@@ -193,7 +194,7 @@
 <div class="app-shell">
   <aside>
     <div class="brand">
-      <span class="brand-mark">⑂</span> PR Desk <span class="version">v1</span>
+      <span class="brand-mark">⑂</span> PR Desk <span class="version">v{version}</span>
     </div>
     <div class="nav-label">WORKSPACE</div>
     <nav aria-label="Main navigation">
