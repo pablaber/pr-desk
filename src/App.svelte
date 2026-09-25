@@ -6,6 +6,7 @@
   // The app's CSP blocks data URLs, so keep the logo as a bundled file.
   import appIcon from '../src-tauri/icons/source.svg?no-inline';
   import PRCard from './components/PRCard.svelte';
+  import Snoozed from './components/Snoozed.svelte';
   import Settings from './components/Settings.svelte';
   import HotkeyHelp from './components/HotkeyHelp.svelte';
   import { GhGitHubService } from './lib/github/client';
@@ -29,7 +30,7 @@
   let preferences = $state<AppState>(defaultState());
   let snapshot = $state<DashboardSnapshot>({ prs: [], sources: {}, warnings: [], staleIds: [] });
   let login = $state(''),
-    screen = $state<'dashboard' | 'settings'>('dashboard');
+    screen = $state<'dashboard' | 'snoozed' | 'settings'>('dashboard');
   let showHotkeys = $state(false);
   let filter = $state<TrackingReason | 'all'>('all'),
     loading = $state(false),
@@ -40,6 +41,7 @@
     now = $state(Date.now()),
     refreshed = $state('');
   const dashboardHotkey = hotkeyFor('open-dashboard');
+  const snoozedHotkey = hotkeyFor('open-snoozed');
   const settingsHotkey = hotkeyFor('open-settings');
   const shortcutsHotkey = hotkeyFor('toggle-shortcuts');
   const columns: { state: DashboardState; title: string; subtitle: string }[] = [
@@ -62,9 +64,6 @@
   );
   let visible = $derived(
     classified.filter((p) => filter === 'all' || p.pr.reasons.includes(filter)),
-  );
-  let snoozed = $derived(
-    Object.values(preferences.snoozedPullRequests).filter((s) => Date.parse(s.until) > now).length,
   );
   onMount(() => {
     void start();
@@ -211,6 +210,7 @@
     if (showHotkeys && hotkey.action !== 'toggle-shortcuts') return;
     event.preventDefault();
     if (hotkey.action === 'open-dashboard') screen = 'dashboard';
+    else if (hotkey.action === 'open-snoozed') screen = 'snoozed';
     else if (hotkey.action === 'open-settings') screen = 'settings';
     else if (hotkey.action === 'toggle-shortcuts') showHotkeys = !showHotkeys;
   }
@@ -238,31 +238,44 @@
         onclick={() => (screen = 'dashboard')}
         aria-keyshortcuts={dashboardHotkey ? ariaKeyShortcut(dashboardHotkey) : null}
         ><span aria-hidden="true">▦</span> Dashboard
-        <span class="nav-count">{classified.length}</span>{#if dashboardHotkey}<span
-            class="nav-hotkey"
-            aria-hidden="true">{compactKeys(dashboardHotkey)}</span
+        {#if dashboardHotkey}<span class="nav-hotkey" aria-hidden="true"
+            >{compactKeys(dashboardHotkey)}</span
           >{/if}</button
       >
       <button
-        class:active={screen === 'settings'}
-        onclick={() => (screen = 'settings')}
-        aria-keyshortcuts={settingsHotkey ? ariaKeyShortcut(settingsHotkey) : null}
-        ><span aria-hidden="true">⚙</span> Settings{#if settingsHotkey}<span
-            class="nav-hotkey"
-            aria-hidden="true">{compactKeys(settingsHotkey)}</span
-          >{/if}</button
+        class:active={screen === 'snoozed'}
+        onclick={() => (screen = 'snoozed')}
+        aria-keyshortcuts={snoozedHotkey ? ariaKeyShortcut(snoozedHotkey) : null}
       >
+        <span aria-hidden="true">◷</span> Snoozed
+        {#if snoozedHotkey}<span class="nav-hotkey" aria-hidden="true"
+            >{compactKeys(snoozedHotkey)}</span
+          >{/if}
+      </button>
     </nav>
-    {#if shortcutsHotkey}
-      <button
-        class="shortcuts-button"
-        onclick={() => (showHotkeys = true)}
-        aria-keyshortcuts={ariaKeyShortcut(shortcutsHotkey)}
-        >Keyboard shortcuts<span class="nav-hotkey" aria-hidden="true"
-          >{compactKeys(shortcutsHotkey)}</span
-        ></button
-      >
-    {/if}
+    <div class="sidebar-utilities">
+      <nav aria-label="Preferences">
+        <button
+          class:active={screen === 'settings'}
+          onclick={() => (screen = 'settings')}
+          aria-keyshortcuts={settingsHotkey ? ariaKeyShortcut(settingsHotkey) : null}
+          ><span aria-hidden="true">⚙</span> Settings{#if settingsHotkey}<span
+              class="nav-hotkey"
+              aria-hidden="true">{compactKeys(settingsHotkey)}</span
+            >{/if}</button
+        >
+      </nav>
+      {#if shortcutsHotkey}
+        <button
+          class="shortcuts-button"
+          onclick={() => (showHotkeys = true)}
+          aria-keyshortcuts={ariaKeyShortcut(shortcutsHotkey)}
+          >Keyboard shortcuts<span class="nav-hotkey" aria-hidden="true"
+            >{compactKeys(shortcutsHotkey)}</span
+          ></button
+        >
+      {/if}
+    </div>
     <div class="sidebar-bottom">
       <span class="connection-dot" class:connected={initialized}></span>{login
         ? `@${login}`
@@ -272,7 +285,13 @@
   </aside>
   <main>
     <div class="toolbar">
-      <span>{screen === 'dashboard' ? 'Workspace / Dashboard' : 'Workspace / Settings'}</span>
+      <span
+        >Workspace / {screen === 'dashboard'
+          ? 'Dashboard'
+          : screen === 'snoozed'
+            ? 'Snoozed'
+            : 'Settings'}</span
+      >
       <div>
         {#if refreshed}<span class="refresh-time">Updated {refreshed}</span>{/if}<button
           disabled={loading || saving}
@@ -293,10 +312,20 @@
           <button class="primary-button" onclick={start} disabled={loading}>Try again</button
           >{:else}<p>Connecting to GitHub…</p>{/if}
       </div>
+    {:else if screen === 'snoozed'}
+      <Snoozed
+        {preferences}
+        {snapshot}
+        {login}
+        {now}
+        busy={saving || loading}
+        onopen={open}
+        onaction={action}
+        onrestore={(id) => restore('snoozed', id)}
+      />
     {:else if screen === 'settings'}
       <Settings
         {preferences}
-        {now}
         busy={saving || loading}
         onadd={add}
         onremove={remove}
@@ -311,9 +340,6 @@
           <h1>Pull requests</h1>
           <p>What needs you. What’s ready. What can wait.</p>
         </div>
-        <button class="quiet" onclick={() => (screen = 'settings')}
-          >◷ Snoozed <span class="pill">{snoozed}</span></button
-        >
       </div>
       <div class="summary">
         {#each columns as col}<span

@@ -1,12 +1,9 @@
 <script lang="ts">
+  import PRDetails from './PRDetails.svelte';
+  import SnoozeChoices from './SnoozeChoices.svelte';
   import { cardViewModel } from '../lib/pr/card-view-model';
   import type { ClassifiedPR } from '../lib/pr/classify';
-  import {
-    snoozeUntil,
-    snoozeOptionKey,
-    snoozeOptionLabel,
-    type SnoozeOption,
-  } from '../lib/store/app-state';
+  import { type SnoozeOption } from '../lib/store/app-state';
   let {
     item,
     now,
@@ -27,8 +24,7 @@
     onaction: (id: string, action: string, until?: string) => void;
   } = $props();
   let menu = $state(false),
-    submenu = $state(false),
-    custom = $state('');
+    submenu = $state(false);
   let card = $derived(cardViewModel(item, now));
   function close() {
     menu = false;
@@ -60,28 +56,7 @@
     onclick={() => onopen(card.pr.url)}
     aria-label={`Open ${card.pr.title} on GitHub`}
   >
-    <span class="repo"
-      >{card.pr.repository} <span class="number">#{card.pr.number}</span>
-      <span class="author">{card.pr.author}</span></span
-    >
-    <strong>{card.pr.title}</strong>
-    <span class="badges"
-      >{#each card.badges as badge}<span class="badge">{badge}</span
-        >{/each}{#if card.reviewBadge}<span class="badge review {card.reviewBadge.tone}"
-          >{card.reviewBadge.label}</span
-        >{/if}{#if card.staleness}<span class="badge staleness {card.staleness}">Stale</span
-        >{/if}</span
-    >
-    <span class="status {card.state}"
-      >{card.state === 'ready-to-merge' ? '✓' : card.state === 'needs-attention' ? '!' : '◷'}
-      {card.primary}</span
-    >
-    {#if card.secondary}<span class="secondary">{card.secondary}</span>{/if}
-    <span class="age"
-      >Updated {card.age}{#if stale}<span class="stale">
-          · Refresh failed · may be out of date</span
-        >{/if}</span
-    >
+    <PRDetails {item} {now} {stale} />
   </button>
   <button
     disabled={busy}
@@ -114,20 +89,12 @@
             role="group"
             aria-label="Snooze options"
           >
-            {#if snoozeOptions.length}<span class="menu-label">Snooze for</span>{/if}
-            {#each snoozeOptions as option (snoozeOptionKey(option))}
-              <button onclick={() => act('snooze', snoozeUntil(option))}
-                >{snoozeOptionLabel(option)}</button
-              >
-            {/each}
-            <label class="custom-label"
-              >Custom date<input type="datetime-local" bind:value={custom} /></label
-            >
-            <button
-              disabled={!custom || new Date(custom).getTime() <= now}
-              onclick={() => act('snooze', new Date(custom).toISOString())}
-              >Snooze until custom date</button
-            >
+            <SnoozeChoices
+              {snoozeOptions}
+              {now}
+              {busy}
+              onselect={(until) => act('snooze', until)}
+            />
           </div>
         {/if}
       </div>

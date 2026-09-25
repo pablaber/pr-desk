@@ -13,7 +13,14 @@ export const hotkeys: Hotkey[] = [
   {
     action: 'open-dashboard',
     key: 'd',
+    shift: true,
     description: 'Open the dashboard',
+  },
+  {
+    action: 'open-snoozed',
+    key: 's',
+    shift: true,
+    description: 'Open snoozed pull requests',
   },
   {
     // Shift is 'any' because reaching ? needs it on some layouts and not on others.
