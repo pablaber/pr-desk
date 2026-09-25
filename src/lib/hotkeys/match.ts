@@ -1,5 +1,5 @@
 import { hotkeys } from './hotkeys';
-import type { Hotkey, HotkeyEvent, HotkeyTarget } from './types';
+import type { Hotkey, HotkeyEvent, HotkeyTarget, Modifier } from './types';
 
 const typingTags = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
 
@@ -8,13 +8,17 @@ export function isTypingTarget(target: HotkeyTarget | null | undefined): boolean
   return typingTags.has((target.tagName ?? '').toUpperCase()) || target.isContentEditable === true;
 }
 
+function modifierMatches(required: Modifier | undefined, pressed: boolean): boolean {
+  return required === 'any' || pressed === (required ?? false);
+}
+
 function matches(hotkey: Hotkey, event: HotkeyEvent): boolean {
   return (
     event.key.toLowerCase() === hotkey.key.toLowerCase() &&
-    event.metaKey === (hotkey.meta ?? false) &&
-    event.ctrlKey === (hotkey.ctrl ?? false) &&
-    event.shiftKey === (hotkey.shift ?? false) &&
-    event.altKey === (hotkey.alt ?? false)
+    modifierMatches(hotkey.meta, event.metaKey) &&
+    modifierMatches(hotkey.ctrl, event.ctrlKey) &&
+    modifierMatches(hotkey.shift, event.shiftKey) &&
+    modifierMatches(hotkey.alt, event.altKey)
   );
 }
 

@@ -17,4 +17,12 @@ export const hotkeys: Hotkey[] = [
     label: 'D',
     description: 'Open the dashboard',
   },
+  {
+    // Shift is 'any' because reaching ? needs it on some layouts and not on others.
+    action: 'toggle-shortcuts',
+    key: '?',
+    shift: 'any',
+    label: '?',
+    description: 'Show keyboard shortcuts',
+  },
 ];

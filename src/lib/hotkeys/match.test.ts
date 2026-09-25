@@ -14,6 +14,13 @@ describe('resolveHotkey', () => {
     expect(resolveHotkey(press(',', { metaKey: true }))?.action).toBe('open-settings');
   });
 
+  it('matches ? with or without shift, since layouts differ', () => {
+    expect(resolveHotkey(press('?'))?.action).toBe('toggle-shortcuts');
+    expect(resolveHotkey(press('?', { shiftKey: true }))?.action).toBe('toggle-shortcuts');
+    // 'any' relaxes only the modifier it is set on.
+    expect(resolveHotkey(press('?', { metaKey: true }))).toBeNull();
+  });
+
   it('ignores unbound keys and unexpected modifiers', () => {
     expect(resolveHotkey(press('x'))).toBeNull();
     expect(resolveHotkey(press('d', { metaKey: true }))).toBeNull();
@@ -64,5 +71,6 @@ describe('hotkeys', () => {
     expect(new Set(actions).size).toBe(actions.length);
     for (const action of actions) expect(hotkeyFor(action)?.action).toBe(action);
     expect(hotkeyFor('open-dashboard')?.label).toBe('D');
+    expect(hotkeyFor('toggle-shortcuts')?.label).toBe('?');
   });
 });

@@ -438,3 +438,33 @@ test('hotkeys switch screens and stay out of the way while typing', async ({ pag
   await page.getByRole('textbox', { name: 'Repository', exact: true }).press('Meta+,');
   await expect(page.getByRole('heading', { name: 'Tracked repositories' })).toBeVisible();
 });
+
+test('the shortcut list opens with ?, lists every hotkey, and closes again', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(dialog).toBeHidden();
+  await page.keyboard.press('?');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.hotkey-row dt')).toHaveText([
+    'Open settings',
+    'Open the dashboard',
+    'Show keyboard shortcuts',
+  ]);
+  await expect(dialog.locator('.hotkey-row kbd')).toHaveText(['⌘,', 'D', '?']);
+  // Shortcuts behind the dialog stay inert, so ⌘, cannot navigate out from under it.
+  await page.keyboard.press('Meta+,');
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.screenshot({ path: '.context/hotkeys.png', fullPage: true });
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  // The same list is reachable without the keyboard, and ? toggles it shut.
+  await page.getByRole('button', { name: 'Keyboard shortcuts', exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('?');
+  await expect(dialog).toBeHidden();
+  await page.getByRole('button', { name: 'Keyboard shortcuts', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Close keyboard shortcuts' }).click();
+  await expect(dialog).toBeHidden();
+});
