@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/pablaber/pr-desk/compare/v0.5.0...v0.6.0) (2026-09-25)
+
+
+### Features
+
+* add a dedicated snoozed pull requests page ([#34](https://github.com/pablaber/pr-desk/issues/34)) ([9e762f0](https://github.com/pablaber/pr-desk/commit/9e762f0663e3ce945f4e2e907a6b689182fa7227))
+
 ## [0.5.0](https://github.com/pablaber/pr-desk/compare/v0.4.0...v0.5.0) (2026-09-25)
 
 
