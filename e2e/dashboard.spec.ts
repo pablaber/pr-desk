@@ -190,8 +190,9 @@ test('snooze, ignore, restore, watch, tracked repositories and persistence', asy
   await expect(page.locator('.pr-card')).toHaveCount(2);
   await page.reload();
   await expect(page.locator('.pr-card')).toHaveCount(2);
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Snoozed', exact: true }).click();
   await page.getByRole('button', { name: 'Restore now', exact: true }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Restore', exact: true }).click();
   await page.getByRole('textbox', { name: 'Repository', exact: true }).fill('bad-repository');
   await page.getByRole('button', { name: 'Add repository' }).click();
@@ -491,7 +492,7 @@ test('hotkeys switch screens and stay out of the way while typing', async ({ pag
   await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
   await page.keyboard.press('Meta+,');
   await expect(page.getByRole('heading', { name: 'Tracked repositories' })).toBeVisible();
-  await page.keyboard.press('d');
+  await page.keyboard.press('Shift+D');
   await expect(page.locator('.pr-card')).toHaveCount(4);
   // A plain-key hotkey must not steal keystrokes from a field.
   await page.keyboard.press('Meta+,');
@@ -499,6 +500,9 @@ test('hotkeys switch screens and stay out of the way while typing', async ({ pag
   await input.fill('');
   await input.press('d');
   await expect(input).toHaveValue('d');
+  await input.press('Shift+S');
+  await input.press('Shift+D');
+  await expect(input).toHaveValue('dSD');
   await expect(page.getByRole('heading', { name: 'Tracked repositories' })).toBeVisible();
   // ⌘, still works from inside a field.
   await page.getByRole('button', { name: /Dashboard/ }).click();
@@ -518,14 +522,16 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
   await expect(dialog.locator('.hotkey-row dt')).toHaveText([
     'Open settings',
     'Open the dashboard',
+    'Open snoozed pull requests',
     'Show keyboard shortcuts',
   ]);
   // Each key gets its own cap, joined by a plus, and the spelled-out combination is what
   // a screen reader reads.
-  await expect(dialog.locator('.hotkey-row .key-combo')).toHaveText(['⌘+,', 'D', '?']);
+  await expect(dialog.locator('.hotkey-row .key-combo')).toHaveText(['⌘+,', '⇧+D', '⇧+S', '?']);
   await expect(dialog.locator('.hotkey-row .visually-hidden')).toHaveText([
     'Command plus Comma',
-    'D',
+    'Shift plus D',
+    'Shift plus S',
     'Question mark',
   ]);
   await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveAttribute(
@@ -547,4 +553,92 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
   await page.getByRole('button', { name: 'Keyboard shortcuts', exact: true }).click();
   await dialog.getByRole('button', { name: 'Close keyboard shortcuts' }).click();
   await expect(dialog).toBeHidden();
+});
+
+test('snoozed rows sort by return date, reschedule, persist, restore, and expire', async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.goto('/');
+  for (const [title, duration] of [
+    ['Refresh session token handling', '1 hour'],
+    ['Reduce cache lookup latency', '4 hours'],
+  ]) {
+    await page.getByRole('button', { name: `Actions for ${title}`, exact: true }).click();
+    await page.getByRole('button', { name: 'Snooze', exact: true }).click();
+    await page.getByRole('button', { name: duration, exact: true }).click();
+  }
+  await page.keyboard.press('Shift+S');
+  const rows = page.locator('.snoozed-row');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toContainText('Refresh session token handling');
+  await expect(rows.first()).toContainText('Changes requested');
+  await expect(rows.first().locator('time')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toHaveText(
+    '▦ Dashboard ⇧D',
+  );
+  await rows
+    .first()
+    .getByRole('button', { name: /Change snooze/ })
+    .click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('group', { name: 'Snooze options' })).toBeHidden();
+  await rows
+    .first()
+    .getByRole('button', { name: /Change snooze/ })
+    .click();
+  await page.getByRole('button', { name: '1 day', exact: true }).click();
+  await expect(rows.first()).toContainText('Reduce cache lookup latency');
+  await page.reload();
+  await page.keyboard.press('Shift+S');
+  await expect(rows.first()).toContainText('Reduce cache lookup latency');
+  await page.screenshot({ path: '.context/snoozed-page.png', fullPage: true });
+  await rows
+    .first()
+    .getByRole('button', { name: /Open .* on GitHub/ })
+    .click();
+  expect(await page.evaluate(() => (window as any).opened)).toEqual([
+    'https://github.com/acme/platform/pull/1',
+  ]);
+  await rows.first().getByRole('button', { name: 'Restore now' }).click();
+  await expect(rows).toHaveCount(1);
+  await page.clock.fastForward(24 * 60 * 60_000);
+  await expect(rows).toHaveCount(0);
+  await expect(page.getByText('Nothing snoozed', { exact: true })).toBeVisible();
+  await page.keyboard.press('Shift+D');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+});
+
+test('unavailable snoozed PRs retain restore and custom rescheduling controls', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page
+    .getByRole('button', { name: 'Actions for Reduce cache lookup latency', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Snooze', exact: true }).click();
+  await page.getByRole('button', { name: '1 hour', exact: true }).click();
+  await page.evaluate(() => {
+    const prefs = JSON.parse(localStorage.getItem('prefs')!);
+    prefs.snoozedPullRequests['acme/platform#99'] = {
+      until: new Date(Date.now() + 30 * 60_000).toISOString(),
+    };
+    localStorage.setItem('prefs', JSON.stringify(prefs));
+  });
+  await page.reload();
+  await page.keyboard.press('Shift+S');
+  const row = page.locator('.snoozed-row').filter({ hasText: 'acme/platform#99' });
+  await expect(row).toContainText('Pull request details unavailable');
+  await row.getByRole('button', { name: /Change snooze/ }).click();
+  await page.getByLabel('Custom date', { exact: true }).fill('2099-10-01T09:00');
+  await page.getByRole('button', { name: 'Snooze until custom date', exact: true }).click();
+  await expect(page.locator('.snoozed-row').last()).toContainText('acme/platform#99');
+  await expect(row.locator('time')).toContainText('2099');
+  await row.getByRole('button', { name: /Open .* on GitHub/ }).click();
+  expect(await page.evaluate(() => (window as any).opened)).toEqual([
+    'https://github.com/acme/platform/pull/99',
+  ]);
+  await row.getByRole('button', { name: 'Restore now' }).click();
+  await expect(row).toHaveCount(0);
 });

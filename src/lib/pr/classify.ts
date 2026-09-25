@@ -17,6 +17,13 @@ export function classify(
   )
     return null;
   if (pr.draft && pr.author.toLowerCase() !== login.toLowerCase()) return null;
+  return describePullRequest(pr, login, rules);
+}
+export function describePullRequest(
+  pr: PullRequest,
+  login: string,
+  rules: DashboardRule[] = dashboardRules,
+) {
   const signals = deriveSignals(pr, login);
   const matches = rules.filter((r) => r.matches(signals)).sort((a, b) => b.priority - a.priority);
   const primary = matches[0];

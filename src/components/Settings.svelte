@@ -4,7 +4,6 @@
   import type { AppState, SnoozeOption } from '../lib/store/app-state';
   let {
     preferences,
-    now,
     busy,
     onadd,
     onremove,
@@ -13,7 +12,6 @@
     onsnoozeoptions,
   }: {
     preferences: AppState;
-    now: number;
     busy: boolean;
     onadd: (kind: 'repo' | 'pr' | 'ignored-repo', value: string) => Promise<boolean>;
     onremove: (kind: 'repo' | 'pr' | 'ignored-repo', value: string) => void;
@@ -115,16 +113,6 @@
     {#each preferences.watchedPullRequests as id}<div class="setting-row">
         <code>{id}</code><button disabled={busy} onclick={() => onremove('pr', id)}>Remove</button>
       </div>{:else}<p class="empty-setting">No individually watched PRs.</p>{/each}
-  </section>
-  <section class="settings-section">
-    <h2>Snoozed pull requests</h2>
-    <p>They return automatically when the snooze expires.</p>
-    {#each Object.entries(preferences.snoozedPullRequests).filter(([, s]) => Date.parse(s.until) > now) as [id, snooze]}
-      <div class="setting-row">
-        <div><code>{id}</code><small>Until {new Date(snooze.until).toLocaleString()}</small></div>
-        <button disabled={busy} onclick={() => onrestore('snoozed', id)}>Restore now</button>
-      </div>
-    {:else}<p class="empty-setting">Nothing snoozed.</p>{/each}
   </section>
   <section class="settings-section">
     <h2>Ignored pull requests</h2>

@@ -1,4 +1,4 @@
-export type HotkeyAction = 'open-dashboard' | 'open-settings' | 'toggle-shortcuts';
+export type HotkeyAction = 'open-dashboard' | 'open-snoozed' | 'open-settings' | 'toggle-shortcuts';
 
 // A modifier must be absent unless the binding asks for it; 'any' means the binding does
 // not care, which is what layout-dependent keys like ? need.

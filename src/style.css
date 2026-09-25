@@ -129,10 +129,6 @@ nav button.active {
   color: #294d36;
   font-weight: 600;
 }
-.nav-count {
-  margin-left: auto;
-  font-size: 11px;
-}
 .nav-hotkey {
   margin-left: auto;
   font-size: 10px;
@@ -141,12 +137,11 @@ nav button.active {
   border-radius: 4px;
   padding: 1px 5px;
 }
-/* The count already claims the free space on rows that have one. */
-.nav-count + .nav-hotkey {
-  margin-left: 0;
+.sidebar-utilities {
+  margin-top: auto;
+  padding-top: 24px;
 }
 .sidebar-bottom {
-  margin-top: auto;
   padding: 12px 8px 0;
   color: #62725e;
   font-size: 12px;
@@ -888,4 +883,78 @@ footer {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+.snoozed-list {
+  padding: 26px 30px;
+  display: grid;
+  gap: 12px;
+}
+.snoozed-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: #798675;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.snoozed-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 225px;
+  border: 1px solid #e1e7dc;
+  border-radius: 8px;
+  background: #fff;
+}
+.snoozed-main {
+  padding: 20px;
+  gap: 9px;
+}
+.snoozed-main .repo {
+  padding-right: 0;
+}
+.snoozed-main strong {
+  font-size: 14px;
+}
+.snoozed-schedule {
+  border-left: 1px solid #edf0e9;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+.snoozed-until-label {
+  font-size: 10px;
+  color: #798675;
+}
+.snoozed-schedule time {
+  font-size: 12px;
+  font-weight: 600;
+}
+.snoozed-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.snoozed-menu-anchor {
+  position: relative;
+}
+.snooze-trigger {
+  display: flex;
+  padding: 7px;
+}
+.snoozed-menu {
+  top: 36px;
+  right: 0;
+}
+@media (max-width: 800px) {
+  .snoozed-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .snoozed-schedule {
+    border-left: 0;
+    border-top: 1px solid #edf0e9;
+  }
 }

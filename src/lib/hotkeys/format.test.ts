@@ -11,7 +11,7 @@ const shortcuts = hotkeyFor('toggle-shortcuts') as Hotkey;
 describe('displayKeys', () => {
   it('gives one cap per key, uppercasing letters', () => {
     expect(displayKeys(settings)).toEqual(['⌘', ',']);
-    expect(displayKeys(dashboard)).toEqual(['D']);
+    expect(displayKeys(dashboard)).toEqual(['⇧', 'D']);
   });
 
   it("omits 'any' modifiers, since ? already implies its own shift", () => {
@@ -35,14 +35,14 @@ describe('displayKeys', () => {
 describe('compactKeys', () => {
   it('concatenates for inline hints, as the macOS menu bar does', () => {
     expect(compactKeys(settings)).toBe('⌘,');
-    expect(compactKeys(dashboard)).toBe('D');
+    expect(compactKeys(dashboard)).toBe('⇧D');
   });
 });
 
 describe('spokenKeys', () => {
   it('spells out glyphs and punctuation for screen readers', () => {
     expect(spokenKeys(settings)).toBe('Command plus Comma');
-    expect(spokenKeys(dashboard)).toBe('D');
+    expect(spokenKeys(dashboard)).toBe('Shift plus D');
     expect(spokenKeys(shortcuts)).toBe('Question mark');
   });
 });
@@ -50,7 +50,7 @@ describe('spokenKeys', () => {
 describe('ariaKeyShortcut', () => {
   it('uses KeyboardEvent key values joined with +', () => {
     expect(ariaKeyShortcut(settings)).toBe('Meta+,');
-    expect(ariaKeyShortcut(dashboard)).toBe('D');
+    expect(ariaKeyShortcut(dashboard)).toBe('Shift+D');
   });
 });
 
