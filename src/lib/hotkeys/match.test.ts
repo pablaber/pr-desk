@@ -15,6 +15,16 @@ describe('resolveHotkey', () => {
     expect(resolveHotkey(press(',', { metaKey: true }))?.action).toBe('open-settings');
   });
 
+  it('matches Command R while typing and rejects other modifiers', () => {
+    expect(resolveHotkey(press('r', { metaKey: true }), { tagName: 'INPUT' })?.action).toBe(
+      'refresh',
+    );
+    expect(resolveHotkey(press('R', { metaKey: true }))?.action).toBe('refresh');
+    expect(resolveHotkey(press('r'))).toBeNull();
+    expect(resolveHotkey(press('r', { ctrlKey: true }))).toBeNull();
+    expect(resolveHotkey(press('r', { metaKey: true, shiftKey: true }))).toBeNull();
+  });
+
   it('matches ? with or without shift, since layouts differ', () => {
     expect(resolveHotkey(press('?'))?.action).toBe('toggle-shortcuts');
     expect(resolveHotkey(press('?', { shiftKey: true }))?.action).toBe('toggle-shortcuts');
