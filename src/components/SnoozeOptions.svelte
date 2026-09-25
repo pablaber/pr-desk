@@ -84,7 +84,7 @@
         onchange={(e) => (drafts[index] = changeKind(draft, e.currentTarget.value as 'duration'))}
       >
         <option value="duration">Duration</option>
-        <option value="next">Next day</option>
+        <option value="next">Next</option>
       </select>
       {#if draft.kind === 'duration'}
         <input
@@ -150,7 +150,7 @@
         onchange={(e) => (addition = changeKind(addition, e.currentTarget.value as 'duration'))}
       >
         <option value="duration">Duration</option>
-        <option value="next">Next day</option>
+        <option value="next">Next</option>
       </select>
       {#if addition.kind === 'duration'}
         <input
