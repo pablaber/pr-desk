@@ -346,6 +346,16 @@ i.waiting {
   color: #a0aa99;
   white-space: nowrap;
 }
+.author {
+  color: #7b8a73;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.author::before {
+  content: '· ';
+  font-weight: 400;
+  color: #a0aa99;
+}
 .card-main strong {
   font-size: 13px;
   line-height: 1.5;
@@ -365,6 +375,24 @@ i.waiting {
   padding: 2px 5px;
   color: #7c8876;
   background: #f8faf5;
+}
+.badge.staleness {
+  font-weight: 600;
+}
+.badge.staleness.low {
+  color: #8a6d1f;
+  border-color: #ecd9a1;
+  background: #fdf6e3;
+}
+.badge.staleness.medium {
+  color: #9a5a1c;
+  border-color: #f0c79b;
+  background: #fdefe1;
+}
+.badge.staleness.high {
+  color: #a33a2f;
+  border-color: #eeb2ab;
+  background: #fdeae7;
 }
 .status {
   font-size: 11px;

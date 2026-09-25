@@ -73,7 +73,10 @@ test.beforeEach(async ({ page }) => {
               author: { login: number === 4 ? 'sam' : 'alex' },
               state: 'OPEN',
               isDraft: false,
-              updatedAt: new Date(Date.now() - number * 3600000).toISOString(),
+              // Days since the last update, chosen to produce one card per staleness level.
+              updatedAt: new Date(
+                Date.now() - ([1 / 24, 10, 20, 30][number - 1] ?? 1 / 24) * 86400000,
+              ).toISOString(),
               reviewDecision: number === 1 ? 'APPROVED' : null,
               mergeable: 'MERGEABLE',
               mergeStateStatus: 'CLEAN',
@@ -133,6 +136,24 @@ test('dashboard classification, source filters, browser action, and screenshot',
   await expect(page.locator('.pr-card')).toHaveCount(1);
   await page.getByRole('button', { name: 'All', exact: true }).click();
   await page.screenshot({ path: '.context/dashboard.png', fullPage: true });
+});
+
+test('cards show the author and the most severe stale badge', async ({ page }) => {
+  await page.goto('/');
+  const card = (title: string) => page.locator('.pr-card').filter({ hasText: title });
+  await expect(card('Reduce cache lookup latency').locator('.author')).toHaveText('alex');
+  await expect(card('Simplify deployment configuration').locator('.author')).toHaveText('sam');
+  await expect(card('Reduce cache lookup latency').locator('.staleness')).toHaveCount(0);
+  for (const [title, level] of [
+    ['Refresh session token handling', 'low'],
+    ['Add audit event retention', 'medium'],
+    ['Simplify deployment configuration', 'high'],
+  ]) {
+    const badge = card(title).locator('.staleness');
+    await expect(badge).toHaveText('Stale');
+    await expect(badge).toHaveClass(`badge staleness ${level}`);
+  }
+  await page.screenshot({ path: '.context/stale-badges.png', fullPage: true });
 });
 
 test('snooze, ignore, restore, watch, tracked repositories and persistence', async ({ page }) => {

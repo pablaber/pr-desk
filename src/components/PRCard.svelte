@@ -40,10 +40,15 @@
     onclick={() => onopen(card.pr.url)}
     aria-label={`Open ${card.pr.title} on GitHub`}
   >
-    <span class="repo">{card.pr.repository} <span class="number">#{card.pr.number}</span></span>
+    <span class="repo"
+      >{card.pr.repository} <span class="number">#{card.pr.number}</span>
+      <span class="author">{card.pr.author}</span></span
+    >
     <strong>{card.pr.title}</strong>
     <span class="badges"
-      >{#each card.badges as badge}<span class="badge">{badge}</span>{/each}</span
+      >{#each card.badges as badge}<span class="badge">{badge}</span
+        >{/each}{#if card.staleness}<span class="badge staleness {card.staleness}">Stale</span
+        >{/if}</span
     >
     <span class="status {card.state}"
       >{card.state === 'ready-to-merge' ? '✓' : card.state === 'needs-attention' ? '!' : '◷'}
