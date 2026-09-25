@@ -49,6 +49,9 @@ jobs:
     if: needs.release-please.outputs.release_created == 'true'
     runs-on: macos-14
     timeout-minutes: 45
+    outputs:
+      version: ${{ steps.homebrew.outputs.version }}
+      sha256: ${{ steps.homebrew.outputs.sha256 }}
     permissions:
       contents: write
     steps:
@@ -72,3 +75,70 @@ jobs:
           releaseId: ${{ needs.release-please.outputs.release_id }}
           args: --target aarch64-apple-darwin --bundles app,dmg
           includeUpdaterJson: false
+      - name: Verify published DMG and calculate Homebrew metadata
+        id: homebrew
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.release-please.outputs.release_id }}
+        run: |
+          gh api "repos/pablaber/pr-desk/releases/$RELEASE_ID" > "$RUNNER_TEMP/release.json"
+          node scripts/update-homebrew.mjs metadata "$RUNNER_TEMP/release.json" \
+            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg >> "$GITHUB_OUTPUT"
+
+  update-homebrew:
+    name: Update Homebrew tap
+    needs: [release-please, release]
+    if: needs.release-please.outputs.release_created == 'true' && needs.release.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out released commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.release-please.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Create token scoped to the Homebrew tap
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+          owner: pablaber
+          repositories: |
+            homebrew-tap
+          permission-contents: write
+      - name: Check out tap default branch
+        uses: actions/checkout@v6
+        with:
+          repository: pablaber/homebrew-tap
+          token: ${{ steps.app-token.outputs.token }}
+          path: homebrew-tap
+      - name: Update and validate cask
+        env:
+          RELEASE_VERSION: ${{ needs.release.outputs.version }}
+          DMG_SHA256: ${{ needs.release.outputs.sha256 }}
+        run: |
+          node scripts/update-homebrew.mjs update homebrew-tap/Casks/pr-desk.rb "$RELEASE_VERSION" "$DMG_SHA256"
+          ruby -c homebrew-tap/Casks/pr-desk.rb
+      - name: Commit and push only if changed
+        working-directory: homebrew-tap
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          RELEASE_VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          if git diff --quiet -- Casks/pr-desk.rb; then
+            echo "Homebrew already contains $RELEASE_VERSION; nothing to commit."
+            exit 0
+          fi
+          bot_id=$(gh api "users/${APP_SLUG}[bot]" --jq .id)
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${bot_id}+${APP_SLUG}[bot]@users.noreply.github.com"
+          git add -- Casks/pr-desk.rb
+          git commit -m "chore: update pr-desk to $RELEASE_VERSION"
+          git push origin HEAD
