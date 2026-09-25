@@ -1,6 +1,6 @@
 [package]
 name = "pr-desk"
-version = "0.1.0"
+publish = false # Internal crate; the application version comes from package.json.
 edition = "2021"
 
 [build-dependencies]

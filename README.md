@@ -25,7 +25,7 @@ npm run tauri build
 # App: src-tauri/target/release/bundle/macos/PR Desk.app
 ```
 
-This produces a local app; distribution signing and notarization are not configured. `npm run tauri build -- --debug` creates a faster development bundle under `src-tauri/target/debug/bundle/macos/`.
+This produces an ad-hoc signed local app; Developer ID signing and notarization are not configured. `npm run tauri build -- --debug` creates a faster development bundle under `src-tauri/target/debug/bundle/macos/`.
 
 ## Architecture
 
@@ -122,3 +122,79 @@ Unit tests cover every attention rule, ready/waiting states, team versus individ
 - Search indexing and GitHub mergeability computation can lag. Refresh again for updated results.
 - Previously loaded cards remain visible and explicitly marked stale when refresh fails; inspect GitHub before acting on stale readiness.
 - State timestamps are approximated by PR update time. Exact time-in-state would need an additional history policy.
+
+## Releases and installation
+
+The first release is **v0.1.0**. `release-please-config.json` explicitly sets
+`initial-version` to `0.1.0`; the initially empty manifest means no version has
+been released yet. Do not seed it with `0.1.0`: Release Please maintains the
+manifest after release. Subsequent `feat:` commits increment the minor version,
+`fix:` commits increment the patch version, and breaking changes (`feat!:` or a
+`BREAKING CHANGE:` footer) increment the major version, including before 1.0.
+Release Please generates `CHANGELOG.md` in its first release PR.
+
+`package.json` is the application version source of truth. Release Please updates
+it and `package-lock.json`; Tauri reads `../package.json` directly. The unpublished
+Rust implementation crate uses Cargo's default internal version (`0.0.0`), which
+is independent of the application version and is not a release version.
+
+### Repository setup
+
+Use squash merging and configure GitHub's default squash commit message to use
+the PR title. Require **Validate PR Title**, **Unit and browser tests**, and
+**Rust checks and tests** in branch protection for `main`. The title check uses
+the same `amannn/action-semantic-pull-request` action as
+[`pablaber/snuffboard`](https://github.com/pablaber/snuffboard/blob/main/.github/workflows/pr-validate.yml),
+accepting standard Conventional Commit types, optional scopes, and `!` for
+breaking changes. Intermediate branch commits need not follow this convention.
+
+Release authentication follows
+[`snuffboard`'s Release Please workflow](https://github.com/pablaber/snuffboard/blob/main/.github/workflows/release-please.yml):
+`actions/create-github-app-token` generates an installation token and passes it to
+`googleapis/release-please-action`, using the same pinned revisions and names:
+
+- Repository **variable** `RELEASE_PLEASE_APP_ID`: GitHub App ID.
+- Repository **secret** `RELEASE_PLEASE_APP_PRIVATE_KEY`: the App's PEM private key.
+- Install the App on `pablaber/pr-desk`, granting repository Contents, Issues,
+  and Pull requests read/write permissions. Ensure repository policies permit
+  the App to open release PRs and create release tags.
+
+The App token allows release PRs to trigger normal CI. The workflow preserves
+`snuffboard`'s permission pattern; only artifact upload uses the ordinary Actions
+`GITHUB_TOKEN`. No Apple credentials are required.
+
+Every push to `main` runs the reusable frontend, browser, and Rust checks before
+Release Please runs. Conventional commits update its release PR; merging that
+PR creates the tag and GitHub Release. Only an actual `release_created` output
+starts the macOS build, checking out the released SHA and attaching artifacts to
+that release ID with the official Tauri action. Builds target
+`aarch64-apple-darwin` and produce a `.dmg` and an `.app.tar.gz` archive. The
+release may briefly exist without assets while the build runs. Inspect the
+Release Please workflow if installation reports missing assets.
+
+### Install on another Mac
+
+On an Apple Silicon Mac with `gh` installed and authenticated to an account with
+repository access:
+
+```sh
+gh auth login --hostname github.com
+gh repo clone pablaber/pr-desk
+cd pr-desk
+./scripts/install.sh
+```
+
+Run the script again to upgrade to the latest published release. It downloads the
+Apple Silicon DMG using authenticated `gh`, verifies the app's signature and
+identifier, and installs into `~/Applications/PR Desk.app`. Quit PR Desk first.
+The old installation is retained until replacement succeeds; app preferences are
+preserved. Set `PR_DESK_INSTALL_DIR` to choose another writable application
+directory. No `sudo` is needed with the default directory.
+
+Builds use ad-hoc signing (`bundle.macOS.signingIdentity: "-"`). They are **not
+Developer ID signed or notarized**; signature verification checks integrity, not
+publisher identity. macOS Gatekeeper may require an explicit **Open Anyway** in
+System Settings → Privacy & Security after an attempted launch. The installer
+does not disable Gatekeeper or remove quarantine attributes. Future Developer ID
+signing can replace the identity and supply Apple's signing/notarization
+credentials to the existing Tauri build step. No in-app updater is configured.
