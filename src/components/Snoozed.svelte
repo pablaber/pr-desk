@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Clock from '@lucide/svelte/icons/clock';
   import type { AppState } from '../lib/store/app-state';
   import type { DashboardSnapshot } from '../lib/github/refresh';
   import { snoozedPullRequests } from '../lib/pr/snoozed';
@@ -51,7 +52,7 @@
     />
   {:else}
     <div class="empty-column">
-      <span aria-hidden="true">◷</span>
+      <span><Clock size={24} /></span>
       <p>Nothing snoozed</p>
       <small>Snooze a pull request from its dashboard menu to set it aside for later.</small>
     </div>

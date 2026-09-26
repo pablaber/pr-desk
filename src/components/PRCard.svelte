@@ -1,4 +1,8 @@
 <script lang="ts">
+  import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import PRDetails from './PRDetails.svelte';
   import SnoozeChoices from './SnoozeChoices.svelte';
   import { cardViewModel } from '../lib/pr/card-view-model';
@@ -63,7 +67,7 @@
     class="menu-trigger"
     aria-label={`Actions for ${card.pr.title}`}
     aria-expanded={menu}
-    onclick={() => (menu ? close() : (menu = true))}>•••</button
+    onclick={() => (menu ? close() : (menu = true))}><Ellipsis size={14} /></button
   >
   {#if menu}
     <!-- The backdrop swallows the dismissing click so it cannot also open the PR behind it. -->
@@ -73,14 +77,17 @@
         onclick={() => {
           close();
           onopen(card.pr.url);
-        }}>Open on GitHub ↗</button
+        }}>Open on GitHub <ArrowUpRight size={12} /></button
       >
       <button onclick={() => act(watching ? 'unwatch' : 'watch')}
         >{watching ? 'Stop watching' : 'Watch PR'}</button
       >
       <div class="submenu-anchor">
         <button aria-expanded={submenu} onclick={() => (submenu = !submenu)}
-          >Snooze<span class="chevron" aria-hidden="true">{submenu ? '▾' : '▸'}</span></button
+          >Snooze{#if submenu}<ChevronDown class="chevron" size={12} />{:else}<ChevronRight
+              class="chevron"
+              size={12}
+            />{/if}</button
         >
         {#if submenu}
           <div

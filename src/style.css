@@ -8,6 +8,14 @@
 * {
   box-sizing: border-box;
 }
+/* Interface icons are @lucide/svelte components. Each call site picks only a size; the
+   stroke weight, colour and text alignment are settled once here so the whole set reads
+   the same. 1.6 is lighter than Lucide's default 2, to sit with the app's type weights. */
+.lucide {
+  flex-shrink: 0;
+  stroke-width: 1.6;
+  vertical-align: -0.14em;
+}
 body {
   margin: 0;
 }
@@ -490,7 +498,6 @@ i.waiting {
 }
 .chevron {
   color: #9aa393;
-  font-size: 9px;
 }
 .card-submenu {
   right: calc(100% + 8px);
@@ -524,7 +531,8 @@ i.waiting {
   color: #a0af94;
 }
 .empty-column > span {
-  font-size: 21px;
+  display: block;
+  line-height: 1;
 }
 .empty-column p {
   font-size: 12px;
@@ -577,9 +585,8 @@ footer {
 }
 .setup-symbol {
   display: block;
-  font-size: 50px;
   color: #67805a;
-  margin-bottom: 22px;
+  margin: 0 auto 22px;
 }
 .setup p {
   margin-top: 15px;

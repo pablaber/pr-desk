@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Clock from '@lucide/svelte/icons/clock';
   import PRDetails from './PRDetails.svelte';
   import SnoozeChoices from './SnoozeChoices.svelte';
   import type { snoozedPullRequests } from '../lib/pr/snoozed';
@@ -83,15 +84,7 @@
           aria-expanded={menu}
           onclick={() => (menu = !menu)}
         >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.6"
-            aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg
-          >
+          <Clock size={16} />
         </button>
         {#if menu}
           <div class="menu-backdrop" onclick={close} role="presentation"></div>

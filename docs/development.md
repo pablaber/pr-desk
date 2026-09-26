@@ -51,6 +51,21 @@ access and persistence require Tauri.
 - `src/components/` and `src/App.svelte`: dashboard, filters, cards, menus, setup and
   error states, and settings.
 
+### Icons
+
+Interface icons come from [`@lucide/svelte`](https://lucide.dev/guide/svelte) (ISC
+licensed), the single icon library for the app. Import each icon by its own path — for
+example `import Clock from '@lucide/svelte/icons/clock'` — so only the icons actually
+used enter the bundle. Icons compile to inline SVG, so nothing is fetched at runtime.
+
+Call sites pass only `size`; stroke weight, colour and text alignment come from the one
+`.lucide` rule in `src/style.css`. Lucide marks an icon `aria-hidden` unless it is given
+an `aria-*`, `role` or `title` prop, which is what decorative icons beside a text label
+want; icon-only controls carry their own `aria-label` on the surrounding button.
+
+The PR Desk brand mark (`src-tauri/icons/source.svg`) and the Tauri app icons are
+project artwork and are not part of this set.
+
 ## Local state
 
 Tauri Store writes `preferences.json` to the app data directory (on macOS,

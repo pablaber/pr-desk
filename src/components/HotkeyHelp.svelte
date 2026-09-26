@@ -1,4 +1,5 @@
 <script lang="ts">
+  import X from '@lucide/svelte/icons/x';
   import { hotkeys } from '../lib/hotkeys/hotkeys';
   import { displayKeys, spokenKeys } from '../lib/hotkeys/format';
   let { open, onclose }: { open: boolean; onclose: () => void } = $props();
@@ -25,7 +26,7 @@
   <div class="hotkey-help-panel">
     <header>
       <h2 id="hotkey-help-title">Keyboard shortcuts</h2>
-      <button onclick={onclose} aria-label="Close keyboard shortcuts">×</button>
+      <button onclick={onclose} aria-label="Close keyboard shortcuts"><X size={16} /></button>
     </header>
     <dl>
       {#each hotkeys as hotkey (hotkey.action)}

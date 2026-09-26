@@ -379,7 +379,7 @@ test('auto refresh defaults to five minutes, reschedules, and persists Never', a
   await page.clock.install();
   await page.goto('/');
   const count = () => page.evaluate(() => (window as any).refreshCount);
-  const refresh = page.getByRole('button', { name: '↻ Refresh', exact: true });
+  const refresh = page.getByRole('button', { name: 'Refresh', exact: true });
   await expect(refresh).toBeEnabled();
   expect(await count()).toBe(1);
   await page.clock.runFor(299_000);
@@ -431,7 +431,7 @@ test('auto refresh defaults to five minutes, reschedules, and persists Never', a
 test('automatic refresh does not overlap a slow manual refresh', async ({ page }) => {
   await page.clock.install();
   await page.goto('/');
-  const refresh = page.getByRole('button', { name: '↻ Refresh', exact: true });
+  const refresh = page.getByRole('button', { name: 'Refresh', exact: true });
   await expect(refresh).toBeEnabled();
   await page.evaluate(() => {
     const w = window as any;
@@ -446,7 +446,7 @@ test('automatic refresh does not overlap a slow manual refresh', async ({ page }
     };
   });
   await refresh.click();
-  await expect(page.getByRole('button', { name: '↻ Refreshing…' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Refreshing…' })).toBeDisabled();
   await page.clock.fastForward(10 * 60_000);
   expect(await page.evaluate(() => (window as any).refreshCount)).toBe(2);
   await page.evaluate(() => (window as any).releaseRefresh());
@@ -520,7 +520,7 @@ test('ignored repositories validate, persist, override tracking, and can be remo
   ).toBeVisible();
   await page.screenshot({ path: '.context/ignored-repositories.png', fullPage: true });
   await page.reload();
-  await expect(page.getByRole('button', { name: '↻ Refresh', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
   await expect(page.locator('.pr-card')).toHaveCount(0);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expandSettingsSection(page, 'Ignored repositories');
@@ -677,7 +677,7 @@ test('snoozed rows sort by return date, reschedule, persist, restore, and expire
   await expect(rows.first()).toContainText('Changes requested');
   await expect(rows.first().locator('time')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toHaveText(
-    '▦ Dashboard ⇧D',
+    'Dashboard ⇧D',
   );
   await rows
     .first()
@@ -793,7 +793,7 @@ for (const manualTrigger of ['button', 'shortcut', 'none'] as const) {
   test(`background refresh with manual trigger: ${manualTrigger}`, async ({ page }) => {
     await page.clock.install();
     await page.goto('/');
-    const refresh = page.getByRole('button', { name: '↻ Refresh', exact: true });
+    const refresh = page.getByRole('button', { name: 'Refresh', exact: true });
     await expect(refresh).toBeEnabled();
     await expect(refresh).toContainText('⌘R');
     await expect(refresh).toHaveAttribute('aria-keyshortcuts', 'Meta+R');
@@ -829,7 +829,7 @@ for (const manualTrigger of ['button', 'shortcut', 'none'] as const) {
     if (manualTrigger !== 'none') {
       if (manualTrigger === 'button') await refresh.click();
       else await page.keyboard.press('Meta+r');
-      await expect(page.getByRole('button', { name: '↻ Refreshing…', exact: true })).toBeDisabled();
+      await expect(page.getByRole('button', { name: 'Refreshing…', exact: true })).toBeDisabled();
       await expect(page.getByText('Loading pull requests…')).toHaveCount(3);
       await page.keyboard.press('Meta+r');
       expect(await page.evaluate(() => (window as any).refreshCount)).toBe(2);
@@ -848,3 +848,38 @@ for (const manualTrigger of ['button', 'shortcut', 'none'] as const) {
     await expect(refresh).toBeEnabled();
   });
 }
+
+test('interface icons render as bundled Lucide SVG and stay out of accessible names', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  // Every nav entry carries an icon, and the label alone still names the button.
+  for (const [name, icon] of [
+    ['Dashboard', 'layout-grid'],
+    ['Snoozed', 'clock'],
+    ['Settings', 'settings'],
+  ]) {
+    const button = page.getByRole('button', { name, exact: true });
+    await expect(button.locator(`svg.lucide-${icon}`)).toHaveAttribute('aria-hidden', 'true');
+  }
+  // Icon-only controls name themselves through aria-label instead.
+  const actions = page.getByRole('button', { name: /^Actions for / }).first();
+  await expect(actions.locator('svg.lucide-ellipsis')).toBeVisible();
+  await actions.click();
+  await expect(
+    page.getByRole('button', { name: 'Open on GitHub', exact: true }).locator('svg'),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+  // The brand mark stays the project's own artwork.
+  await expect(page.locator('img.brand-mark')).toHaveAttribute('src', /source/);
+  // Icons are inline SVG markup rather than <img> or <use> references to a sprite or an
+  // icon service, so they need no network access at runtime.
+  expect(await page.locator('svg.lucide').count()).toBeGreaterThan(10);
+  expect(await page.locator('svg.lucide use, svg.lucide image').count()).toBe(0);
+  // Each empty column gets its own icon from the same set.
+  await page.getByRole('button', { name: 'Watching', exact: true }).click();
+  await expect(page.locator('.empty-column')).toHaveCount(3);
+  await expect(page.locator('.empty-column svg.lucide')).toHaveCount(3);
+  await page.screenshot({ path: '.context/empty-columns.png', fullPage: true });
+});

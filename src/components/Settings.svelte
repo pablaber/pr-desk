@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import RefreshInterval from './RefreshInterval.svelte';
   import SnoozeOptions from './SnoozeOptions.svelte';
   import type { AppState, SnoozeOption } from '../lib/store/app-state';
@@ -52,7 +53,7 @@
         aria-expanded={open.refresh}
         aria-controls="settings-section-refresh"
         onclick={() => (open.refresh = !open.refresh)}
-        ><span class="chevron" aria-hidden="true">▸</span> Automatic refresh</button
+        ><ChevronRight class="chevron" size={13} /> Automatic refresh</button
       >
     </h2>
     {#if open.refresh}
@@ -74,7 +75,7 @@
         aria-expanded={open.snooze}
         aria-controls="settings-section-snooze"
         onclick={() => (open.snooze = !open.snooze)}
-        ><span class="chevron" aria-hidden="true">▸</span>
+        ><ChevronRight class="chevron" size={13} />
         {heading('Snooze options', preferences.settings.snoozeOptions.length)}</button
       >
     </h2>
@@ -100,7 +101,7 @@
         aria-expanded={open.tracked}
         aria-controls="settings-section-tracked"
         onclick={() => (open.tracked = !open.tracked)}
-        ><span class="chevron" aria-hidden="true">▸</span>
+        ><ChevronRight class="chevron" size={13} />
         {heading('Tracked repositories', preferences.trackedRepositories.length)}</button
       >
     </h2>
@@ -138,7 +139,7 @@
         aria-expanded={open.ignoredRepos}
         aria-controls="settings-section-ignored-repos"
         onclick={() => (open.ignoredRepos = !open.ignoredRepos)}
-        ><span class="chevron" aria-hidden="true">▸</span>
+        ><ChevronRight class="chevron" size={13} />
         {heading('Ignored repositories', preferences.ignoredRepositories.length)}</button
       >
     </h2>
@@ -179,7 +180,7 @@
         aria-expanded={open.watched}
         aria-controls="settings-section-watched"
         onclick={() => (open.watched = !open.watched)}
-        ><span class="chevron" aria-hidden="true">▸</span>
+        ><ChevronRight class="chevron" size={13} />
         {heading('Watched pull requests', preferences.watchedPullRequests.length)}</button
       >
     </h2>
@@ -215,7 +216,7 @@
         aria-expanded={open.ignoredPrs}
         aria-controls="settings-section-ignored-prs"
         onclick={() => (open.ignoredPrs = !open.ignoredPrs)}
-        ><span class="chevron" aria-hidden="true">▸</span>
+        ><ChevronRight class="chevron" size={13} />
         {heading(
           'Ignored pull requests',
           Object.keys(preferences.ignoredPullRequests).length,
