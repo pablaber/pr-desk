@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { parsePullRequest, parseRepository } from '../store/app-state';
-import { normalize } from './normalize';
+import { normalize, rawConnections } from './normalize';
 import { pullRequestQuery, repositoryQuery, searchQuery } from './queries';
 import type { Connection, GitHubService, RawPR } from './types';
 export type QueryRunner = <T>(query: string) => Promise<T>;
@@ -20,26 +20,26 @@ export class GhGitHubService implements GitHubService {
       await this.query<{ viewer: { login: string } }>('query DeskViewer { viewer { login } }')
     ).viewer.login;
   }
-  private async search(search: string, ignoredRepositories: string[]): Promise<string[]> {
+  private async search(search: string, ignoredRepositories: string[]): Promise<RawPR[]> {
     search = [
       search,
       ...[...new Set(ignoredRepositories.map(parseRepository))].map((repo) => `-repo:${repo}`),
     ].join(' ');
-    const urls: string[] = [];
+    const prs: RawPR[] = [];
     let cursor: string | null = null;
     do {
-      const { search: result }: { search: Connection<{ url: string }> & { issueCount: number } } =
-        await this.query<{ search: Connection<{ url: string }> & { issueCount: number } }>(
+      const { search: result }: { search: Connection<RawPR> & { issueCount: number } } =
+        await this.query<{ search: Connection<RawPR> & { issueCount: number } }>(
           searchQuery(search, cursor),
         );
       if (result.issueCount > 1000)
         throw new Error(
           'This source exceeds GitHub’s 1,000-result search limit. Narrow the account scope.',
         );
-      urls.push(...result.nodes.filter(Boolean).map((n) => parsePullRequest(n.url)));
-      cursor = result.pageInfo.hasNextPage ? result.pageInfo.endCursor : null;
+      prs.push(...result.nodes.filter(Boolean));
+      cursor = continuationCursor(result, cursor);
     } while (cursor);
-    return urls;
+    return prs;
   }
   getOwnedPullRequests(ignoredRepositories: string[] = []) {
     return this.search('is:pr is:open author:@me', ignoredRepositories);
@@ -55,51 +55,66 @@ export class GhGitHubService implements GitHubService {
       throw new Error('Repository not found or not accessible to your GitHub account.');
   }
   async getRepositoryPullRequests(repo: string) {
-    const ids: string[] = [];
+    const prs: RawPR[] = [];
     let cursor: string | null = null;
     do {
-      const data: { repository: { pullRequests: Connection<{ url: string }> } | null } =
-        await this.query<{ repository: { pullRequests: Connection<{ url: string }> } | null }>(
-          repositoryQuery(parseRepository(repo), cursor),
-        );
+      const data: { repository: { pullRequests: Connection<RawPR> } | null } = await this.query<{
+        repository: { pullRequests: Connection<RawPR> } | null;
+      }>(repositoryQuery(parseRepository(repo), cursor));
       if (!data.repository) throw new Error('Repository not found or inaccessible.');
       const result = data.repository.pullRequests;
-      ids.push(...result.nodes.map((n) => parsePullRequest(n.url)));
-      cursor = result.pageInfo.hasNextPage ? result.pageInfo.endCursor : null;
+      prs.push(...result.nodes.filter(Boolean));
+      cursor = continuationCursor(result, cursor);
     } while (cursor);
-    return ids;
+    return prs;
   }
-  async getPullRequest(input: string) {
+  async getPullRequest(input: string, seed?: RawPR) {
     const id = parsePullRequest(input);
-    const first = await this.query<{ repository: { pullRequest: RawPR | null } | null }>(
-      pullRequestQuery(id),
-    );
-    const raw = first.repository?.pullRequest;
-    if (!raw)
+    const first =
+      seed ??
+      (await this.query<{ repository: { pullRequest: RawPR | null } | null }>(pullRequestQuery(id)))
+        .repository?.pullRequest;
+    if (!first)
       throw new Error('PR not found or inaccessible. Saved preferences have been retained.');
-    const connections = (pr: RawPR) => [
-      pr.reviewRequests,
-      pr.reviewThreads,
-      pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts,
-    ];
-    let pages = connections(raw);
-    while (pages.some((p) => p?.pageInfo.hasNextPage)) {
-      const next = await this.query<{ repository: { pullRequest: RawPR } }>(
-        pullRequestQuery(
-          id,
-          pages.map((p) => (p?.pageInfo.hasNextPage ? p.pageInfo.endCursor : null)),
-        ),
-      );
-      const nextPages = connections(next.repository.pullRequest);
-      const targets = connections(raw);
-      pages.forEach((p, i) => {
-        if (p?.pageInfo.hasNextPage && nextPages[i] && targets[i]) {
-          // Connections are accumulated by position, keeping their distinct node types.
-          (targets[i]!.nodes as unknown[]).push(...nextPages[i]!.nodes);
-        }
+    const raw = structuredClone(first);
+    while (rawConnections(raw).some((p) => p?.pageInfo.hasNextPage)) {
+      const pages = rawConnections(raw);
+      const cursors = pages.map((p) => {
+        if (!p?.pageInfo.hasNextPage) return undefined;
+        if (!p.pageInfo.endCursor) throw new Error('Missing continuation cursor.');
+        return p.pageInfo.endCursor;
       });
-      pages = nextPages.map((p, i) => (pages[i]?.pageInfo.hasNextPage ? p : undefined));
+      const next = (
+        await this.query<{ repository: { pullRequest: RawPR | null } | null }>(
+          pullRequestQuery(id, cursors),
+        )
+      ).repository?.pullRequest;
+      if (!next) throw new Error('PR not found or inaccessible.');
+      if (
+        cursors[2] !== undefined &&
+        raw.commits.nodes[0]?.commit.oid !== next.commits?.nodes[0]?.commit.oid
+      )
+        throw new Error('Latest commit changed while fetching checks.');
+      const nextPages = rawConnections(next);
+      pages.forEach((target, i) => {
+        if (cursors[i] === undefined || !target) return;
+        const incoming = nextPages[i];
+        if (
+          !incoming ||
+          (incoming.pageInfo.hasNextPage && incoming.pageInfo.endCursor === cursors[i])
+        )
+          throw new Error('Invalid connection continuation.');
+        (target.nodes as unknown[]).push(...incoming.nodes);
+        target.pageInfo = incoming.pageInfo;
+      });
     }
     return normalize(raw);
   }
+}
+
+function continuationCursor(connection: Connection<unknown>, previous: string | null) {
+  if (!connection.pageInfo.hasNextPage) return null;
+  const cursor = connection.pageInfo.endCursor;
+  if (!cursor || cursor === previous) throw new Error('Invalid discovery continuation cursor.');
+  return cursor;
 }

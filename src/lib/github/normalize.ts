@@ -9,7 +9,6 @@ export function normalizeCheck(check: RawCheck): PullRequest['checks'][number] {
       : check.state;
   return {
     name: check.name ?? check.context ?? 'Check',
-    required: check.isRequired,
     state: ['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(status ?? '')
       ? 'passing'
       : [
@@ -53,4 +52,15 @@ export function normalize(raw: RawPR): PullRequest {
     ),
     reasons: [],
   };
+}
+
+export function rawConnections(pr: RawPR) {
+  return [
+    pr.reviewRequests,
+    pr.reviewThreads,
+    pr.commits?.nodes[0]?.commit.statusCheckRollup?.contexts,
+  ];
+}
+export function completeSeed(pr: RawPR) {
+  return !rawConnections(pr).some((p) => p?.pageInfo.hasNextPage);
 }

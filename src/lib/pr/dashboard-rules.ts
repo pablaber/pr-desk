@@ -36,8 +36,8 @@ export const dashboardRules: DashboardRule[] = [
     id: 'checks',
     state: 'needs-attention',
     priority: 70,
-    matches: (s) => s.owned && s.failedRequiredChecks > 0,
-    getLabel: () => 'Required checks failed',
+    matches: (s) => s.owned && s.failedChecks > 0,
+    getLabel: () => 'Checks failed',
   },
   {
     id: 'conflict',
@@ -70,8 +70,8 @@ export const dashboardRules: DashboardRule[] = [
     getLabel: (s) =>
       s.pr.draft
         ? 'Draft'
-        : s.pr.checks.some((c) => c.required && c.state === 'pending')
-          ? 'Required checks running'
+        : s.pr.checks.some((c) => c.state === 'pending')
+          ? 'Checks running'
           : s.owned
             ? 'Waiting for review or merge requirements'
             : 'No action needed',

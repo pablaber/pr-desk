@@ -16,6 +16,6 @@ export interface PullRequest {
   directReviewers: string[];
   activeUnresolvedThreads: number;
   outdatedUnresolvedThreads: number;
-  checks: { name: string; required: boolean; state: 'passing' | 'pending' | 'failed' }[];
+  checks: { name: string; state: 'passing' | 'pending' | 'failed' }[];
   reasons: TrackingReason[];
 }
