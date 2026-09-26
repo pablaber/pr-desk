@@ -6,6 +6,15 @@ async function expandSettingsSection(page: Page, heading: string) {
   await page.getByRole('button', { name: new RegExp(`^${heading}( · [0-9]+)?$`) }).click();
 }
 
+// Tracked repositories, ignore rules and watched PRs are drafts until the Save bar is used; no
+// GitHub refresh happens before that.
+async function saveSettings(page: Page) {
+  const save = page.getByRole('button', { name: 'Save changes', exact: true });
+  await expect(save).toBeVisible();
+  await save.click();
+  await expect(save).toBeHidden();
+}
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     const w = window as unknown as {
@@ -214,6 +223,11 @@ test('snooze, ignore, restore, watch, tracked repositories and persistence', asy
     .fill('https://github.com/acme/platform/pull/5');
   await page.getByRole('button', { name: 'Watch PR', exact: true }).click();
   await expect(page.locator('.setting-row').filter({ hasText: 'acme/platform#5' })).toHaveCount(1);
+  // Both additions are still only a draft, so nothing has been written yet.
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!).trackedRepositories),
+  ).toEqual([]);
+  await saveSettings(page);
   await page.reload();
   await expect(page.locator('.pr-card')).toHaveCount(5);
   // Tracking the repository moves its open PRs to Needs attention; the watched PR stays waiting.
@@ -510,6 +524,7 @@ test('ignored repositories validate, persist, override tracking, and can be remo
   await expect(section.locator('.setting-row')).toHaveCount(1);
   await expect(page.getByRole('heading', { name: 'Ignored · 1', exact: true })).toBeVisible();
   await page.screenshot({ path: '.context/ignored-repositories.png', fullPage: true });
+  await saveSettings(page);
   await page.reload();
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
   await expect(page.locator('.pr-card')).toHaveCount(0);
@@ -517,6 +532,7 @@ test('ignored repositories validate, persist, override tracking, and can be remo
   await expandSettingsSection(page, 'Ignored');
   await section.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(section.locator('.setting-row')).toHaveCount(0);
+  await saveSettings(page);
   await page.getByRole('button', { name: /Dashboard/ }).click();
   await expect(page.locator('.pr-card')).toHaveCount(5);
 });
@@ -897,12 +913,14 @@ for (const [kind, value, remaining] of [
     await expect(section.locator('.setting-row')).toContainText(value.toLowerCase());
     if (kind === 'title')
       await page.screenshot({ path: '.context/ignore-rules.png', fullPage: true });
+    await saveSettings(page);
     await page.reload();
     await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
     await expect(page.locator('.pr-card')).toHaveCount(remaining);
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await expandSettingsSection(page, 'Ignored');
     await section.getByRole('button', { name: 'Remove', exact: true }).click();
+    await saveSettings(page);
     await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
     await expect(page.locator('.pr-card')).toHaveCount(4);
   });
@@ -929,6 +947,7 @@ test('broad rules stay effective on failed refreshes and do not erase individual
   await page.getByRole('textbox', { name: 'Ignore rule', exact: true }).fill('ALEX');
   await page.getByRole('button', { name: 'Add ignore rule', exact: true }).click();
   await expect(page.locator('#settings-section-ignored-rules .setting-row')).toHaveCount(1);
+  await saveSettings(page);
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
   await expect(page.locator('.pr-card')).toHaveCount(1);
   await expect(page.locator('.pr-card')).toContainText('Simplify deployment');
@@ -939,6 +958,7 @@ test('broad rules stay effective on failed refreshes and do not erase individual
     .locator('#settings-section-ignored-rules')
     .getByRole('button', { name: 'Remove' })
     .click();
+  await saveSettings(page);
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
   await expect(page.locator('.pr-card')).toHaveCount(3);
   await expect(page.getByText('Add audit event retention', { exact: true })).toBeHidden();
@@ -971,6 +991,7 @@ test('the ignored pull requests screen opens from Settings, lists, and unignores
   await page.getByLabel('Ignore rule type').selectOption('author');
   await page.getByRole('textbox', { name: 'Ignore rule', exact: true }).fill('sam');
   await page.getByRole('button', { name: 'Add ignore rule', exact: true }).click();
+  await saveSettings(page);
   // The count rides along with the button, and Enter opens the screen from the keyboard.
   const counted = page.getByRole('button', { name: 'Ignored pull requests · 2' });
   await counted.focus();
@@ -1008,6 +1029,7 @@ test('the ignored pull requests screen opens from Settings, lists, and unignores
     .locator('#settings-section-ignored-rules')
     .getByRole('button', { name: 'Remove', exact: true })
     .click();
+  await saveSettings(page);
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
   await expect(page.locator('.pr-card')).toHaveCount(3);
   await expect(page.getByText('Add audit event retention', { exact: true })).toBeHidden();
@@ -1085,6 +1107,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
     .locator('#settings-section-ignored-rules')
     .getByRole('button', { name: 'Remove' })
     .click();
+  await saveSettings(page);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
   expect(saved.schemaVersion).toBe(5);
   expect(saved.ignoreRules).toEqual([]);
@@ -1101,6 +1124,92 @@ test('legacy repository ignores migrate and future preferences are never overwri
   await page.reload();
   await expect(page.getByRole('alert')).toContainText('Unsupported preferences version');
   expect(await page.evaluate(() => localStorage.getItem('prefs'))).toBe(before);
+});
+
+test('settings edits stay a draft until saved, and leaving with unsaved changes asks first', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const refreshes = () => page.evaluate(() => (window as any).refreshCount);
+  const before = await refreshes();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Tracked repositories');
+  const save = page.getByRole('button', { name: 'Save changes', exact: true });
+  await expect(save).toBeHidden();
+  // Adding a repository checks it on GitHub, keeps the field usable, and only drafts the value.
+  // Hold that check open long enough to see the in-field progress indicator.
+  await page.evaluate(() => {
+    const w = window as any;
+    const invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command === 'github' && (args?.query as string)?.includes('DeskRepository'))
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      return invoke(command, args);
+    };
+  });
+  const repository = page.getByRole('textbox', { name: 'Repository', exact: true });
+  await repository.fill('acme/platform');
+  await page.getByRole('button', { name: 'Add repository' }).click();
+  await expect(page.getByRole('status', { name: 'Checking repository on GitHub' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add repository' })).toBeDisabled();
+  await page.screenshot({ path: '.context/settings-checking.png', fullPage: true });
+  await expect(page.locator('.setting-row').filter({ hasText: 'acme/platform' })).toHaveCount(1);
+  await expect(repository).toHaveValue('');
+  await expect(repository).toBeEnabled();
+  await expect(save).toBeVisible();
+  expect(await refreshes()).toBe(before);
+  expect(
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem('prefs')!)?.trackedRepositories ?? [],
+    ),
+  ).toEqual([]);
+  await page.screenshot({ path: '.context/settings-unsaved.png', fullPage: true });
+  // Leaving is blocked by a dialog. Keep editing returns to Settings with the draft intact.
+  const dialog = page.getByRole('dialog', { name: 'Save your settings?' });
+  await page.getByRole('button', { name: /Dashboard/ }).click();
+  await expect(dialog).toBeVisible();
+  await page.screenshot({ path: '.context/settings-unsaved-dialog.png', fullPage: true });
+  await page.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(save).toBeVisible();
+  // Discarding restores the last saved settings and leaves.
+  await page.keyboard.press('Shift+D');
+  await expect(dialog).toBeVisible();
+  await page.getByRole('button', { name: 'Discard changes' }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  expect(await refreshes()).toBe(before);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Tracked repositories');
+  await expect(page.getByText('No repositories tracked yet.')).toBeVisible();
+  // Removing a drafted value again leaves nothing to save.
+  await repository.fill('acme/platform');
+  await page.getByRole('button', { name: 'Add repository' }).click();
+  await expect(save).toBeVisible();
+  await page.getByRole('button', { name: 'Remove', exact: true }).click();
+  await expect(save).toBeHidden();
+  // The Ignored sub-screen is part of Settings, so it does not ask and keeps the draft.
+  await repository.fill('acme/platform');
+  await page.getByRole('button', { name: 'Add repository' }).click();
+  await expandSettingsSection(page, 'Ignored');
+  await page.getByRole('button', { name: /^Ignored pull requests/ }).click();
+  await expect(dialog).toBeHidden();
+  await page.getByRole('button', { name: 'Back to settings' }).click();
+  await expect(save).toBeVisible();
+  // Saving from the dialog writes the draft, refreshes in the background, and completes the move.
+  await page.getByRole('button', { name: /Dashboard/ }).click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect
+    .poll(async () =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!).trackedRepositories),
+    )
+    .toEqual(['acme/platform']);
+  // Tracking the repository moves its open PRs to Needs attention once the refresh lands.
+  await expect(page.locator('.column').nth(1).locator('.pr-card')).toHaveCount(3);
 });
 
 test('ordinary discovery needs no detail calls and all failed or pending checks affect placement', async ({

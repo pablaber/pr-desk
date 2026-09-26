@@ -242,3 +242,27 @@ function readStoredIgnoreRules(stored: {
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
   }
 }
+
+// The Settings screen edits these three lists locally and only writes them back on Save, so
+// every other part of the preferences file — snoozes, individual ignores, refresh settings —
+// stays free to change underneath an unsaved draft.
+export type PreferenceDraft = Pick<
+  AppState,
+  'trackedRepositories' | 'ignoreRules' | 'watchedPullRequests'
+>;
+export function preferenceDraft(state: AppState): PreferenceDraft {
+  return {
+    trackedRepositories: [...state.trackedRepositories],
+    ignoreRules: state.ignoreRules.map((rule) => ({ ...rule })),
+    watchedPullRequests: [...state.watchedPullRequests],
+  };
+}
+export function draftDiffers(draft: PreferenceDraft, state: AppState): boolean {
+  const same = (a: string[], b: string[]) =>
+    a.length === b.length && a.every((value, index) => value === b[index]);
+  return !(
+    same(draft.trackedRepositories, state.trackedRepositories) &&
+    same(draft.watchedPullRequests, state.watchedPullRequests) &&
+    same(draft.ignoreRules.map(ignoreRuleKey), state.ignoreRules.map(ignoreRuleKey))
+  );
+}

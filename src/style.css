@@ -742,6 +742,55 @@ footer {
   padding: 12px 0 0;
   color: #8d9a80;
 }
+.settings-field {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+.settings-field input {
+  flex: 1;
+}
+/* The spinner sits over the trailing edge of the field it belongs to; the extra padding keeps a
+   long value from running underneath it. */
+.settings-field .field-spinner {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  margin-top: -7px;
+  color: #67805a;
+  animation: field-spin 0.9s linear infinite;
+}
+.settings-field:has(.field-spinner) input {
+  padding-right: 30px;
+}
+@keyframes field-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.settings.with-save-bar {
+  padding-bottom: 90px;
+}
+.settings-save-bar {
+  position: fixed;
+  left: 190px;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 35px;
+  font-size: 12px;
+  background: #f7faf5;
+  border-top: 1px solid #cfdcc7;
+  box-shadow: 0 -6px 18px #26332e0f;
+}
+.settings-save-bar > div {
+  display: flex;
+  gap: 8px;
+}
 .settings-note {
   font-size: 10px;
 }
@@ -751,6 +800,9 @@ footer {
   }
   main {
     margin-left: 160px;
+  }
+  .settings-save-bar {
+    left: 160px;
   }
   .board {
     gap: 10px;

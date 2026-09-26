@@ -60,6 +60,10 @@ PR Desk has no in-app updater.
   to match text anywhere in a title. Any matching rule hides a PR from every dashboard source.
   Exact repository exclusions still narrow GitHub searches; repository patterns filter before
   detail fetching, and author/title rules use already-fetched details without extra requests.
+- Batches Settings edits: tracked repositories, ignore rules and watched pull requests are
+  collected as a draft — each new repository or PR is checked against GitHub as you add it —
+  and only Save writes them and refreshes the dashboard, in the background. Leaving Settings
+  with unsaved changes asks whether to save, discard, or keep editing.
 - Offers configurable automatic refresh while keeping failed refresh results visible
   and clearly marked as stale.
 - Stores preferences locally and uses your existing GitHub CLI authentication.
