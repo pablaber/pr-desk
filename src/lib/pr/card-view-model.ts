@@ -1,6 +1,6 @@
 import type { ClassifiedPR } from './classify';
 import type { TrackingReason } from './types';
-export const sourceLabels: Record<TrackingReason, string> = {
+const sourceLabels: Record<TrackingReason, string> = {
   owned: 'Mine',
   'direct-review-request': 'Review request',
   'tracked-repository': 'Tracked repo',
