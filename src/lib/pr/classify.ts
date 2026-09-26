@@ -1,3 +1,4 @@
+import { ignoresPullRequest } from './ignore';
 import { dashboardRules, type DashboardRule } from './dashboard-rules';
 import { deriveSignals } from './signals';
 import type { PullRequest } from './types';
@@ -11,7 +12,7 @@ export function classify(
 ) {
   if (
     pr.state !== 'OPEN' ||
-    local.ignoredRepositories.some((repo) => repo.toLowerCase() === pr.repository.toLowerCase()) ||
+    ignoresPullRequest(pr, local.ignoreRules) ||
     local.ignoredPullRequests[pr.id] ||
     Date.parse(local.snoozedPullRequests[pr.id]?.until ?? '') > now
   )

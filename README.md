@@ -52,7 +52,13 @@ PR Desk has no in-app updater.
   reviews, required checks, unresolved threads, conflicts, and draft state.
 - Combines your own PRs, direct review requests, tracked repositories, and individually
   watched PRs in one dashboard.
-- Filters by source and supports snoozing or ignoring PRs and entire repositories.
+- Filters by source and supports snoozing or individually ignoring PRs. Settings → Ignored
+  also hides PRs by repository, exact author login (including bots), or title. Repository and
+  title rules use case-insensitive whole-value globs: `*` matches zero or more characters and
+  `?` matches one. For example, `acme/*`, `*/docs`, or title `chore:*`; use `*dependenc*`
+  to match text anywhere in a title. Any matching rule hides a PR from every dashboard source.
+  Exact repository exclusions still narrow GitHub searches; repository patterns filter before
+  detail fetching, and author/title rules use already-fetched details without extra requests.
 - Offers configurable automatic refresh while keeping failed refresh results visible
   and clearly marked as stale.
 - Stores preferences locally and uses your existing GitHub CLI authentication.

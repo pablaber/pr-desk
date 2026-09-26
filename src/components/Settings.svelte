@@ -2,7 +2,7 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import RefreshInterval from './RefreshInterval.svelte';
   import SnoozeOptions from './SnoozeOptions.svelte';
-  import type { AppState, SnoozeOption } from '../lib/store/app-state';
+  import type { AppState, SnoozeOption, IgnoreRuleKind } from '../lib/store/app-state';
   let {
     preferences,
     busy,
@@ -14,13 +14,15 @@
   }: {
     preferences: AppState;
     busy: boolean;
-    onadd: (kind: 'repo' | 'pr' | 'ignored-repo', value: string) => Promise<boolean>;
-    onremove: (kind: 'repo' | 'pr' | 'ignored-repo', value: string) => void;
+    onadd: (kind: 'repo' | 'pr' | IgnoreRuleKind, value: string) => Promise<boolean>;
+    onremove: (kind: 'repo' | 'pr' | IgnoreRuleKind, value: string) => void;
     onrestore: (kind: 'ignored' | 'snoozed', id: string) => void;
     onrefreshinterval: (minutes: number) => Promise<void>;
     onsnoozeoptions: (options: SnoozeOption[]) => Promise<void>;
   } = $props();
-  let ignoredRepository = $state(''),
+  let ignoreKind = $state<IgnoreRuleKind>('repository');
+  const ignoreLabels = { repository: 'Repository', author: 'PR author', title: 'PR title' };
+  let ignoreValue = $state(''),
     repository = $state(''),
     pr = $state('');
 
@@ -30,7 +32,7 @@
     refresh: true,
     snooze: false,
     tracked: false,
-    ignoredRepos: false,
+    ignoredRules: false,
     watched: false,
     ignoredPrs: false,
   });
@@ -136,39 +138,66 @@
       <button
         type="button"
         class="settings-section-toggle"
-        aria-expanded={open.ignoredRepos}
-        aria-controls="settings-section-ignored-repos"
-        onclick={() => (open.ignoredRepos = !open.ignoredRepos)}
+        aria-expanded={open.ignoredRules}
+        aria-controls="settings-section-ignored-rules"
+        onclick={() => (open.ignoredRules = !open.ignoredRules)}
         ><ChevronRight class="chevron" size={13} />
-        {heading('Ignored repositories', preferences.ignoredRepositories.length)}</button
+        {heading('Ignored', preferences.ignoreRules.length)}</button
       >
     </h2>
-    {#if open.ignoredRepos}
-      <div class="settings-section-body" id="settings-section-ignored-repos">
+    {#if open.ignoredRules}
+      <div class="settings-section-body" id="settings-section-ignored-rules">
         <p>
-          Hide all PRs from these repositories, including your own, review requests, tracked and
-          watched PRs. Remove a repository here to show its PRs again.
+          Hide PRs matching any rule, including your own, review requests, tracked and watched PRs.
+          Remove a rule to make matching PRs eligible to appear on the next refresh.
         </p>
         <form
           onsubmit={async (e) => {
             e.preventDefault();
-            if (await onadd('ignored-repo', ignoredRepository)) ignoredRepository = '';
+            if (await onadd(ignoreKind, ignoreValue)) ignoreValue = '';
           }}
         >
+          <select aria-label="Ignore rule type" bind:value={ignoreKind} disabled={busy}>
+            <option value="repository">Repository</option>
+            <option value="author">PR author</option>
+            <option value="title">PR title</option>
+          </select>
           <input
-            aria-label="Ignored repository"
-            placeholder="owner/repository"
-            bind:value={ignoredRepository}
+            aria-label="Ignore rule"
+            aria-describedby="ignore-rule-help"
+            placeholder={ignoreKind === 'repository'
+              ? 'acme/*'
+              : ignoreKind === 'author'
+                ? 'dependabot[bot]'
+                : 'chore:*'}
+            bind:value={ignoreValue}
             required
+            disabled={busy}
           />
-          <button class="primary-button" disabled={busy}>Ignore repository</button>
+          <button class="primary-button" disabled={busy}>Add ignore rule</button>
         </form>
-        {#each preferences.ignoredRepositories as repo}<div class="setting-row">
-            <code>{repo}</code><button
+        <p id="ignore-rule-help">
+          {#if ignoreKind === 'repository'}
+            Use owner/repository, acme/*, */docs, or acme/service-?.
+          {:else if ignoreKind === 'author'}
+            Use an exact GitHub login without @, such as octocat or dependabot[bot].
+          {:else}
+            Use chore:* for titles starting with “chore:”, or *dependenc* for titles containing
+            “dependenc”.
+          {/if}
+          Matching is case-insensitive.
+          {#if ignoreKind !== 'author'}
+            Patterns match the entire {ignoreKind === 'repository' ? 'repository name' : 'title'}: *
+            matches zero or more characters; ? matches exactly one. All other characters are
+            literal.
+          {/if}
+        </p>
+        {#each preferences.ignoreRules as rule}<div class="setting-row">
+            <span>{ignoreLabels[rule.kind]}: <code>{rule.value}</code></span><button
               disabled={busy}
-              onclick={() => onremove('ignored-repo', repo)}>Remove</button
+              onclick={() => onremove(rule.kind, rule.value)}>Remove</button
             >
-          </div>{:else}<p class="empty-setting">No repositories ignored.</p>{/each}
+          </div>{:else}<p class="empty-setting">No ignore rules.</p>{/each}
       </div>
     {/if}
   </section>
@@ -225,7 +254,10 @@
     </h2>
     {#if open.ignoredPrs}
       <div class="settings-section-body" id="settings-section-ignored-prs">
-        <p>Hidden until you restore them. Closed or inaccessible PRs stay saved here.</p>
+        <p>
+          Individually ignored with Ignore PR, separate from broad rules above. Restoring a PR keeps
+          any matching broad rules in effect. Closed or inaccessible PRs stay saved here.
+        </p>
         {#each Object.keys(preferences.ignoredPullRequests) as id}<div class="setting-row">
             <code>{id}</code><button disabled={busy} onclick={() => onrestore('ignored', id)}
               >Restore</button

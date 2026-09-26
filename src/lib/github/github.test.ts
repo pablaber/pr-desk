@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GhGitHubService, type QueryRunner } from './client';
 import { normalize, normalizeCheck } from './normalize';
 import { refreshDashboard } from './refresh';
+import { classify } from '../pr/classify';
 import { defaultState } from '../store/app-state';
 import { pr } from '../../test/fixtures';
 import type { GitHubService, RawPR } from './types';
@@ -147,7 +148,7 @@ it('skips ignored tracked repos and details, including watched and failed cached
   local.trackedRepositories = ['acme/api'];
   local.watchedPullRequests = ['acme/api#1'];
   const previous = await refreshDashboard(api, local);
-  local.ignoredRepositories = ['ACME/API'];
+  local.ignoreRules = [{ kind: 'repository', value: 'ACME/API' }];
   vi.mocked(api.getRepositoryPullRequests).mockClear();
   vi.mocked(api.getPullRequest).mockClear();
   vi.mocked(api.getOwnedPullRequests).mockRejectedValue(new Error('offline'));
@@ -158,6 +159,55 @@ it('skips ignored tracked repos and details, including watched and failed cached
   expect(api.getRepositoryPullRequests).not.toHaveBeenCalled();
   expect(api.getPullRequest).not.toHaveBeenCalled();
   expect(api.getDirectReviewRequests).toHaveBeenLastCalledWith(['ACME/API']);
-  local.ignoredRepositories = [];
+  local.ignoreRules = [];
   expect((await refreshDashboard(api, local, result)).prs).toHaveLength(1);
+});
+
+it('filters repository patterns before details and sends only exact exclusions to searches', async () => {
+  const api = service(),
+    local = defaultState();
+  local.trackedRepositories = ['acme/api'];
+  local.watchedPullRequests = ['acme/api#1'];
+  const previous = await refreshDashboard(api, local);
+  local.ignoreRules = [
+    { kind: 'repository', value: 'acme/a?i' },
+    { kind: 'repository', value: 'other/exact' },
+    { kind: 'author', value: 'someone' },
+    { kind: 'title', value: '*noise*' },
+  ];
+  vi.mocked(api.getRepositoryPullRequests).mockClear();
+  vi.mocked(api.getPullRequest).mockClear();
+  vi.mocked(api.getOwnedPullRequests).mockRejectedValue(new Error('offline'));
+  const result = await refreshDashboard(api, local, previous);
+  expect(result.prs).toEqual([]);
+  expect(api.getRepositoryPullRequests).not.toHaveBeenCalled();
+  expect(api.getPullRequest).not.toHaveBeenCalled();
+  expect(api.getOwnedPullRequests).toHaveBeenLastCalledWith(['other/exact']);
+  expect(api.getDirectReviewRequests).toHaveBeenLastCalledWith(['other/exact']);
+});
+
+it.each([
+  { kind: 'author' as const, value: 'ME' },
+  { kind: 'title' as const, value: '*caching' },
+])('keeps request counts and stale recovery intact for $kind rules', async (rule) => {
+  const api = service(),
+    local = defaultState();
+  const previous = await refreshDashboard(api, local);
+  local.ignoreRules = [rule];
+  vi.mocked(api.getPullRequest).mockClear();
+  const fresh = await refreshDashboard(api, local, previous);
+  expect(api.getPullRequest).toHaveBeenCalledTimes(1);
+  expect(api.getOwnedPullRequests).toHaveBeenLastCalledWith([]);
+  expect(api.getDirectReviewRequests).toHaveBeenLastCalledWith([]);
+  expect(classify(fresh.prs[0], 'me', local)).toBeNull();
+  vi.mocked(api.getOwnedPullRequests).mockRejectedValue(new Error('offline'));
+  vi.mocked(api.getDirectReviewRequests).mockRejectedValue(new Error('offline'));
+  vi.mocked(api.getPullRequest).mockRejectedValue(new Error('offline'));
+  const stale = await refreshDashboard(api, local, fresh);
+  expect(stale.staleIds).toEqual(['acme/api#1']);
+  expect(classify(stale.prs[0], 'me', local)).toBeNull();
+  local.ignoreRules = [];
+  const restored = await refreshDashboard(api, local, stale);
+  expect(classify(restored.prs[0], 'me', local)).not.toBeNull();
+  expect(restored.staleIds).toEqual(['acme/api#1']);
 });

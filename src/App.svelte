@@ -28,6 +28,9 @@
     loadState,
     saveState,
     parseRepository,
+    parseIgnoreRule,
+    ignoreRuleKey,
+    type IgnoreRuleKind,
     parsePullRequest,
     isRefreshInterval,
     parseSnoozeOptions,
@@ -167,15 +170,17 @@
       saving = false;
     }
   }
-  async function add(kind: 'repo' | 'pr' | 'ignored-repo', value: string): Promise<boolean> {
+  async function add(kind: 'repo' | 'pr' | IgnoreRuleKind, value: string): Promise<boolean> {
     if (saving || loading) return false;
     saving = true;
     error = '';
     try {
       const next = structuredClone($state.snapshot(preferences));
-      if (kind === 'ignored-repo') {
-        const repo = parseRepository(value);
-        next.ignoredRepositories = [...new Set([...next.ignoredRepositories, repo])];
+      if (kind === 'repository' || kind === 'author' || kind === 'title') {
+        const rule = parseIgnoreRule(kind, value);
+        if (next.ignoreRules.some((existing) => ignoreRuleKey(existing) === ignoreRuleKey(rule)))
+          throw new Error('That ignore rule is already configured.');
+        next.ignoreRules = [...next.ignoreRules, rule];
       } else if (kind === 'repo') {
         const repo = parseRepository(value);
         await service.validateRepository(repo);
@@ -198,10 +203,12 @@
       saving = false;
     }
   }
-  async function remove(kind: 'repo' | 'pr' | 'ignored-repo', value: string) {
+  async function remove(kind: 'repo' | 'pr' | IgnoreRuleKind, value: string) {
     await change((next) => {
-      if (kind === 'ignored-repo')
-        next.ignoredRepositories = next.ignoredRepositories.filter((r) => r !== value);
+      if (kind === 'repository' || kind === 'author' || kind === 'title')
+        next.ignoreRules = next.ignoreRules.filter(
+          (rule) => rule.kind !== kind || rule.value !== value,
+        );
       else if (kind === 'repo')
         next.trackedRepositories = next.trackedRepositories.filter((r) => r !== value);
       else next.watchedPullRequests = next.watchedPullRequests.filter((p) => p !== value);
