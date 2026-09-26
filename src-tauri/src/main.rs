@@ -1,4 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+mod errors;
+
 use std::{path::PathBuf, time::Duration};
 use tokio::process::Command;
 
@@ -55,6 +57,9 @@ async fn github(operation: String, query: Option<String>) -> Result<serde_json::
         // Never return auth output: gh may include credential details in diagnostics.
         if operation == "auth" {
             return Err("GitHub authentication failed. Run gh auth login --hostname github.com in Terminal, then retry.".into());
+        }
+        if let Some(code) = errors::graphql_error_code(&output.stdout) {
+            return Err(code.into());
         }
         return Err(format!("GitHub request failed ({}). Check repository access, connectivity, and API rate limits.", output.status));
     }

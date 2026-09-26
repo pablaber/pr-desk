@@ -1,6 +1,7 @@
 <script lang="ts">
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+  import { githubErrorMessage } from '../lib/github/errors';
   import RefreshInterval from './RefreshInterval.svelte';
   import SnoozeOptions from './SnoozeOptions.svelte';
   import type { AppState, SnoozeOption, IgnoreRuleKind } from '../lib/store/app-state';
@@ -32,6 +33,7 @@
   let ignoreValue = $state(''),
     repository = $state(''),
     pr = $state('');
+  let repositoryError = $state('');
   // Adding a repository or a watched PR asks GitHub whether it exists before the value joins the
   // draft, so each of those two fields shows its own in-field progress while that check runs.
   let checking = $state({ repo: false, pr: false });
@@ -52,11 +54,15 @@
   async function submit(field: 'repo' | 'pr', value: string) {
     if (checking[field]) return;
     checking[field] = true;
+    if (field === 'repo') repositoryError = '';
     try {
       if (await onadd(field, value)) {
         if (field === 'repo') repository = '';
         else pr = '';
       }
+    } catch (error) {
+      if (field === 'repo') repositoryError = githubErrorMessage(error);
+      else throw error;
     } finally {
       checking[field] = false;
     }
@@ -142,6 +148,9 @@
           <span class="settings-field">
             <input
               aria-label="Repository"
+              aria-invalid={repositoryError ? true : undefined}
+              aria-describedby={repositoryError ? 'repository-error' : undefined}
+              oninput={() => (repositoryError = '')}
               placeholder="owner/repository"
               bind:value={repository}
               required
@@ -157,6 +166,9 @@
             >Add repository</button
           >
         </form>
+        {#if repositoryError}
+          <p id="repository-error" class="field-error" role="alert">{repositoryError}</p>
+        {/if}
         {#each preferences.trackedRepositories as repo}<div class="setting-row">
             <code>{repo}</code><button disabled={busy} onclick={() => onremove('repo', repo)}
               >Remove</button

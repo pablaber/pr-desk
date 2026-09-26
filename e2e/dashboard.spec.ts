@@ -1316,3 +1316,48 @@ test('check continuation gates the initial snapshot and preserves cards during r
   await page.evaluate(() => (window as any).releaseContinuation());
   await expect(page.locator('.column').nth(0)).toContainText('Updated after complete refresh');
 });
+
+test('repository validation errors stay beside the input and allow correction', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.evaluate(() => {
+    const w = window as any;
+    const invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (args?.query?.includes('DeskRepository') && args.query.includes('missing-repo'))
+        throw 'GITHUB_REPOSITORY_NOT_FOUND';
+      return invoke(command, args);
+    };
+  });
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Tracked repositories');
+  const repository = page.getByRole('textbox', { name: 'Repository', exact: true });
+  const add = page.getByRole('button', { name: 'Add repository' });
+  const alert = page.locator('#settings-section-tracked').getByRole('alert');
+  await repository.fill('octocat/missing-repo');
+  await add.click();
+  await expect(alert).toContainText('We couldn’t find that repository');
+  await expect(alert).toContainText('your GitHub account doesn’t have access');
+  await expect(repository).toHaveAttribute('aria-describedby', 'repository-error');
+  await expect(repository).toHaveAttribute('aria-invalid', 'true');
+  await expect(repository).toHaveValue('octocat/missing-repo');
+  await expect(page.locator('.alert')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeHidden();
+  await page.screenshot({ path: '.context/settings-repository-error.png', fullPage: true });
+  await repository.fill('invalid');
+  await expect(alert).toBeHidden();
+  await add.click();
+  await expect(alert).toBeVisible();
+  await expect(alert).not.toContainText('We couldn’t find');
+  await repository.fill('acme/platform');
+  await add.click();
+  await expect(repository).toHaveValue('');
+  await expect(alert).toBeHidden();
+  await expect(repository).not.toHaveAttribute('aria-invalid');
+  await saveSettings(page);
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!).trackedRepositories),
+  ).toEqual(['acme/platform']);
+});
