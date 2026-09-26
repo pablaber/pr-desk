@@ -29,6 +29,12 @@ npm run tauri dev
 and CSS edits update automatically; Rust edits trigger a rebuild and restart. Stop the
 development session with `Ctrl+C` in the terminal.
 
+The development app has a pink Dock icon with the same PR Desk artwork. The
+`npm run tauri` wrapper selects `src-tauri/tauri.dev.conf.json` automatically for
+`dev` and `build --debug`; normal release builds keep the green icon. When invoking
+the Tauri CLI directly, pass `--config src-tauri/tauri.dev.conf.json` to use the pink icon.
+The development icon source and generated macOS assets live in `src-tauri/dev-icons/`.
+
 The development app uses your real GitHub account and shares saved preferences with
 the packaged app; it does not use separate demo data or storage.
 
