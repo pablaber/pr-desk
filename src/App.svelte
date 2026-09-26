@@ -18,6 +18,7 @@
   import { stalenessLevel } from './lib/pr/card-view-model';
   import type { PullRequest } from './lib/pr/types';
   import PRCard from './components/PRCard.svelte';
+  import Ignored from './components/Ignored.svelte';
   import Snoozed from './components/Snoozed.svelte';
   import Settings from './components/Settings.svelte';
   import HotkeyHelp from './components/HotkeyHelp.svelte';
@@ -45,7 +46,7 @@
   let preferences = $state<AppState>(defaultState());
   let snapshot = $state<DashboardSnapshot>({ prs: [], sources: {}, warnings: [], staleIds: [] });
   let login = $state(''),
-    screen = $state<'dashboard' | 'snoozed' | 'settings'>('dashboard');
+    screen = $state<'dashboard' | 'snoozed' | 'settings' | 'ignored'>('dashboard');
   let closingPR = $state<PullRequest | null>(null);
   let closeError = $state('');
   let showHotkeys = $state(false);
@@ -349,7 +350,9 @@
           ? 'Dashboard'
           : screen === 'snoozed'
             ? 'Snoozed'
-            : 'Settings'}</span
+            : screen === 'ignored'
+              ? 'Settings / Ignored pull requests'
+              : 'Settings'}</span
       >
       <div>
         {#if refreshed}<span class="refresh-time">Updated {refreshed}</span>{/if}<button
@@ -389,15 +392,26 @@
         onaction={action}
         onrestore={(id) => restore('snoozed', id)}
       />
+    {:else if screen === 'ignored'}
+      <Ignored
+        {preferences}
+        {snapshot}
+        {login}
+        {now}
+        busy={saving || loading}
+        onopen={open}
+        onunignore={(id) => restore('ignored', id)}
+        onback={() => (screen = 'settings')}
+      />
     {:else if screen === 'settings'}
       <Settings
         {preferences}
         busy={saving || loading}
         onadd={add}
         onremove={remove}
-        onrestore={restore}
         onrefreshinterval={setRefreshInterval}
         onsnoozeoptions={setSnoozeOptions}
+        onopenignored={() => (screen = 'ignored')}
       />
     {:else}
       <div class="dashboard-heading">
