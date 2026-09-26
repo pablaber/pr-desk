@@ -13,8 +13,8 @@ The confirmed Close as stale action closes stale PRs with a fixed automatic comm
 
 Pinned and expected versions: Rust 1.94.0 (`rust-toolchain.toml`, installed by rustup
 without changing your global default), Node 22.12+ or 24+ (CI uses 24), Svelte 5,
-Vite 7, Vitest 4, Prettier 3, Playwright. Anything Tauri needs macOS with the Xcode
-Command Line Tools.
+Vite 7, Vitest 4, Prettier 3, Playwright, Fallow 3.29.0 (pinned exactly). Anything Tauri
+needs macOS with the Xcode Command Line Tools.
 
 ## Commands
 
@@ -32,6 +32,8 @@ Verification — the same set CI runs, so run all of it before pushing:
 ```sh
 npm run format         # rewrite; CI runs format:check and fails on unformatted files
 npm run check          # svelte-check + TypeScript
+npm run fallow:dead-code
+npm run fallow:dupes   # both must be clean; see Static analysis below
 npm test               # vitest, src only
 node --test scripts/update-homebrew.test.mjs
 npm run build          # vite build
@@ -60,6 +62,7 @@ Inspect the generated screenshot and include the updated image in the change.
 | `src/lib/store/app-state.ts`        | versioned preferences and all input validation                                                                        |
 | `src/App.svelte`, `src/components/` | rendering only                                                                                                        |
 | `src/test/fixtures.ts`              | shared unit-test fixtures (never shipped)                                                                             |
+| `.fallowrc.jsonc`                   | Fallow config; the only place for analyzer exceptions, each with its reason                                           |
 | `e2e/dashboard.spec.ts`             | Playwright against the real UI with the Tauri boundary mocked                                                         |
 | `scripts/`                          | `install.sh`, `notarize-macos.sh`, `update-homebrew.mjs` (+ its `node --test` suite)                                  |
 | `docs/macos-signing.md`             | signing and notarization reference                                                                                    |
@@ -108,6 +111,21 @@ reasons the code cannot state — for example in `src/lib/pr/classify.ts`:
   tests; UI-visible behavior needs an `e2e/` case.
 - Playwright mocks the Tauri boundary rather than calling GitHub. Keep mock fixtures
   out of the shipped bundle.
+
+## Static analysis
+
+Fallow runs in CI on every pull request, in the required **Unit and browser tests** check,
+and both commands must be clean before pushing.
+
+- `fallow dead-code` covers `src/`, `e2e/`, `scripts/` and the root config files. Resolve a
+  finding by deleting the code or wiring it up — an unused export that only its own module
+  uses should simply stop being exported.
+- `fallow dupes` reports duplicated blocks. Prefer extracting the shared markup or logic:
+  the ignored and snoozed rows share `src/components/RowSummary.svelte` for exactly this
+  reason, with each caller passing an `unavailable` snippet for its own wording.
+- Exceptions belong in `.fallowrc.jsonc`, narrow and each with a comment saying why the
+  finding is wrong for this project. Do not reach for inline suppressions, and do not widen
+  an ignore to silence a finding you could fix.
 
 ## Boundaries
 

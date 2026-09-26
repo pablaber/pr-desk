@@ -38,6 +38,12 @@ jobs:
       - name: Check Svelte and TypeScript
         run: npm run check
 
+      - name: Check for dead code
+        run: npm run fallow:dead-code
+
+      - name: Check for duplicate code
+        run: npm run fallow:dupes
+
       - name: Run unit tests
         run: npm test
 

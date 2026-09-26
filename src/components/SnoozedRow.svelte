@@ -1,6 +1,6 @@
 <script lang="ts">
   import Clock from '@lucide/svelte/icons/clock';
-  import PRDetails from './PRDetails.svelte';
+  import RowSummary from './RowSummary.svelte';
   import SnoozeChoices from './SnoozeChoices.svelte';
   import type { snoozedPullRequests } from '../lib/pr/snoozed';
   import type { SnoozeOption } from '../lib/store/app-state';
@@ -50,16 +50,13 @@
     onclick={() =>
       onopen(row.item?.pr.url ?? `https://github.com/${row.id.replace('#', '/pull/')}`)}
   >
-    {#if row.item}
-      <PRDetails item={row.item} {now} {stale} />
-      {#if row.item.pr.state !== 'OPEN'}<span class="badge"
-          >{row.item.pr.state === 'MERGED' ? 'Merged' : 'Closed'}</span
-        >{/if}
-    {:else}
-      <span class="repo">{row.id}</span><strong>Pull request details unavailable</strong><span
-        class="secondary">You can still open, reschedule, or restore this pull request.</span
-      >
-    {/if}
+    <RowSummary item={row.item} {now} {stale}>
+      {#snippet unavailable()}
+        <span class="repo">{row.id}</span><strong>Pull request details unavailable</strong><span
+          class="secondary">You can still open, reschedule, or restore this pull request.</span
+        >
+      {/snippet}
+    </RowSummary>
   </button>
   <div class="snoozed-schedule">
     <span class="snoozed-until-label">Snoozed until</span>

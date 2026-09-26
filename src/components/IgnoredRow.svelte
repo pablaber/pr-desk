@@ -1,5 +1,5 @@
 <script lang="ts">
-  import PRDetails from './PRDetails.svelte';
+  import RowSummary from './RowSummary.svelte';
   import type { ignoredPullRequests } from '../lib/pr/ignored';
   let {
     row,
@@ -25,16 +25,13 @@
     aria-label={`Open ${row.item?.pr.title ?? row.id} on GitHub`}
     onclick={() => onopen(row.url)}
   >
-    {#if row.item}
-      <PRDetails item={row.item} {now} {stale} />
-      {#if row.item.pr.state !== 'OPEN'}<span class="badge"
-          >{row.item.pr.state === 'MERGED' ? 'Merged' : 'Closed'}</span
-        >{/if}
-    {:else}
-      <span class="repo">{row.repository} <span class="number">#{row.number}</span></span><strong
-        >Pull request details unavailable</strong
-      ><span class="secondary">You can still open or unignore this pull request.</span>
-    {/if}
+    <RowSummary item={row.item} {now} {stale}>
+      {#snippet unavailable()}
+        <span class="repo">{row.repository} <span class="number">#{row.number}</span></span><strong
+          >Pull request details unavailable</strong
+        ><span class="secondary">You can still open or unignore this pull request.</span>
+      {/snippet}
+    </RowSummary>
   </button>
   <div class="ignored-meta">
     <span class="ignored-at-label">Ignored</span>

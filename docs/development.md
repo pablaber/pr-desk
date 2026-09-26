@@ -158,6 +158,8 @@ Run the same checks used by CI before pushing:
 ```sh
 npm run format
 npm run check
+npm run fallow:dead-code
+npm run fallow:dupes
 npm test
 node --test scripts/update-homebrew.test.mjs
 npm run build
@@ -177,6 +179,17 @@ npm run test:e2e
 
 Playwright exercises the real Svelte UI with a mocked Tauri boundary. Mock fixtures
 never ship in the app.
+
+### Static analysis
+
+[Fallow](https://github.com/fallow-rs/fallow) is pinned as an exact dev dependency and
+runs in CI. `npm run fallow:dead-code` reports unreachable files, unused exports and
+unused dependencies; `npm run fallow:dupes` reports duplicated blocks. Both cover `src/`,
+`e2e/`, `scripts/` and the root config files, and both must be clean.
+
+Resolve findings by deleting or reusing the code. When a finding is genuinely wrong for
+this project, record a narrow exception with its reason in `.fallowrc.jsonc` rather than
+an inline suppression, so every exception stays reviewable in one place.
 
 ### Update the README screenshot
 

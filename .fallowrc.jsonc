@@ -1,0 +1,8 @@
+// Analyzer exceptions live here rather than in inline suppressions, narrow and with the reason
+// beside them. Everything else passes on fallow's defaults.
+{
+  "$schema": "./node_modules/fallow/schema.json",
+  // vite-plugin-svelte loads svelte.config.js by convention, so nothing imports it and the
+  // static graph cannot see the edge that makes it reachable.
+  "dynamicallyLoaded": ["svelte.config.js"]
+}
