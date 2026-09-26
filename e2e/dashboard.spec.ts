@@ -453,11 +453,14 @@ test('automatic refresh does not overlap a slow manual refresh', async ({ page }
     };
   });
   await refresh.click();
-  await expect(page.getByRole('button', { name: 'Refreshing…' })).toBeDisabled();
+  const refreshing = page.getByRole('button', { name: 'Refreshing…' });
+  await expect(refreshing).toBeDisabled();
+  await expect(refreshing).toHaveClass(/refreshing/);
   await page.clock.fastForward(10 * 60_000);
   expect(await page.evaluate(() => (window as any).refreshCount)).toBe(2);
   await page.evaluate(() => (window as any).releaseRefresh());
   await expect(refresh).toBeEnabled();
+  await expect(refresh).not.toHaveClass(/refreshing/);
 });
 
 test('refresh slider and numeric input stay synchronized and validate exact values', async ({

@@ -425,6 +425,7 @@
           disabled={showLoading || saving}
           onclick={manualRefresh}
           aria-keyshortcuts={refreshHotkey ? ariaKeyShortcut(refreshHotkey) : null}
+          class:refreshing={showLoading}
           ><RefreshCw size={13} />
           {showLoading ? 'Refreshing…' : 'Refresh'}
           {#if refreshHotkey}<span class="refresh-hotkey" aria-hidden="true"
