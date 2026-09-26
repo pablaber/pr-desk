@@ -21,6 +21,55 @@ test.beforeEach(async ({ page }) => {
       nodes,
       pageInfo: { hasNextPage: false, endCursor: null },
     });
+    const raw = (number: number) => ({
+      number,
+      url: `https://github.com/acme/platform/pull/${number}`,
+      title:
+        [
+          'Reduce cache lookup latency',
+          'Refresh session token handling',
+          'Add audit event retention',
+          'Simplify deployment configuration',
+        ][number - 1] ?? 'A watched pull request',
+      repository: { nameWithOwner: 'acme/platform' },
+      author: { login: number === 4 ? 'sam' : 'alex' },
+      state: 'OPEN',
+      isDraft: false,
+      // Days since the last update, chosen to produce one card per staleness level.
+      updatedAt: new Date(
+        Date.now() - ([1 / 24, 10, 20, 30][number - 1] ?? 1 / 24) * 86400000,
+      ).toISOString(),
+      reviewDecision: number === 1 ? 'APPROVED' : number === 2 ? 'CHANGES_REQUESTED' : null,
+      mergeable: 'MERGEABLE',
+      mergeStateStatus: 'CLEAN',
+      reviewRequests: connection(
+        number === 4 ? [{ requestedReviewer: { __typename: 'User', login: 'alex' } }] : [],
+      ),
+      reviewThreads: connection(
+        number === 2
+          ? Array.from({ length: 3 }, () => ({ isResolved: false, isOutdated: false }))
+          : [],
+      ),
+      commits: {
+        nodes: [
+          {
+            commit: {
+              oid: 'commit-1',
+              statusCheckRollup: {
+                contexts: connection([
+                  {
+                    __typename: 'CheckRun',
+                    name: 'CI',
+                    status: 'COMPLETED',
+                    conclusion: 'SUCCESS',
+                  },
+                ]),
+              },
+            },
+          },
+        ],
+      },
+    });
     w.__TAURI_INTERNALS__ = {
       invoke: async (command: string, args: Record<string, any>) => {
         if (command === 'plugin:store|load') return 1;
@@ -53,76 +102,18 @@ test.beforeEach(async ({ page }) => {
           return {
             search: {
               issueCount: 3,
-              ...connection(
-                (query.includes('author:@me') ? [1, 2, 3] : [4]).map((n) => ({
-                  url: `https://github.com/acme/platform/pull/${n}`,
-                })),
-              ),
+              ...connection((query.includes('author:@me') ? [1, 2, 3] : [4]).map(raw)),
             },
           };
         if (query.includes('DeskRepository'))
           return {
             repository: {
               nameWithOwner: 'acme/platform',
-              pullRequests: connection(
-                [1, 2, 3, 4].map((n) => ({ url: `https://github.com/acme/platform/pull/${n}` })),
-              ),
+              pullRequests: connection([1, 2, 3, 4].map(raw)),
             },
           };
         const number = Number(query.match(/pullRequest\(number: (\d+)/)?.[1]);
-        return {
-          repository: {
-            pullRequest: {
-              number,
-              url: `https://github.com/acme/platform/pull/${number}`,
-              title:
-                [
-                  'Reduce cache lookup latency',
-                  'Refresh session token handling',
-                  'Add audit event retention',
-                  'Simplify deployment configuration',
-                ][number - 1] ?? 'A watched pull request',
-              repository: { nameWithOwner: 'acme/platform' },
-              author: { login: number === 4 ? 'sam' : 'alex' },
-              state: 'OPEN',
-              isDraft: false,
-              // Days since the last update, chosen to produce one card per staleness level.
-              updatedAt: new Date(
-                Date.now() - ([1 / 24, 10, 20, 30][number - 1] ?? 1 / 24) * 86400000,
-              ).toISOString(),
-              reviewDecision: number === 1 ? 'APPROVED' : number === 2 ? 'CHANGES_REQUESTED' : null,
-              mergeable: 'MERGEABLE',
-              mergeStateStatus: 'CLEAN',
-              reviewRequests: connection(
-                number === 4 ? [{ requestedReviewer: { __typename: 'User', login: 'alex' } }] : [],
-              ),
-              reviewThreads: connection(
-                number === 2
-                  ? Array.from({ length: 3 }, () => ({ isResolved: false, isOutdated: false }))
-                  : [],
-              ),
-              commits: {
-                nodes: [
-                  {
-                    commit: {
-                      statusCheckRollup: {
-                        contexts: connection([
-                          {
-                            __typename: 'CheckRun',
-                            name: 'CI',
-                            status: 'COMPLETED',
-                            conclusion: 'SUCCESS',
-                            isRequired: true,
-                          },
-                        ]),
-                      },
-                    },
-                  },
-                ],
-              },
-            },
-          },
-        };
+        return { repository: { pullRequest: raw(number) } };
       },
     };
   });
@@ -812,8 +803,8 @@ for (const manualTrigger of ['button', 'shortcut', 'none'] as const) {
           await new Promise((resolve) => {
             w.releaseRefresh = resolve;
           });
-        if (args?.query?.includes('pullRequest(number: 1)'))
-          result.repository.pullRequest.title = 'Updated pull request title';
+        if (args?.query?.includes('author:@me'))
+          result.search.nodes[0].title = 'Updated pull request title';
         return result;
       };
     });
@@ -1110,4 +1101,109 @@ test('legacy repository ignores migrate and future preferences are never overwri
   await page.reload();
   await expect(page.getByRole('alert')).toContainText('Unsupported preferences version');
   expect(await page.evaluate(() => localStorage.getItem('prefs'))).toBe(before);
+});
+
+test('ordinary discovery needs no detail calls and all failed or pending checks affect placement', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const w = window as any,
+      invoke = w.__TAURI_INTERNALS__.invoke;
+    w.detailCalls = 0;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (args?.query?.includes('DeskPullRequest')) w.detailCalls++;
+      const result = await invoke(command, args);
+      for (const pr of result?.search?.nodes ?? []) {
+        if (pr.number === 1)
+          pr.commits.nodes[0].commit.statusCheckRollup.contexts.nodes[0].conclusion = 'FAILURE';
+        if (pr.number === 3)
+          pr.commits.nodes[0].commit.statusCheckRollup.contexts.nodes[0].status = 'IN_PROGRESS';
+      }
+      return result;
+    };
+  });
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const failed = page.locator('.pr-card').filter({ hasText: 'Reduce cache lookup latency' });
+  const pending = page.locator('.pr-card').filter({ hasText: 'Add audit event retention' });
+  await expect(failed).toContainText('Checks failed');
+  await expect(pending).toContainText('Checks running');
+  await expect(page.locator('.column').nth(0).locator('.pr-card')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).detailCalls)).toBe(0);
+});
+
+test('check continuation gates the initial snapshot and preserves cards during refresh', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const w = window as any,
+      invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (args?.query?.includes('DeskPullRequest')) {
+        await new Promise((resolve) => {
+          w.releaseContinuation = resolve;
+        });
+        return {
+          repository: {
+            pullRequest: {
+              commits: {
+                nodes: [
+                  {
+                    commit: {
+                      oid: 'commit-1',
+                      statusCheckRollup: {
+                        contexts: {
+                          nodes: [
+                            {
+                              __typename: 'CheckRun',
+                              name: 'Additional check',
+                              status: 'COMPLETED',
+                              conclusion: w.refreshCount === 1 ? 'FAILURE' : 'SUCCESS',
+                            },
+                          ],
+                          pageInfo: { hasNextPage: false, endCursor: null },
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        };
+      }
+      const result = await invoke(command, args);
+      for (const pr of result?.search?.nodes ?? [])
+        if (pr.number === 1) {
+          pr.commits.nodes[0].commit.statusCheckRollup.contexts.pageInfo = {
+            hasNextPage: true,
+            endCursor: 'more-checks',
+          };
+          if (w.refreshCount > 1) pr.title = 'Updated after complete refresh';
+        }
+      return result;
+    };
+  });
+  await page.goto('/');
+  await expect
+    .poll(() => page.evaluate(() => typeof (window as any).releaseContinuation))
+    .toBe('function');
+  await expect(page.locator('.pr-card')).toHaveCount(0);
+  await page.evaluate(() => {
+    (window as any).releaseContinuation();
+    (window as any).releaseContinuation = null;
+  });
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect(
+    page.locator('.pr-card').filter({ hasText: 'Reduce cache lookup latency' }),
+  ).toContainText('Checks failed');
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => typeof (window as any).releaseContinuation))
+    .toBe('function');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect(page.getByText('Reduce cache lookup latency', { exact: true })).toBeVisible();
+  await expect(page.getByText('Updated after complete refresh', { exact: true })).toHaveCount(0);
+  await page.evaluate(() => (window as any).releaseContinuation());
+  await expect(page.locator('.column').nth(0)).toContainText('Updated after complete refresh');
 });

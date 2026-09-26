@@ -10,7 +10,6 @@ export interface RawCheck {
   status?: string;
   conclusion?: string;
   state?: string;
-  isRequired: boolean;
 }
 export interface RawPR {
   url: string;
@@ -27,15 +26,17 @@ export interface RawPR {
   reviewRequests: Connection<{ requestedReviewer: { __typename: string; login?: string } | null }>;
   reviewThreads: Connection<{ isResolved: boolean; isOutdated: boolean }>;
   commits: {
-    nodes: { commit: { statusCheckRollup: { contexts: Connection<RawCheck> } | null } }[];
+    nodes: {
+      commit: { oid: string; statusCheckRollup: { contexts: Connection<RawCheck> } | null };
+    }[];
   };
 }
 export interface GitHubService {
   authenticate(): Promise<void>;
   getCurrentUser(): Promise<string>;
-  getOwnedPullRequests(ignoredRepositories?: string[]): Promise<string[]>;
-  getDirectReviewRequests(ignoredRepositories?: string[]): Promise<string[]>;
-  getRepositoryPullRequests(repo: string): Promise<string[]>;
+  getOwnedPullRequests(ignoredRepositories?: string[]): Promise<RawPR[]>;
+  getDirectReviewRequests(ignoredRepositories?: string[]): Promise<RawPR[]>;
+  getRepositoryPullRequests(repo: string): Promise<RawPR[]>;
   validateRepository(repo: string): Promise<void>;
-  getPullRequest(id: string): Promise<PullRequest>;
+  getPullRequest(id: string, seed?: RawPR): Promise<PullRequest>;
 }

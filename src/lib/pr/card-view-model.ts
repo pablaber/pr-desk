@@ -30,7 +30,11 @@ export function cardViewModel(item: ClassifiedPR, now: number) {
   const checks = item.pr.checks;
   const secondary = [
     ...item.statuses.filter((s) => s !== item.primary),
-    ...(checks.some((c) => !c.required && c.state === 'failed') ? ['Optional checks failed'] : []),
+    ...(checks.some((c) => c.state === 'failed') &&
+    item.primary !== 'Checks failed' &&
+    !item.statuses.includes('Checks failed')
+      ? ['Checks failed']
+      : []),
     ...(item.pr.outdatedUnresolvedThreads
       ? [`${item.pr.outdatedUnresolvedThreads} outdated threads`]
       : []),

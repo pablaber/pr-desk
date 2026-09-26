@@ -49,7 +49,7 @@ PR Desk has no in-app updater.
 ## Key features
 
 - Sorts pull requests into Ready to merge, Needs attention, and Waiting based on
-  reviews, required checks, unresolved threads, conflicts, and draft state.
+  reviews, all checks, unresolved threads, conflicts, and draft state.
 - Combines your own PRs, direct review requests, tracked repositories, and individually
   watched PRs in one dashboard.
 - Filters by source and supports snoozing or individually ignoring PRs. Individually ignored
@@ -81,16 +81,19 @@ PR Desk never handles a GitHub token itself. GraphQL queries fetch:
 - Search `is:pr is:open author:@me` for owned PRs.
 - Search `is:pr is:open user-review-requested:@me` for **individual** review requests.
 - `repository.pullRequests(states: OPEN)` for tracked repositories.
-- `repository.pullRequest(number: ...)` for each unique PR, including watched PRs.
+- `repository.pullRequest(number: ...)` for missing connection pages and PRs absent from
+  discovery (watched PRs or IDs retained from failed sources).
 - Aggregate `reviewDecision`, `mergeable`, `mergeStateStatus`, draft/state/update
   fields, reviewer requests, review threads, and the latest commit's status-check
   rollup.
-- `CheckRun.isRequired(pullRequestNumber: ...)` and `StatusContext.isRequired(...)`
-  distinguish required from optional checks. Pending/unknown checks never count as
-  passing.
+- Every check contributes to status. Pending/unknown checks never count as passing;
+  success, neutral, and skipped checks pass. Empty check sets also pass. PR Desk can
+  withhold readiness when GitHub permits merging because an optional check failed.
 
 Searches, repository lists, review requests, review threads, and check contexts are
-paginated. Only `User` reviewers contribute direct requests; team requests never
+paginated. Complete discovery records need no detail request. Refresh finishes all
+fetching before publishing one snapshot; existing cards remain visible until then.
+Only `User` reviewers contribute direct requests; team requests never
 trigger attention. GitHub search's 1,000-result ceiling is reported as an error rather
 than silently truncating. Detail query failures are reported individually.
 
@@ -101,8 +104,8 @@ References: [GitHub check fields](https://docs.github.com/en/graphql/reference/c
 ## Current limits
 
 - One active GitHub.com account; there is no Enterprise hostname or account selector.
-- Detail queries run for each unique PR, so very large dashboards may need additional
-  time and API quota.
+- Discovery includes complete card fields. Large dashboards with paginated nested
+  connections still need additional time and API quota.
 - GitHub search indexing and mergeability computation can lag. Refresh again to fetch
   updated results.
 - Previously loaded cards remain visible and are marked stale when refresh fails;

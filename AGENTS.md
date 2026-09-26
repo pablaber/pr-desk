@@ -229,3 +229,16 @@ starts the build; a failed tap update can be re-run from that workflow run.
 - The dev app shares real preferences with the installed app — no separate demo storage.
 - Pending or unknown checks never count as passing, and team review requests never
   create attention. Tests assert both.
+
+## Fetching and check policy
+
+Discovery includes complete initial card fields. Reuse raw seeds and fetch only missing
+connection pages; individual lookups remain for watched or recovered IDs absent from
+successful discovery. Keep four-worker discovery and completion phases and publish one
+finished snapshot. Existing cards stay visible during refresh. Never combine check pages
+from different commit OIDs.
+
+All checks count, including optional checks GitHub permits merging without. Failed checks
+create attention for owned PRs; pending or unknown checks prevent readiness. Success,
+neutral, skipped, and no checks pass. Failures on others’ PRs are secondary information
+unless another attention rule applies. Do not restore a required/optional distinction.
