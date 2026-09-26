@@ -11,6 +11,8 @@ import {
   defaultSnoozeOptions,
   parseSnoozeOptions,
   snoozeOptionLabel,
+  preferenceDraft,
+  draftDiffers,
   type SnoozeOption,
 } from './app-state';
 it('validates and canonicalizes input', () => {
@@ -259,4 +261,42 @@ it('validates ignore rules and canonicalizes duplicates on load', () => {
     expect(() => migrateState({ ...defaultState(), ignoreRules })).toThrow(
       'Invalid preferences file',
     );
+});
+
+it('drafts only the Settings lists and reports whether they differ from the saved state', () => {
+  const state = {
+    ...defaultState(),
+    trackedRepositories: ['acme/api'],
+    ignoreRules: [{ kind: 'author' as const, value: 'dependabot[bot]' }],
+    watchedPullRequests: ['acme/api#1'],
+    ignoredPullRequests: { 'acme/api#2': { ignoredAt: '2026-01-01' } },
+  };
+  const draft = preferenceDraft(state);
+  expect(Object.keys(draft).sort()).toEqual([
+    'ignoreRules',
+    'trackedRepositories',
+    'watchedPullRequests',
+  ]);
+  expect(draftDiffers(draft, state)).toBe(false);
+  // A draft is a copy: editing it never reaches the saved state.
+  draft.trackedRepositories.push('acme/web');
+  expect(state.trackedRepositories).toEqual(['acme/api']);
+  expect(draftDiffers(draft, state)).toBe(true);
+  // Removing and re-adding the same values leaves nothing to save.
+  expect(draftDiffers(preferenceDraft(state), { ...state, ignoreRules: [] })).toBe(true);
+  expect(
+    draftDiffers(preferenceDraft(state), {
+      ...state,
+      ignoredPullRequests: {},
+      settings: { automaticRefreshMinutes: 0, snoozeOptions: [] },
+    }),
+  ).toBe(false);
+  // Order matters, so reordering a list is a change worth saving.
+  expect(
+    draftDiffers(
+      { ...preferenceDraft(state), trackedRepositories: ['acme/web', 'acme/api'] },
+      { ...state, trackedRepositories: ['acme/api', 'acme/web'] },
+    ),
+  ).toBe(true);
+  expect(draftDiffers({ ...preferenceDraft(state), watchedPullRequests: [] }, state)).toBe(true);
 });

@@ -1,21 +1,28 @@
 <script lang="ts">
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import RefreshInterval from './RefreshInterval.svelte';
   import SnoozeOptions from './SnoozeOptions.svelte';
   import type { AppState, SnoozeOption, IgnoreRuleKind } from '../lib/store/app-state';
   let {
     preferences,
     busy,
+    dirty,
     onadd,
     onremove,
+    onsave,
+    ondiscard,
     onrefreshinterval,
     onsnoozeoptions,
     onopenignored,
   }: {
     preferences: AppState;
     busy: boolean;
+    dirty: boolean;
     onadd: (kind: 'repo' | 'pr' | IgnoreRuleKind, value: string) => Promise<boolean>;
     onremove: (kind: 'repo' | 'pr' | IgnoreRuleKind, value: string) => void;
+    onsave: () => Promise<boolean>;
+    ondiscard: () => void;
     onrefreshinterval: (minutes: number) => Promise<void>;
     onsnoozeoptions: (options: SnoozeOption[]) => Promise<void>;
     onopenignored: () => void;
@@ -25,6 +32,9 @@
   let ignoreValue = $state(''),
     repository = $state(''),
     pr = $state('');
+  // Adding a repository or a watched PR asks GitHub whether it exists before the value joins the
+  // draft, so each of those two fields shows its own in-field progress while that check runs.
+  let checking = $state({ repo: false, pr: false });
 
   // Automatic refresh is a commonly adjusted, compact setting, so it starts open; the
   // management-heavy sections start collapsed.
@@ -39,9 +49,21 @@
   function heading(label: string, count: number): string {
     return count > 0 ? `${label} · ${count}` : label;
   }
+  async function submit(field: 'repo' | 'pr', value: string) {
+    if (checking[field]) return;
+    checking[field] = true;
+    try {
+      if (await onadd(field, value)) {
+        if (field === 'repo') repository = '';
+        else pr = '';
+      }
+    } finally {
+      checking[field] = false;
+    }
+  }
 </script>
 
-<div class="settings">
+<div class="settings" class:with-save-bar={dirty}>
   <header>
     <h1>Settings</h1>
     <p>Choose what belongs on your desk.</p>
@@ -112,17 +134,28 @@
           Show all open PRs from these repositories under Needs attention. Drafts stay in Waiting.
         </p>
         <form
-          onsubmit={async (e) => {
+          onsubmit={(e) => {
             e.preventDefault();
-            if (await onadd('repo', repository)) repository = '';
+            void submit('repo', repository);
           }}
         >
-          <input
-            aria-label="Repository"
-            placeholder="owner/repository"
-            bind:value={repository}
-            required
-          /><button class="primary-button" disabled={busy}>Add repository</button>
+          <span class="settings-field">
+            <input
+              aria-label="Repository"
+              placeholder="owner/repository"
+              bind:value={repository}
+              required
+              disabled={busy}
+            />
+            {#if checking.repo}<LoaderCircle
+                class="field-spinner"
+                size={14}
+                role="status"
+                aria-label="Checking repository on GitHub"
+              />{/if}
+          </span><button class="primary-button" disabled={busy || checking.repo}
+            >Add repository</button
+          >
         </form>
         {#each preferences.trackedRepositories as repo}<div class="setting-row">
             <code>{repo}</code><button disabled={busy} onclick={() => onremove('repo', repo)}
@@ -226,17 +259,26 @@
       <div class="settings-section-body" id="settings-section-watched">
         <p>Keep an individual PR here, even if you don’t track its repository.</p>
         <form
-          onsubmit={async (e) => {
+          onsubmit={(e) => {
             e.preventDefault();
-            if (await onadd('pr', pr)) pr = '';
+            void submit('pr', pr);
           }}
         >
-          <input
-            aria-label="Pull request URL"
-            placeholder="https://github.com/owner/repo/pull/123"
-            bind:value={pr}
-            required
-          /><button class="primary-button" disabled={busy}>Watch PR</button>
+          <span class="settings-field">
+            <input
+              aria-label="Pull request URL"
+              placeholder="https://github.com/owner/repo/pull/123"
+              bind:value={pr}
+              required
+              disabled={busy}
+            />
+            {#if checking.pr}<LoaderCircle
+                class="field-spinner"
+                size={14}
+                role="status"
+                aria-label="Checking pull request on GitHub"
+              />{/if}
+          </span><button class="primary-button" disabled={busy || checking.pr}>Watch PR</button>
         </form>
         {#each preferences.watchedPullRequests as id}<div class="setting-row">
             <code>{id}</code><button disabled={busy} onclick={() => onremove('pr', id)}
@@ -250,3 +292,14 @@
     GitHub.com · Authentication managed by gh · Preferences stored on this Mac
   </p>
 </div>
+{#if dirty}
+  <div class="settings-save-bar" role="region" aria-label="Unsaved settings">
+    <span>Unsaved changes. Tracking takes effect after you save.</span>
+    <div>
+      <button type="button" disabled={busy} onclick={ondiscard}>Discard</button>
+      <button type="button" class="primary-button" disabled={busy} onclick={() => void onsave()}
+        >{busy ? 'Saving…' : 'Save changes'}</button
+      >
+    </div>
+  </div>
+{/if}

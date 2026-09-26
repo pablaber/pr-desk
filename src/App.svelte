@@ -21,6 +21,7 @@
   import Ignored from './components/Ignored.svelte';
   import Snoozed from './components/Snoozed.svelte';
   import Settings from './components/Settings.svelte';
+  import UnsavedChanges from './components/UnsavedChanges.svelte';
   import HotkeyHelp from './components/HotkeyHelp.svelte';
   import { GhGitHubService } from './lib/github/client';
   import { refreshDashboard, type DashboardSnapshot } from './lib/github/refresh';
@@ -35,7 +36,10 @@
     parsePullRequest,
     isRefreshInterval,
     parseSnoozeOptions,
+    preferenceDraft,
+    draftDiffers,
     type AppState,
+    type PreferenceDraft,
     type SnoozeOption,
   } from './lib/store/app-state';
   import { classify, sortPullRequests } from './lib/pr/classify';
@@ -45,8 +49,15 @@
   const service = new GhGitHubService();
   let preferences = $state<AppState>(defaultState());
   let snapshot = $state<DashboardSnapshot>({ prs: [], sources: {}, warnings: [], staleIds: [] });
+  type Screen = 'dashboard' | 'snoozed' | 'settings' | 'ignored';
   let login = $state(''),
-    screen = $state<'dashboard' | 'snoozed' | 'settings' | 'ignored'>('dashboard');
+    screen = $state<Screen>('dashboard');
+  // Settings edits live here until Save, so leaving and returning through the Ignored sub-screen
+  // keeps them, and a refresh never fires for a half-finished list of repositories.
+  let settingsDraft = $state<PreferenceDraft | null>(null);
+  let settingsDirty = $derived(settingsDraft !== null && draftDiffers(settingsDraft, preferences));
+  let settingsView = $derived(settingsDraft ? { ...preferences, ...settingsDraft } : preferences);
+  let pendingScreen = $state<Screen | null>(null);
   let closingPR = $state<PullRequest | null>(null);
   let closeError = $state('');
   let showHotkeys = $state(false);
@@ -55,6 +66,7 @@
     saving = $state(false),
     initialized = $state(false);
   let silentRefresh = $state(false);
+  let refreshQueued = false;
   let showLoading = $derived(loading && !silentRefresh);
   let error = $state(''),
     setupError = $state(''),
@@ -131,7 +143,12 @@
     if (initialized) await refresh();
   }
   async function refresh(silent = false) {
-    if (loading || saving) return;
+    if (loading || saving) {
+      // A background refresh asked for while one is already running would otherwise be dropped,
+      // leaving the board built from the preferences that were current before the save.
+      if (silent) refreshQueued = true;
+      return;
+    }
     loading = true;
     silentRefresh = silent;
     error = '';
@@ -143,6 +160,10 @@
       error = String(e);
     } finally {
       loading = false;
+    }
+    if (refreshQueued) {
+      refreshQueued = false;
+      await refresh(true);
     }
   }
   function manualRefresh() {
@@ -171,41 +192,50 @@
       saving = false;
     }
   }
+  function editDraft(update: (next: PreferenceDraft) => void) {
+    const next = preferenceDraft(
+      settingsDraft ? { ...preferences, ...settingsDraft } : preferences,
+    );
+    update(next);
+    settingsDraft = next;
+  }
+  // Validating a value costs a GitHub round trip for repositories and PRs, so it happens here,
+  // before the value joins the draft. Nothing is written or refreshed until Save.
   async function add(kind: 'repo' | 'pr' | IgnoreRuleKind, value: string): Promise<boolean> {
-    if (saving || loading) return false;
-    saving = true;
+    if (saving) return false;
     error = '';
     try {
-      const next = structuredClone($state.snapshot(preferences));
       if (kind === 'repository' || kind === 'author' || kind === 'title') {
         const rule = parseIgnoreRule(kind, value);
-        if (next.ignoreRules.some((existing) => ignoreRuleKey(existing) === ignoreRuleKey(rule)))
+        if (settingsView.ignoreRules.some((e) => ignoreRuleKey(e) === ignoreRuleKey(rule)))
           throw new Error('That ignore rule is already configured.');
-        next.ignoreRules = [...next.ignoreRules, rule];
+        editDraft((next) => {
+          next.ignoreRules = [...next.ignoreRules, rule];
+        });
       } else if (kind === 'repo') {
         const repo = parseRepository(value);
         await service.validateRepository(repo);
-        next.trackedRepositories = [...new Set([...next.trackedRepositories, repo])];
+        editDraft((next) => {
+          next.trackedRepositories = [...new Set([...next.trackedRepositories, repo])];
+        });
       } else {
         const id = parsePullRequest(value);
         const pr = await service.getPullRequest(id);
         if (pr.state !== 'OPEN')
           throw new Error('This PR is closed or merged. Watch an open PR instead.');
-        next.watchedPullRequests = [...new Set([...next.watchedPullRequests, pr.id])];
+        editDraft((next) => {
+          next.watchedPullRequests = [...new Set([...next.watchedPullRequests, pr.id])];
+        });
       }
-      await persist(next);
-      saving = false;
-      await refresh();
       return true;
     } catch (e) {
       error = String(e);
       return false;
-    } finally {
-      saving = false;
     }
   }
-  async function remove(kind: 'repo' | 'pr' | IgnoreRuleKind, value: string) {
-    await change((next) => {
+  function remove(kind: 'repo' | 'pr' | IgnoreRuleKind, value: string) {
+    error = '';
+    editDraft((next) => {
       if (kind === 'repository' || kind === 'author' || kind === 'title')
         next.ignoreRules = next.ignoreRules.filter(
           (rule) => rule.kind !== kind || rule.value !== value,
@@ -214,7 +244,42 @@
         next.trackedRepositories = next.trackedRepositories.filter((r) => r !== value);
       else next.watchedPullRequests = next.watchedPullRequests.filter((p) => p !== value);
     });
-    await refresh();
+  }
+  async function saveSettings(): Promise<boolean> {
+    if (!settingsDraft || saving) return false;
+    const draft = $state.snapshot(settingsDraft) as PreferenceDraft;
+    await change((next) => {
+      next.trackedRepositories = draft.trackedRepositories;
+      next.ignoreRules = draft.ignoreRules;
+      next.watchedPullRequests = draft.watchedPullRequests;
+    });
+    // change() reports failures through error; keep the draft so the user can try again.
+    if (error) return false;
+    settingsDraft = null;
+    void refresh(true);
+    return true;
+  }
+  function discardSettings() {
+    settingsDraft = null;
+    error = '';
+  }
+  // The Ignored screen is part of Settings, so a draft survives a trip through it; anything else
+  // leaves Settings behind and has to ask first.
+  function navigate(to: Screen) {
+    if (settingsDirty && to !== 'settings' && to !== 'ignored') pendingScreen = to;
+    else screen = to;
+  }
+  async function saveAndLeave() {
+    const to = pendingScreen;
+    if (!(await saveSettings())) return;
+    pendingScreen = null;
+    if (to) screen = to;
+  }
+  function discardAndLeave() {
+    const to = pendingScreen;
+    discardSettings();
+    pendingScreen = null;
+    if (to) screen = to;
   }
   async function action(id: string, action: string, until?: string) {
     if (action === 'close-stale') {
@@ -261,16 +326,16 @@
     await refresh();
   }
   function handleHotkey(event: KeyboardEvent) {
-    if (closingPR) return;
+    if (closingPR || pendingScreen) return;
     const hotkey = resolveHotkey(event, event.target as HTMLElement | null);
     if (!hotkey) return;
     event.preventDefault();
     // While the shortcut list is up, the only shortcut that still acts is the one that
     // dismisses it; navigating behind an open dialog would leave the user lost.
     if (showHotkeys && hotkey.action !== 'toggle-shortcuts') return;
-    if (hotkey.action === 'open-dashboard') screen = 'dashboard';
-    else if (hotkey.action === 'open-snoozed') screen = 'snoozed';
-    else if (hotkey.action === 'open-settings') screen = 'settings';
+    if (hotkey.action === 'open-dashboard') navigate('dashboard');
+    else if (hotkey.action === 'open-snoozed') navigate('snoozed');
+    else if (hotkey.action === 'open-settings') navigate('settings');
     else if (hotkey.action === 'refresh') manualRefresh();
     else if (hotkey.action === 'toggle-shortcuts') showHotkeys = !showHotkeys;
   }
@@ -295,7 +360,7 @@
     <nav aria-label="Main navigation">
       <button
         class:active={screen === 'dashboard'}
-        onclick={() => (screen = 'dashboard')}
+        onclick={() => navigate('dashboard')}
         aria-keyshortcuts={dashboardHotkey ? ariaKeyShortcut(dashboardHotkey) : null}
         ><LayoutGrid size={15} /> Dashboard
         {#if dashboardHotkey}<span class="nav-hotkey" aria-hidden="true"
@@ -304,7 +369,7 @@
       >
       <button
         class:active={screen === 'snoozed'}
-        onclick={() => (screen = 'snoozed')}
+        onclick={() => navigate('snoozed')}
         aria-keyshortcuts={snoozedHotkey ? ariaKeyShortcut(snoozedHotkey) : null}
       >
         <Clock size={15} /> Snoozed
@@ -317,7 +382,7 @@
       <nav aria-label="Preferences">
         <button
           class:active={screen === 'settings'}
-          onclick={() => (screen = 'settings')}
+          onclick={() => navigate('settings')}
           aria-keyshortcuts={settingsHotkey ? ariaKeyShortcut(settingsHotkey) : null}
           ><SettingsIcon size={15} /> Settings{#if settingsHotkey}<span
               class="nav-hotkey"
@@ -401,17 +466,20 @@
         busy={saving || loading}
         onopen={open}
         onunignore={(id) => restore('ignored', id)}
-        onback={() => (screen = 'settings')}
+        onback={() => navigate('settings')}
       />
     {:else if screen === 'settings'}
       <Settings
-        {preferences}
-        busy={saving || loading}
+        preferences={settingsView}
+        busy={saving}
+        dirty={settingsDirty}
         onadd={add}
         onremove={remove}
+        onsave={saveSettings}
+        ondiscard={discardSettings}
         onrefreshinterval={setRefreshInterval}
         onsnoozeoptions={setSnoozeOptions}
-        onopenignored={() => (screen = 'ignored')}
+        onopenignored={() => navigate('ignored')}
       />
     {:else}
       <div class="dashboard-heading">
@@ -504,6 +572,15 @@
     {/if}
   </main>
 </div>
+<UnsavedChanges
+  open={pendingScreen !== null}
+  busy={saving}
+  onsave={() => void saveAndLeave()}
+  ondiscard={discardAndLeave}
+  oncancel={() => {
+    if (!saving) pendingScreen = null;
+  }}
+/>
 <HotkeyHelp open={showHotkeys} onclose={() => (showHotkeys = false)} />
 
 <CloseStale
