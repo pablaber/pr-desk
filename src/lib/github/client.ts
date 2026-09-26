@@ -1,12 +1,19 @@
 import { invoke } from '@tauri-apps/api/core';
 import { parsePullRequest, parseRepository } from '../store/app-state';
+import { githubErrorMessage } from './errors';
 import { normalize, rawConnections } from './normalize';
 import { pullRequestQuery, repositoryQuery, searchQuery } from './queries';
 import type { Connection, GitHubService, RawPR } from './types';
 export type QueryRunner = <T>(query: string) => Promise<T>;
 export class GhGitHubService implements GitHubService {
   constructor(
-    private query: QueryRunner = (query) => invoke('github', { operation: 'graphql', query }),
+    private query: QueryRunner = async (query) => {
+      try {
+        return await invoke('github', { operation: 'graphql', query });
+      } catch (error) {
+        throw new Error(githubErrorMessage(error));
+      }
+    },
   ) {}
   async closeStalePullRequest(input: string) {
     const [repository, number] = parsePullRequest(input).split('#');
@@ -51,8 +58,7 @@ export class GhGitHubService implements GitHubService {
     const data = await this.query<{ repository: unknown }>(
       repositoryQuery(parseRepository(repo), null, true),
     );
-    if (!data.repository)
-      throw new Error('Repository not found or not accessible to your GitHub account.');
+    if (!data.repository) throw new Error('GITHUB_REPOSITORY_NOT_FOUND');
   }
   async getRepositoryPullRequests(repo: string) {
     const prs: RawPR[] = [];

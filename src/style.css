@@ -1102,3 +1102,8 @@ footer {
 .board.silent-refresh .menu-trigger:disabled {
   opacity: 1;
 }
+
+.settings-section-body .field-error {
+  color: #9c3b32;
+  margin-top: 8px;
+}

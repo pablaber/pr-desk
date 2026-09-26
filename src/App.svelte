@@ -229,6 +229,7 @@
       }
       return true;
     } catch (e) {
+      if (kind === 'repo') throw e;
       error = String(e);
       return false;
     }
