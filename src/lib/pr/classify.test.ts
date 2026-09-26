@@ -141,7 +141,7 @@ describe('dashboard rules', () => {
 
 it('hides ignored repositories immediately regardless of tracking reason', () => {
   const preferences = defaultState();
-  preferences.ignoredRepositories = ['ACME/API'];
+  preferences.ignoreRules = [{ kind: 'repository', value: 'ACME/API' }];
   expect(
     classify(
       pr({ reasons: ['owned', 'watched', 'tracked-repository', 'direct-review-request'] }),

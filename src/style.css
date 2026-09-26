@@ -20,6 +20,7 @@ body {
   margin: 0;
 }
 button,
+.settings-section select,
 input {
   font: inherit;
 }
@@ -40,10 +41,12 @@ button:disabled {
 }
 button:focus-visible,
 input:focus-visible,
+.settings-section select:focus-visible,
 summary:focus-visible {
   outline: 2px solid #488066;
   outline-offset: 3px;
 }
+.settings-section select,
 input {
   padding: 9px 11px;
   border: 1px solid #d7dfd8;

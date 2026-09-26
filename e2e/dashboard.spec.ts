@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 // Collapsed by default: expand a Settings accordion section by its heading text before
 // interacting with controls inside it.
 async function expandSettingsSection(page: Page, heading: string) {
-  await page.getByRole('button', { name: heading }).click();
+  await page.getByRole('button', { name: new RegExp(`^${heading}( · [0-9]+)?$`) }).click();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -500,30 +500,28 @@ test('ignored repositories validate, persist, override tracking, and can be remo
   await expandSettingsSection(page, 'Watched pull requests');
   await page.getByRole('textbox', { name: 'Pull request URL' }).fill('acme/platform#5');
   await page.getByRole('button', { name: 'Watch PR', exact: true }).click();
-  await expandSettingsSection(page, 'Ignored repositories');
-  const input = page.getByRole('textbox', { name: 'Ignored repository', exact: true });
+  await expandSettingsSection(page, 'Ignored');
+  const input = page.getByRole('textbox', { name: 'Ignore rule', exact: true });
   await input.fill('invalid');
-  await page.getByRole('button', { name: 'Ignore repository', exact: true }).click();
+  await page.getByRole('button', { name: 'Add ignore rule', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Use owner/repository');
   await input.fill(' Acme/Platform ');
-  await page.getByRole('button', { name: 'Ignore repository', exact: true }).click();
+  await page.getByRole('button', { name: 'Add ignore rule', exact: true }).click();
   const section = page
     .locator('.settings-section')
-    .filter({ has: page.getByRole('heading', { name: 'Ignored repositories' }) });
-  await expect(section.locator('.setting-row')).toHaveText('acme/platformRemove');
+    .filter({ has: page.getByRole('heading', { name: /^Ignored( · [0-9]+)?$/ }) });
+  await expect(section.locator('.setting-row')).toHaveText('Repository: acme/platformRemove');
   await input.fill('acme/platform');
-  await page.getByRole('button', { name: 'Ignore repository', exact: true }).click();
-  await expect(input).toHaveValue('');
+  await page.getByRole('button', { name: 'Add ignore rule', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('already configured');
   await expect(section.locator('.setting-row')).toHaveCount(1);
-  await expect(
-    page.getByRole('heading', { name: 'Ignored repositories · 1', exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ignored · 1', exact: true })).toBeVisible();
   await page.screenshot({ path: '.context/ignored-repositories.png', fullPage: true });
   await page.reload();
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
   await expect(page.locator('.pr-card')).toHaveCount(0);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Ignored repositories');
+  await expandSettingsSection(page, 'Ignored');
   await section.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(section.locator('.setting-row')).toHaveCount(0);
   await page.getByRole('button', { name: /Dashboard/ }).click();
@@ -536,7 +534,11 @@ test('settings sections default to accordion states, expand/collapse by mouse an
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   const section = (name: RegExp | string) =>
-    page.locator('.settings-section').filter({ has: page.getByRole('heading', { name }) });
+    page.locator('.settings-section').filter({
+      has: page.getByRole('heading', {
+        name: typeof name === 'string' ? new RegExp(`^${name}( · [0-9]+)?$`) : name,
+      }),
+    });
   // Automatic refresh is expanded by default; the management-heavy sections start collapsed.
   await expect(section('Automatic refresh').getByRole('button')).toHaveAttribute(
     'aria-expanded',
@@ -545,7 +547,7 @@ test('settings sections default to accordion states, expand/collapse by mouse an
   for (const heading of [
     'Snooze options · 4',
     'Tracked repositories',
-    'Ignored repositories',
+    'Ignored',
     'Watched pull requests',
     'Ignored pull requests',
   ]) {
@@ -882,4 +884,116 @@ test('interface icons render as bundled Lucide SVG and stay out of accessible na
   await expect(page.locator('.empty-column')).toHaveCount(3);
   await expect(page.locator('.empty-column svg.lucide')).toHaveCount(3);
   await page.screenshot({ path: '.context/empty-columns.png', fullPage: true });
+});
+
+for (const [kind, value, remaining] of [
+  ['repository', 'ACME/*', 0],
+  ['author', 'SAM', 3],
+  ['title', '*SESSION*', 3],
+] as const) {
+  test(`${kind} ignore rules hide matching PRs, persist, and restore on removal`, async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await expect(page.locator('.pr-card')).toHaveCount(4);
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await expandSettingsSection(page, 'Ignored');
+    await page.getByLabel('Ignore rule type').selectOption(kind);
+    await page.getByRole('textbox', { name: 'Ignore rule', exact: true }).fill(value);
+    await page.getByRole('button', { name: 'Add ignore rule', exact: true }).click();
+    const section = page.locator('#settings-section-ignored-rules');
+    await expect(section.locator('.setting-row')).toContainText(value.toLowerCase());
+    if (kind === 'title')
+      await page.screenshot({ path: '.context/ignore-rules.png', fullPage: true });
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+    await expect(page.locator('.pr-card')).toHaveCount(remaining);
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await expandSettingsSection(page, 'Ignored');
+    await section.getByRole('button', { name: 'Remove', exact: true }).click();
+    await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+    await expect(page.locator('.pr-card')).toHaveCount(4);
+  });
+}
+
+test('broad rules stay effective on failed refreshes and do not erase individual ignores', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Actions for Add audit event retention' }).click();
+  await page.getByRole('button', { name: 'Ignore PR', exact: true }).click();
+  await page.evaluate(() => {
+    const w = window as any;
+    const invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command === 'github' && args?.operation === 'graphql') throw new Error('offline');
+      return invoke(command, args);
+    };
+  });
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Ignored');
+  await page.getByLabel('Ignore rule type').selectOption('author');
+  await page.getByRole('textbox', { name: 'Ignore rule', exact: true }).fill('ALEX');
+  await page.getByRole('button', { name: 'Add ignore rule', exact: true }).click();
+  await expect(page.locator('#settings-section-ignored-rules .setting-row')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(1);
+  await expect(page.locator('.pr-card')).toContainText('Simplify deployment');
+  await expect(page.getByText(/refresh issues/)).toBeVisible();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Ignored');
+  await page
+    .locator('#settings-section-ignored-rules')
+    .getByRole('button', { name: 'Remove' })
+    .click();
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(3);
+  await expect(page.getByText('Add audit event retention', { exact: true })).toBeHidden();
+});
+
+test('legacy repository ignores migrate and future preferences are never overwritten', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.evaluate(() =>
+    localStorage.setItem(
+      'prefs',
+      JSON.stringify({
+        schemaVersion: 4,
+        trackedRepositories: ['acme/platform'],
+        ignoredRepositories: ['Acme/Platform'],
+        watchedPullRequests: [],
+        ignoredPullRequests: { 'acme/platform#2': { ignoredAt: '2026-01-01' } },
+        snoozedPullRequests: {},
+        settings: { automaticRefreshMinutes: 0, snoozeOptions: [] },
+      }),
+    ),
+  );
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+  await expect(page.locator('.pr-card')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Ignored');
+  await page
+    .locator('#settings-section-ignored-rules')
+    .getByRole('button', { name: 'Remove' })
+    .click();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
+  expect(saved.schemaVersion).toBe(5);
+  expect(saved.ignoreRules).toEqual([]);
+  expect(saved.ignoredPullRequests).toHaveProperty('acme/platform#2');
+  expect(saved.settings.snoozeOptions).toEqual([]);
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(3);
+  await page.evaluate(() => {
+    const saved = JSON.parse(localStorage.getItem('prefs')!);
+    saved.schemaVersion = 999;
+    localStorage.setItem('prefs', JSON.stringify(saved));
+  });
+  const before = await page.evaluate(() => localStorage.getItem('prefs'));
+  await page.reload();
+  await expect(page.getByRole('alert')).toContainText('Unsupported preferences version');
+  expect(await page.evaluate(() => localStorage.getItem('prefs'))).toBe(before);
 });

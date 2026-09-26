@@ -5,10 +5,15 @@ export type SnoozeDay =
 export type SnoozeOption =
   | { kind: 'duration'; amount: number; unit: SnoozeUnit }
   | { kind: 'next'; day: SnoozeDay; hour: number };
+export type IgnoreRuleKind = 'repository' | 'author' | 'title';
+export interface IgnoreRule {
+  kind: IgnoreRuleKind;
+  value: string;
+}
 export interface AppState {
-  schemaVersion: 4;
+  schemaVersion: 5;
   trackedRepositories: string[];
-  ignoredRepositories: string[];
+  ignoreRules: IgnoreRule[];
   watchedPullRequests: string[];
   ignoredPullRequests: Record<string, { ignoredAt: string }>;
   snoozedPullRequests: Record<string, { until: string }>;
@@ -22,9 +27,9 @@ export const defaultSnoozeOptions = (): SnoozeOption[] => [
   { kind: 'duration', amount: 1, unit: 'weeks' },
 ];
 export const defaultState = (): AppState => ({
-  schemaVersion: 4,
+  schemaVersion: 5,
   trackedRepositories: [],
-  ignoredRepositories: [],
+  ignoreRules: [],
   watchedPullRequests: [],
   ignoredPullRequests: {},
   snoozedPullRequests: {},
@@ -38,8 +43,11 @@ export async function loadState(): Promise<AppState> {
 
 export function migrateState(value: unknown): AppState {
   if (!value) return defaultState();
-  const stored = value as Omit<AppState, 'schemaVersion'> & { schemaVersion: number };
-  if (![1, 2, 3, 4].includes(stored.schemaVersion))
+  const stored = value as Omit<AppState, 'schemaVersion'> & {
+    schemaVersion: number;
+    ignoredRepositories?: string[];
+  };
+  if (![1, 2, 3, 4, 5].includes(stored.schemaVersion))
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
@@ -52,6 +60,7 @@ export function migrateState(value: unknown): AppState {
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
   if (
     stored.schemaVersion >= 3 &&
+    stored.schemaVersion <= 4 &&
     (!Array.isArray(stored.ignoredRepositories) ||
       stored.ignoredRepositories.some((repo) => typeof repo !== 'string'))
   )
@@ -60,17 +69,17 @@ export function migrateState(value: unknown): AppState {
   const minutes = stored.settings?.automaticRefreshMinutes;
   return {
     ...defaultState(),
-    ...stored,
-    schemaVersion: 4,
-    ignoredRepositories:
-      stored.schemaVersion >= 3
-        ? [...new Set(stored.ignoredRepositories.map(parseRepository))]
-        : [],
+    trackedRepositories: stored.trackedRepositories,
+    watchedPullRequests: stored.watchedPullRequests,
+    ignoredPullRequests: stored.ignoredPullRequests,
+    snoozedPullRequests: stored.snoozedPullRequests,
+    schemaVersion: 5,
+    ignoreRules: readStoredIgnoreRules(stored),
     settings: {
       automaticRefreshMinutes:
         stored.schemaVersion !== 1 && isRefreshInterval(minutes) ? minutes : 5,
       snoozeOptions:
-        stored.schemaVersion === 4
+        stored.schemaVersion >= 4
           ? readStoredSnoozeOptions(stored.settings?.snoozeOptions)
           : defaultSnoozeOptions(),
     },
@@ -183,4 +192,53 @@ export function snoozeUntil(option: SnoozeOption, now = new Date()): string {
   );
   date.setHours(option.hour, 0, 0, 0);
   return date.toISOString();
+}
+
+export function parseRepositoryPattern(input: string): string {
+  const value = input.trim().toLowerCase();
+  if (!value.includes('*') && !value.includes('?')) return parseRepository(value);
+  if (!/^[a-z0-9*?][a-z0-9*?-]*\/[a-z0-9_.*?-]+$/.test(value))
+    throw new Error('Use owner/repository or a pattern such as acme/*, */docs, or acme/service-?.');
+  return value;
+}
+export function parseIgnoreRule(kind: IgnoreRuleKind, input: string): IgnoreRule {
+  if (typeof input !== 'string') throw new Error('Enter an ignore rule.');
+  const value = input.trim().toLowerCase();
+  if (kind === 'repository') return { kind, value: parseRepositoryPattern(value) };
+  if (kind === 'author') {
+    if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\[bot\])?$/.test(value))
+      throw new Error(
+        'Enter an exact GitHub login, such as octocat or dependabot[bot], without @.',
+      );
+    return { kind, value };
+  }
+  if (kind === 'title') {
+    if (!value || /[\u0000-\u001f\u007f]/.test(value))
+      throw new Error('Enter a single-line title pattern, such as *dependenc* or chore:*.');
+    return { kind, value };
+  }
+  throw new Error('Choose Repository, PR author, or PR title.');
+}
+export function ignoreRuleKey(rule: IgnoreRule): string {
+  return `${rule.kind}:${rule.value}`;
+}
+function readStoredIgnoreRules(stored: {
+  schemaVersion: number;
+  ignoreRules?: unknown;
+  ignoredRepositories?: string[];
+}): IgnoreRule[] {
+  try {
+    const rules =
+      stored.schemaVersion === 5
+        ? stored.ignoreRules
+        : (stored.schemaVersion >= 3 ? stored.ignoredRepositories! : []).map((repo) => ({
+            kind: 'repository',
+            value: parseRepository(repo),
+          }));
+    if (!Array.isArray(rules)) throw new Error('Invalid rules');
+    const parsed = rules.map((rule) => parseIgnoreRule(rule?.kind, rule?.value));
+    return [...new Map(parsed.map((rule) => [ignoreRuleKey(rule), rule])).values()];
+  } catch {
+    throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
+  }
 }

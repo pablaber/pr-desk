@@ -1,3 +1,4 @@
+import { exactIgnoredRepositories, ignoresRepository } from '../pr/ignore';
 import type { AppState } from '../store/app-state';
 import type { PullRequest, TrackingReason } from '../pr/types';
 import type { GitHubService } from './types';
@@ -15,18 +16,18 @@ export async function refreshDashboard(
   const warnings: string[] = [],
     sources: Record<string, string[]> = {},
     staleIds: string[] = [];
-  const ignored = new Set(local.ignoredRepositories.map((repo) => repo.toLowerCase()));
-  const include = (id: string) => !ignored.has(id.split('#')[0].toLowerCase());
+  const ignored = exactIgnoredRepositories(local.ignoreRules);
+  const include = (id: string) => !ignoresRepository(id.split('#')[0], local.ignoreRules);
   const jobs: { key: string; reason: TrackingReason; run: () => Promise<string[]> }[] = [
     {
       key: 'owned',
       reason: 'owned',
-      run: () => service.getOwnedPullRequests(local.ignoredRepositories),
+      run: () => service.getOwnedPullRequests(ignored),
     },
     {
       key: 'reviews',
       reason: 'direct-review-request',
-      run: () => service.getDirectReviewRequests(local.ignoredRepositories),
+      run: () => service.getDirectReviewRequests(ignored),
     },
     ...local.trackedRepositories.filter(include).map((repo) => ({
       key: repo,

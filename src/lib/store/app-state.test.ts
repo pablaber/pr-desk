@@ -1,6 +1,8 @@
 import { expect, it } from 'vitest';
 import {
   parsePullRequest,
+  parseIgnoreRule,
+  parseRepositoryPattern,
   parseRepository,
   snoozeUntil,
   defaultState,
@@ -102,7 +104,7 @@ it('defaults to five minutes and migrates reserved v1 settings without losing pr
     settings: { automaticRefreshMinutes: 0 },
   };
   expect(migrateState(legacy)).toMatchObject({
-    schemaVersion: 4,
+    schemaVersion: 5,
     watchedPullRequests: ['acme/api#1'],
     settings: { automaticRefreshMinutes: 5, snoozeOptions: defaultSnoozeOptions() },
   });
@@ -121,12 +123,12 @@ it('preserves Never and all valid intervals, and repairs invalid stored interval
         .automaticRefreshMinutes,
     ).toBe(5);
   }
-  expect(() => migrateState({ ...defaultState(), schemaVersion: 5 })).toThrow('Unsupported');
+  expect(() => migrateState({ ...defaultState(), schemaVersion: 6 })).toThrow('Unsupported');
 });
 
 it('migrates older preferences and validates ignored repositories', () => {
   for (const schemaVersion of [1, 2]) {
-    const { ignoredRepositories: _, ...legacy } = defaultState();
+    const { ignoreRules: _, ...legacy } = defaultState();
     expect(
       migrateState({
         ...legacy,
@@ -135,16 +137,19 @@ it('migrates older preferences and validates ignored repositories', () => {
         settings: { automaticRefreshMinutes: 0 },
       }),
     ).toMatchObject({
-      schemaVersion: 4,
-      ignoredRepositories: [],
+      schemaVersion: 5,
+      ignoreRules: [],
       trackedRepositories: ['acme/api'],
       settings: { automaticRefreshMinutes: schemaVersion === 1 ? 5 : 0 },
     });
   }
   expect(
-    migrateState({ ...defaultState(), ignoredRepositories: [' Acme/API ', 'acme/api'] })
-      .ignoredRepositories,
-  ).toEqual(['acme/api']);
+    migrateState({
+      ...defaultState(),
+      schemaVersion: 4,
+      ignoredRepositories: [' Acme/API ', 'acme/api'],
+    }).ignoreRules,
+  ).toEqual([{ kind: 'repository', value: 'acme/api' }]);
   for (const ignoredRepositories of [
     undefined,
     null,
@@ -153,7 +158,9 @@ it('migrates older preferences and validates ignored repositories', () => {
     ['invalid'],
     ['acme/api is:closed'],
   ])
-    expect(() => migrateState({ ...defaultState(), ignoredRepositories })).toThrow();
+    expect(() =>
+      migrateState({ ...defaultState(), schemaVersion: 4, ignoredRepositories }),
+    ).toThrow();
 });
 
 it('migrates snooze options and refuses to overwrite an invalid saved list', () => {
@@ -171,11 +178,85 @@ it('migrates snooze options and refuses to overwrite an invalid saved list', () 
   ).toEqual([]);
   // Pre-v4 files predate the setting and start from the defaults.
   for (const schemaVersion of [1, 2, 3])
-    expect(migrateState({ ...defaultState(), schemaVersion }).settings.snoozeOptions).toEqual(
-      defaultSnoozeOptions(),
-    );
+    expect(
+      migrateState({ ...defaultState(), schemaVersion, ignoredRepositories: [] }).settings
+        .snoozeOptions,
+    ).toEqual(defaultSnoozeOptions());
   for (const snoozeOptions of [null, 'weekly', [{ kind: 'duration', amount: 0, unit: 'hours' }]])
     expect(() =>
       migrateState({ ...defaultState(), settings: { automaticRefreshMinutes: 5, snoozeOptions } }),
     ).toThrow('Invalid preferences file');
+});
+
+it('migrates all supported versions without losing independently saved preferences', () => {
+  for (const schemaVersion of [1, 2, 3, 4]) {
+    const legacy = {
+      ...defaultState(),
+      schemaVersion,
+      ignoredRepositories: ['Acme/API', 'acme/api'],
+      trackedRepositories: ['acme/api'],
+      watchedPullRequests: ['acme/api#2'],
+      ignoredPullRequests: { 'acme/api#1': { ignoredAt: '2026-01-01' } },
+      snoozedPullRequests: { 'acme/api#2': { until: '2027-01-01' } },
+      settings: { automaticRefreshMinutes: 12, snoozeOptions: [] },
+    };
+    const migrated = migrateState(legacy);
+    expect(migrated.schemaVersion).toBe(5);
+    expect(migrated.ignoreRules).toEqual(
+      schemaVersion >= 3 ? [{ kind: 'repository', value: 'acme/api' }] : [],
+    );
+    for (const key of [
+      'trackedRepositories',
+      'watchedPullRequests',
+      'ignoredPullRequests',
+      'snoozedPullRequests',
+    ] as const)
+      expect(migrated[key]).toEqual(legacy[key]);
+    expect(migrated.settings.snoozeOptions).toEqual(
+      schemaVersion === 4 ? [] : defaultSnoozeOptions(),
+    );
+    expect(migrated).not.toHaveProperty('ignoredRepositories');
+    expect(migrateState(migrated)).toEqual(migrated);
+  }
+});
+
+it('validates ignore rules and canonicalizes duplicates on load', () => {
+  expect(parseRepositoryPattern(' AcMe/service-? ')).toBe('acme/service-?');
+  expect(parseRepositoryPattern('*/docs')).toBe('*/docs');
+  expect(parseIgnoreRule('author', ' Dependabot[bot] ')).toEqual({
+    kind: 'author',
+    value: 'dependabot[bot]',
+  });
+  expect(parseIgnoreRule('title', ' Chore:* ')).toEqual({ kind: 'title', value: 'chore:*' });
+  for (const value of ['*', '/repo', 'acme/', 'acme/*/more', 'acme/[ab]', 'acme/* is:closed'])
+    expect(() => parseRepositoryPattern(value)).toThrow();
+  for (const value of ['', '@me', 'user*', 'a/b', 'a b', 'a[bot]extra', '-user'])
+    expect(() => parseIgnoreRule('author', value)).toThrow();
+  for (const value of ['', '   ', 'a\nb', 'a\tb'])
+    expect(() => parseIgnoreRule('title', value)).toThrow();
+  expect(
+    migrateState({
+      ...defaultState(),
+      ignoreRules: [
+        { kind: 'author', value: 'ME' },
+        { kind: 'author', value: 'me' },
+        { kind: 'title', value: 'ME' },
+      ],
+    }).ignoreRules,
+  ).toEqual([
+    { kind: 'author', value: 'me' },
+    { kind: 'title', value: 'me' },
+  ]);
+  for (const ignoreRules of [
+    undefined,
+    null,
+    {},
+    [null],
+    [{ kind: 'unknown', value: '*' }],
+    [{ kind: 'title', value: 4 }],
+    [{ kind: 'repository', value: 'invalid' }],
+  ])
+    expect(() => migrateState({ ...defaultState(), ignoreRules })).toThrow(
+      'Invalid preferences file',
+    );
 });
