@@ -8,7 +8,7 @@
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run src",
-    "tauri": "tauri",
+    "tauri": "node scripts/tauri.mjs",
     "test:e2e": "playwright test",
     "screenshot:readme": "node scripts/capture-readme-screenshot.mjs",
     "format": "prettier --write .",
