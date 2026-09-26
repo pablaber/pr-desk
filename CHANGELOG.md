@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.0](https://github.com/pablaber/pr-desk/compare/v0.7.0...v0.8.0) (2026-09-26)
+
+
+### Features
+
+* add author and title ignore rules ([#51](https://github.com/pablaber/pr-desk/issues/51)) ([0bea745](https://github.com/pablaber/pr-desk/commit/0bea745ef376b2600bdd7e8fb4967669f0bd9dd3))
+* move individually ignored pull requests to a dedicated screen ([#52](https://github.com/pablaber/pr-desk/issues/52)) ([af89649](https://github.com/pablaber/pr-desk/commit/af89649b8b70ce5f6e754433423762a1f1ee8e17))
+* standardize interface icons on lucide ([#49](https://github.com/pablaber/pr-desk/issues/49)) ([eb852c3](https://github.com/pablaber/pr-desk/commit/eb852c31260964f4d3e42ff71cf25c89558933f6))
+
 ## [0.7.0](https://github.com/pablaber/pr-desk/compare/v0.6.0...v0.7.0) (2026-09-25)
 
 
