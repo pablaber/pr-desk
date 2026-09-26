@@ -689,6 +689,18 @@ footer {
 .empty-setting {
   padding: 12px 0;
 }
+.settings-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 10px;
+  padding: 11px 13px;
+  font-weight: 600;
+}
+.settings-link .chevron {
+  color: #8d9a80;
+}
 .snooze-option-row {
   display: grid;
   /* Shared across Duration and Next rows so the kind, second and third
@@ -940,12 +952,16 @@ footer {
   white-space: nowrap;
 }
 
-.snoozed-list {
+/* The Snoozed and Ignored pull request screens share one row layout: a card body on the
+   left and a dated action column on the right. */
+.snoozed-list,
+.ignored-list {
   padding: 26px 30px;
   display: grid;
   gap: 12px;
 }
-.snoozed-summary {
+.snoozed-summary,
+.ignored-summary {
   display: flex;
   justify-content: space-between;
   gap: 16px;
@@ -953,7 +969,8 @@ footer {
   font-size: 11px;
   margin-bottom: 4px;
 }
-.snoozed-row {
+.snoozed-row,
+.ignored-row {
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 225px;
@@ -961,17 +978,21 @@ footer {
   border-radius: 8px;
   background: #fff;
 }
-.snoozed-main {
+.snoozed-main,
+.ignored-main {
   padding: 20px;
   gap: 9px;
 }
-.snoozed-main .repo {
+.snoozed-main .repo,
+.ignored-main .repo {
   padding-right: 0;
 }
-.snoozed-main strong {
+.snoozed-main strong,
+.ignored-main strong {
   font-size: 14px;
 }
-.snoozed-schedule {
+.snoozed-schedule,
+.ignored-meta {
   border-left: 1px solid #edf0e9;
   padding: 20px;
   display: flex;
@@ -979,15 +1000,18 @@ footer {
   justify-content: center;
   gap: 8px;
 }
-.snoozed-until-label {
+.snoozed-until-label,
+.ignored-at-label {
   font-size: 10px;
   color: #798675;
 }
-.snoozed-schedule time {
+.snoozed-schedule time,
+.ignored-at {
   font-size: 12px;
   font-weight: 600;
 }
-.snoozed-actions {
+.snoozed-actions,
+.ignored-actions {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1005,10 +1029,12 @@ footer {
   right: 0;
 }
 @media (max-width: 800px) {
-  .snoozed-row {
+  .snoozed-row,
+  .ignored-row {
     grid-template-columns: minmax(0, 1fr);
   }
-  .snoozed-schedule {
+  .snoozed-schedule,
+  .ignored-meta {
     border-left: 0;
     border-top: 1px solid #edf0e9;
   }

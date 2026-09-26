@@ -8,17 +8,17 @@
     busy,
     onadd,
     onremove,
-    onrestore,
     onrefreshinterval,
     onsnoozeoptions,
+    onopenignored,
   }: {
     preferences: AppState;
     busy: boolean;
     onadd: (kind: 'repo' | 'pr' | IgnoreRuleKind, value: string) => Promise<boolean>;
     onremove: (kind: 'repo' | 'pr' | IgnoreRuleKind, value: string) => void;
-    onrestore: (kind: 'ignored' | 'snoozed', id: string) => void;
     onrefreshinterval: (minutes: number) => Promise<void>;
     onsnoozeoptions: (options: SnoozeOption[]) => Promise<void>;
+    onopenignored: () => void;
   } = $props();
   let ignoreKind = $state<IgnoreRuleKind>('repository');
   const ignoreLabels = { repository: 'Repository', author: 'PR author', title: 'PR title' };
@@ -34,7 +34,6 @@
     tracked: false,
     ignoredRules: false,
     watched: false,
-    ignoredPrs: false,
   });
 
   function heading(label: string, count: number): string {
@@ -198,6 +197,16 @@
               onclick={() => onremove(rule.kind, rule.value)}>Remove</button
             >
           </div>{:else}<p class="empty-setting">No ignore rules.</p>{/each}
+        <p>
+          PRs ignored one at a time with Ignore PR are kept on their own screen. Unignoring one
+          leaves any rule above in effect, and closed or inaccessible PRs stay listed there.
+        </p>
+        <button type="button" class="settings-link" onclick={onopenignored}
+          >{heading(
+            'Ignored pull requests',
+            Object.keys(preferences.ignoredPullRequests).length,
+          )}<ChevronRight class="chevron" size={14} /></button
+        >
       </div>
     {/if}
   </section>
@@ -234,35 +243,6 @@
               >Remove</button
             >
           </div>{:else}<p class="empty-setting">No individually watched PRs.</p>{/each}
-      </div>
-    {/if}
-  </section>
-  <section class="settings-section">
-    <h2>
-      <button
-        type="button"
-        class="settings-section-toggle"
-        aria-expanded={open.ignoredPrs}
-        aria-controls="settings-section-ignored-prs"
-        onclick={() => (open.ignoredPrs = !open.ignoredPrs)}
-        ><ChevronRight class="chevron" size={13} />
-        {heading(
-          'Ignored pull requests',
-          Object.keys(preferences.ignoredPullRequests).length,
-        )}</button
-      >
-    </h2>
-    {#if open.ignoredPrs}
-      <div class="settings-section-body" id="settings-section-ignored-prs">
-        <p>
-          Individually ignored with Ignore PR, separate from broad rules above. Restoring a PR keeps
-          any matching broad rules in effect. Closed or inaccessible PRs stay saved here.
-        </p>
-        {#each Object.keys(preferences.ignoredPullRequests) as id}<div class="setting-row">
-            <code>{id}</code><button disabled={busy} onclick={() => onrestore('ignored', id)}
-              >Restore</button
-            >
-          </div>{:else}<p class="empty-setting">Nothing ignored.</p>{/each}
       </div>
     {/if}
   </section>

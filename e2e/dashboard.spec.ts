@@ -206,8 +206,10 @@ test('snooze, ignore, restore, watch, tracked repositories and persistence', asy
   await page.getByRole('button', { name: 'Snoozed', exact: true }).click();
   await page.getByRole('button', { name: 'Restore now', exact: true }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Ignored pull requests');
-  await page.getByRole('button', { name: 'Restore', exact: true }).click();
+  await expandSettingsSection(page, 'Ignored');
+  await page.getByRole('button', { name: 'Ignored pull requests · 1' }).click();
+  await page.getByRole('button', { name: /^Unignore / }).click();
+  await page.getByRole('button', { name: 'Back to settings' }).click();
   await expandSettingsSection(page, 'Tracked repositories');
   await page.getByRole('textbox', { name: 'Repository', exact: true }).fill('bad-repository');
   await page.getByRole('button', { name: 'Add repository' }).click();
@@ -549,7 +551,6 @@ test('settings sections default to accordion states, expand/collapse by mouse an
     'Tracked repositories',
     'Ignored',
     'Watched pull requests',
-    'Ignored pull requests',
   ]) {
     await expect(section(heading).getByRole('button')).toHaveAttribute('aria-expanded', 'false');
   }
@@ -572,11 +573,11 @@ test('settings sections default to accordion states, expand/collapse by mouse an
   await expect(trackedSummary).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByRole('heading', { name: 'Tracked repositories · 1' })).toBeVisible();
   // Mouse expand/collapse works the same way on a different section.
-  const ignoredPrSummary = page.getByRole('button', { name: 'Ignored pull requests' });
-  await ignoredPrSummary.click();
-  await expect(ignoredPrSummary).toHaveAttribute('aria-expanded', 'true');
-  await ignoredPrSummary.click();
-  await expect(ignoredPrSummary).toHaveAttribute('aria-expanded', 'false');
+  const ignoredSummary = page.getByRole('button', { name: 'Ignored', exact: true });
+  await ignoredSummary.click();
+  await expect(ignoredSummary).toHaveAttribute('aria-expanded', 'true');
+  await ignoredSummary.click();
+  await expect(ignoredSummary).toHaveAttribute('aria-expanded', 'false');
   await page.screenshot({ path: '.context/settings-accordion.png', fullPage: true });
 });
 
@@ -950,6 +951,119 @@ test('broad rules stay effective on failed refreshes and do not erase individual
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
   await expect(page.locator('.pr-card')).toHaveCount(3);
   await expect(page.getByText('Add audit event retention', { exact: true })).toBeHidden();
+});
+
+test('the ignored pull requests screen opens from Settings, lists, and unignores', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  // The screen is reachable only from the Settings Ignored section, and starts empty.
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Ignored');
+  const link = page.getByRole('button', { name: /^Ignored pull requests/ });
+  await expect(link).toHaveText('Ignored pull requests');
+  await link.click();
+  await expect(page.getByRole('heading', { name: 'Ignored pull requests' })).toBeVisible();
+  await expect(page.locator('.toolbar')).toContainText('Settings / Ignored pull requests');
+  await expect(page.getByText('Nothing individually ignored', { exact: true })).toBeVisible();
+  await page.screenshot({ path: '.context/ignored-empty.png', fullPage: true });
+  // Ignore two PRs, one of which also matches a broad author rule.
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  for (const title of ['Add audit event retention', 'Simplify deployment configuration']) {
+    await page.getByRole('button', { name: `Actions for ${title}`, exact: true }).click();
+    await page.getByRole('button', { name: 'Ignore PR', exact: true }).click();
+  }
+  await expect(page.locator('.pr-card')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Ignored');
+  await page.getByLabel('Ignore rule type').selectOption('author');
+  await page.getByRole('textbox', { name: 'Ignore rule', exact: true }).fill('sam');
+  await page.getByRole('button', { name: 'Add ignore rule', exact: true }).click();
+  // The count rides along with the button, and Enter opens the screen from the keyboard.
+  const counted = page.getByRole('button', { name: 'Ignored pull requests · 2' });
+  await counted.focus();
+  await expect(counted).toBeFocused();
+  await page.keyboard.press('Enter');
+  const rows = page.locator('.ignored-row');
+  await expect(rows).toHaveCount(2);
+  // Most recently ignored first, identified by repository, number, title and author.
+  await expect(rows.first()).toContainText('Simplify deployment configuration');
+  await expect(rows.first().locator('.repo')).toContainText('acme/platform');
+  await expect(rows.first().locator('.number')).toHaveText('#4');
+  await expect(rows.first().locator('.author')).toHaveText('sam');
+  await expect(rows.first().locator('time')).toBeVisible();
+  await page.screenshot({ path: '.context/ignored-screen.png', fullPage: true });
+  await rows
+    .first()
+    .getByRole('button', { name: /Open .* on GitHub/ })
+    .click();
+  expect(await page.evaluate(() => (window as any).opened)).toEqual([
+    'https://github.com/acme/platform/pull/4',
+  ]);
+  // Unignore is the only PR-level action, next to the row's own open button.
+  await expect(rows.first().getByRole('button')).toHaveCount(2);
+  await rows
+    .first()
+    .getByRole('button', { name: 'Unignore Simplify deployment configuration' })
+    .click();
+  await expect(rows).toHaveCount(1);
+  // The broad author rule still hides the PR that was just unignored.
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Ignored');
+  await page
+    .locator('#settings-section-ignored-rules')
+    .getByRole('button', { name: 'Remove', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(3);
+  await expect(page.getByText('Add audit event retention', { exact: true })).toBeHidden();
+  // The remaining individual ignore survives a reload and Back returns to Settings.
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Ignored');
+  await page.getByRole('button', { name: 'Ignored pull requests · 1' }).click();
+  await expect(rows).toHaveCount(1);
+  await page.getByRole('button', { name: 'Back to settings' }).click();
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expandSettingsSection(page, 'Ignored');
+  await page.getByRole('button', { name: 'Ignored pull requests · 1' }).click();
+  await page.getByRole('button', { name: 'Unignore Add audit event retention' }).click();
+  await expect(page.getByText('Nothing individually ignored', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+});
+
+test('ignored PRs without fetched details stay identifiable and unignorable', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Actions for Add audit event retention' }).click();
+  await page.getByRole('button', { name: 'Ignore PR', exact: true }).click();
+  await page.evaluate(() => {
+    const prefs = JSON.parse(localStorage.getItem('prefs')!);
+    prefs.ignoredPullRequests['acme/platform#99'] = { ignoredAt: new Date().toISOString() };
+    localStorage.setItem('prefs', JSON.stringify(prefs));
+  });
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Ignored');
+  await page.getByRole('button', { name: 'Ignored pull requests · 2' }).click();
+  // The saved identifier alone still names the repository and number on the row.
+  const row = page.locator('.ignored-row').filter({ hasText: '#99' });
+  await expect(row).toContainText('acme/platform');
+  await expect(row).toContainText('Pull request details unavailable');
+  await page.screenshot({ path: '.context/ignored-unavailable.png', fullPage: true });
+  await row.getByRole('button', { name: /Open .* on GitHub/ }).click();
+  expect(await page.evaluate(() => (window as any).opened)).toEqual([
+    'https://github.com/acme/platform/pull/99',
+  ]);
+  await row.getByRole('button', { name: 'Unignore acme/platform#99' }).click();
+  await expect(row).toHaveCount(0);
+  await expect(page.locator('.ignored-row')).toHaveCount(1);
 });
 
 test('legacy repository ignores migrate and future preferences are never overwritten', async ({
