@@ -86,6 +86,12 @@ Prettier owns formatting — don't hand-format, and don't argue with it. Config 
 `.prettierrc.json` (single quotes, 100 columns, `prettier-plugin-svelte`); Rust uses
 `cargo fmt` and must be clippy-clean under `-D warnings`.
 
+Interface icons come from `@lucide/svelte` only — no hand-typed Unicode glyphs as icons.
+Import each icon by path (`@lucide/svelte/icons/clock`), pass only `size`, and leave
+stroke, colour and alignment to the `.lucide` rule in `src/style.css`. The PR Desk brand
+mark and Tauri app icons stay project artwork. See
+[`docs/development.md`](docs/development.md).
+
 Beyond formatting, match the surrounding code: small focused modules, shared types in
 each folder's `types.ts`, derived data as pure functions, and comments reserved for
 reasons the code cannot state — for example in `src/lib/pr/classify.ts`:

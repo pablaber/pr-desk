@@ -3,6 +3,15 @@
   import { isTauri } from '@tauri-apps/api/core';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { version } from '../package.json';
+  import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
+  import ClipboardCheck from '@lucide/svelte/icons/clipboard-check';
+  import Clock from '@lucide/svelte/icons/clock';
+  import CircleCheck from '@lucide/svelte/icons/circle-check';
+  import GitPullRequest from '@lucide/svelte/icons/git-pull-request';
+  import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import SettingsIcon from '@lucide/svelte/icons/settings';
+  import X from '@lucide/svelte/icons/x';
   // The app's CSP blocks data URLs, so keep the logo as a bundled file.
   import appIcon from '../src-tauri/icons/source.svg?no-inline';
   import CloseStale from './components/CloseStale.svelte';
@@ -280,7 +289,7 @@
         class:active={screen === 'dashboard'}
         onclick={() => (screen = 'dashboard')}
         aria-keyshortcuts={dashboardHotkey ? ariaKeyShortcut(dashboardHotkey) : null}
-        ><span aria-hidden="true">▦</span> Dashboard
+        ><LayoutGrid size={15} /> Dashboard
         {#if dashboardHotkey}<span class="nav-hotkey" aria-hidden="true"
             >{compactKeys(dashboardHotkey)}</span
           >{/if}</button
@@ -290,7 +299,7 @@
         onclick={() => (screen = 'snoozed')}
         aria-keyshortcuts={snoozedHotkey ? ariaKeyShortcut(snoozedHotkey) : null}
       >
-        <span aria-hidden="true">◷</span> Snoozed
+        <Clock size={15} /> Snoozed
         {#if snoozedHotkey}<span class="nav-hotkey" aria-hidden="true"
             >{compactKeys(snoozedHotkey)}</span
           >{/if}
@@ -302,7 +311,7 @@
           class:active={screen === 'settings'}
           onclick={() => (screen = 'settings')}
           aria-keyshortcuts={settingsHotkey ? ariaKeyShortcut(settingsHotkey) : null}
-          ><span aria-hidden="true">⚙</span> Settings{#if settingsHotkey}<span
+          ><SettingsIcon size={15} /> Settings{#if settingsHotkey}<span
               class="nav-hotkey"
               aria-hidden="true">{compactKeys(settingsHotkey)}</span
             >{/if}</button
@@ -340,7 +349,8 @@
           disabled={showLoading || saving}
           onclick={manualRefresh}
           aria-keyshortcuts={refreshHotkey ? ariaKeyShortcut(refreshHotkey) : null}
-          >{showLoading ? '↻ Refreshing…' : '↻ Refresh'}
+          ><RefreshCw size={13} />
+          {showLoading ? 'Refreshing…' : 'Refresh'}
           {#if refreshHotkey}<span class="refresh-hotkey" aria-hidden="true"
               >{compactKeys(refreshHotkey)}</span
             >{/if}</button
@@ -348,11 +358,13 @@
       </div>
     </div>
     {#if error}<div class="alert" role="alert">
-        {error}<button onclick={() => (error = '')} aria-label="Dismiss error">×</button>
+        {error}<button onclick={() => (error = '')} aria-label="Dismiss error"
+          ><X size={14} /></button
+        >
       </div>{/if}
     {#if !initialized}
       <div class="setup">
-        <span class="setup-symbol">⑂</span>
+        <GitPullRequest class="setup-symbol" size={48} />
         <h1>Your pull requests, in focus.</h1>
         <p>PR Desk uses your existing GitHub CLI sign-in.</p>
         {#if setupError}<div class="alert" role="alert">{setupError}</div>
@@ -437,13 +449,13 @@
                   onopen={open}
                   onaction={action}
                 />{:else}<div class="empty-column">
-                  <span
-                    >{col.state === 'ready-to-merge'
-                      ? '✓'
-                      : col.state === 'needs-attention'
-                        ? '☑'
-                        : '◷'}</span
-                  >
+                  <span>
+                    {#if col.state === 'ready-to-merge'}<CircleCheck
+                        size={24}
+                      />{:else if col.state === 'needs-attention'}<ClipboardCheck
+                        size={24}
+                      />{:else}<Clock size={24} />{/if}
+                  </span>
                   <p>
                     {showLoading
                       ? 'Loading pull requests…'
@@ -464,7 +476,7 @@
         {/each}
       </div>
       <footer>
-        <span>↗ Select a pull request to open it on GitHub</span><span
+        <span><ArrowUpRight size={11} /> Select a pull request to open it on GitHub</span><span
           >Only direct review requests need your attention</span
         >
       </footer>

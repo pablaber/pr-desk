@@ -1,4 +1,7 @@
 <script lang="ts">
+  import CircleAlert from '@lucide/svelte/icons/circle-alert';
+  import Check from '@lucide/svelte/icons/check';
+  import Clock from '@lucide/svelte/icons/clock';
   import { cardViewModel } from '../lib/pr/card-view-model';
   import type { ClassifiedPR } from '../lib/pr/classify';
   let { item, now, stale }: { item: ClassifiedPR; now: number; stale: boolean } = $props();
@@ -16,7 +19,11 @@
     >{/if}{#if card.staleness}<span class="badge staleness {card.staleness}">Stale</span>{/if}</span
 >
 <span class="status {card.state}"
-  >{card.state === 'ready-to-merge' ? '✓' : card.state === 'needs-attention' ? '!' : '◷'}
+  >{#if card.state === 'ready-to-merge'}<Check
+      size={12}
+    />{:else if card.state === 'needs-attention'}<CircleAlert size={12} />{:else}<Clock
+      size={12}
+    />{/if}
   {card.primary}</span
 >
 {#if card.secondary}<span class="secondary">{card.secondary}</span>{/if}
