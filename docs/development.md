@@ -42,7 +42,7 @@ access and persistence require Tauri.
   inherited `PATH`. Commands use argument arrays, never a shell, have a 45-second
   timeout, and never return authentication output or retrieve tokens.
 - `src/lib/github/`: replaceable `GitHubService`, queries, pagination, raw response
-  types, normalization, and refresh orchestration. At most four source/detail requests
+  types, normalization, and refresh orchestration. At most four discovery or completion requests
   run concurrently. Failed sources or PRs retain their last in-memory results and show
   a stale warning.
 - `src/lib/pr/`: normalized model → signals → declarative dashboard rules →
@@ -118,9 +118,9 @@ column and primary label:
 1. Direct individual review request.
 2. Active unresolved threads on an owned PR.
 3. GitHub's aggregate changes-requested decision on an owned PR.
-4. Failed required checks on an owned PR.
+4. Any failed checks on an owned PR.
 5. Merge conflicts on an owned PR.
-6. Owned, non-draft, approved, required checks passing, mergeable, and a compatible
+6. Owned, non-draft, approved, all checks passing, mergeable, and a compatible
    GitHub merge state → Ready to Merge.
 7. Any other non-draft PR from a tracked repository → Needs Attention, labelled
    “Open in a tracked repository”.
@@ -128,7 +128,10 @@ column and primary label:
 
 Unknown, blocked, behind, draft, and otherwise non-ready merge states prevent Ready to
 Merge. Tracked-repository and waiting are catch-alls and do not appear in a card's
-secondary status list. Optional failures may be displayed without creating attention.
+secondary status list. Failures on other people’s PRs appear as secondary information
+without independently creating attention. Every check counts, including optional checks
+that GitHub does not require for merging. Pending and unknown checks block readiness;
+success, neutral, skipped, and empty check sets pass.
 Source badges are independent of classification.
 
 Sorting is centralized in `classify.ts`: attention priority then oldest update; ready
@@ -240,3 +243,12 @@ Read [macOS signing and notarization](macos-signing.md) before changing signing 
 the release workflow, or `scripts/notarize-macos.sh`. It documents credential setup,
 artifact verification, and non-obvious failure modes. Contributors and automated
 agents should also follow [AGENTS.md](../AGENTS.md).
+
+Discovery returns raw PR records with the initial pages of every card connection.
+Refresh unions source reasons and chooses the newest seed, preferring complete seeds
+on equal timestamps and then source order. Completion normalizes complete seeds locally;
+only unfinished connections and undiscovered watched or retained IDs need detail calls.
+Discovery and completion each use the same four-worker bound. Check continuation pages
+must retain the latest commit OID or the previous complete PR is recovered as stale.
+No provisional cards are published: the application replaces its snapshot once after
+completion, keeping existing cards visible throughout refresh.

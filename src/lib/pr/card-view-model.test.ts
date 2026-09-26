@@ -20,7 +20,7 @@ describe('review badges', () => {
     const item = classify(
       pr({
         reviewDecision: 'APPROVED',
-        checks: [{ name: 'CI', required: true, state: 'pending' }],
+        checks: [{ name: 'CI', state: 'pending' }],
       }),
       'me',
       defaultState(),
@@ -50,4 +50,18 @@ describe('staleness', () => {
     expect(view(daysAgo(30)).staleness).toBe('high');
     expect(view(daysAgo(1)).staleness).toBe(null);
   });
+});
+
+it.each([
+  [{}, 'Checks failed', ''],
+  [{ directReviewers: ['me'] }, 'Review requested', 'Checks failed'],
+  [{ author: 'other' }, 'No action needed', 'Checks failed'],
+])('shows check failures exactly once: %j', (overrides, primary, secondary) => {
+  const item = classify(
+    pr({ ...overrides, checks: [{ name: 'lint', state: 'failed' }] }),
+    'me',
+    defaultState(),
+    now,
+  )!;
+  expect(cardViewModel(item, now)).toMatchObject({ primary, secondary });
 });

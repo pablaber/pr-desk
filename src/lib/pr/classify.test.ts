@@ -10,7 +10,7 @@ describe('dashboard rules', () => {
     [{ directReviewers: ['me'] }, 'Review requested'],
     [{ activeUnresolvedThreads: 3 }, '3 unresolved threads'],
     [{ reviewDecision: 'CHANGES_REQUESTED' }, 'Changes requested'],
-    [{ checks: [{ name: 'CI', required: true, state: 'failed' }] }, 'Required checks failed'],
+    [{ checks: [{ name: 'CI', state: 'failed' }] }, 'Checks failed'],
     [{ mergeable: 'CONFLICTING' }, 'Merge conflict'],
   ] as [Partial<PullRequest>, string][])('classifies attention: %j', (changes, label) => {
     expect(run(changes)).toMatchObject({ state: 'needs-attention', primary: label });
@@ -46,7 +46,7 @@ describe('dashboard rules', () => {
       run({
         reasons: ['owned', 'tracked-repository'],
         reviewDecision: 'APPROVED',
-        checks: [{ name: 'CI', required: true, state: 'passing' }],
+        checks: [{ name: 'CI', state: 'passing' }],
       }).state,
     ).toBe('ready-to-merge');
     expect(run({ reasons: ['tracked-repository'], directReviewers: ['me'] }).primary).toBe(
@@ -56,7 +56,7 @@ describe('dashboard rules', () => {
   it('readiness requires owned, approved, passing, mergeable and not draft', () => {
     const ready: Partial<PullRequest> = {
       reviewDecision: 'APPROVED',
-      checks: [{ name: 'CI', required: true, state: 'passing' }],
+      checks: [{ name: 'CI', state: 'passing' }],
     };
     expect(run(ready).state).toBe('ready-to-merge');
     for (const changes of [
@@ -65,25 +65,24 @@ describe('dashboard rules', () => {
       { reviewDecision: null },
       { mergeable: 'UNKNOWN' },
       { mergeStateStatus: 'BLOCKED' },
-      { checks: [{ name: 'CI', required: true, state: 'pending' as const }] },
+      { checks: [{ name: 'CI', state: 'pending' as const }] },
     ])
       expect(run({ ...ready, ...changes }).state).toBe('waiting');
   });
-  it('optional failures do not prevent readiness', () =>
+  it('any failure prevents readiness even when GitHub permits merging', () =>
     expect(
       run({
         reviewDecision: 'APPROVED',
         mergeStateStatus: 'UNSTABLE',
-        checks: [{ name: 'lint', required: false, state: 'failed' }],
+        checks: [{ name: 'lint', state: 'failed' }],
       }).state,
-    ).toBe('ready-to-merge'));
-  it('outdated threads, drafts, pending and optional checks fall back to waiting', () => {
+    ).toBe('needs-attention'));
+  it('outdated threads, drafts, pending checks fall back to waiting', () => {
     for (const changes of [
       {},
       { draft: true },
       { outdatedUnresolvedThreads: 5 },
-      { checks: [{ name: 'CI', required: false, state: 'failed' as const }] },
-      { checks: [{ name: 'CI', required: true, state: 'pending' as const }] },
+      { checks: [{ name: 'CI', state: 'pending' as const }] },
     ])
       expect(run(changes).state).toBe('waiting');
   });
@@ -94,7 +93,7 @@ describe('dashboard rules', () => {
         activeUnresolvedThreads: 5,
         mergeable: 'CONFLICTING',
         reviewDecision: 'CHANGES_REQUESTED',
-        checks: [{ name: 'CI', required: true, state: 'failed' }],
+        checks: [{ name: 'CI', state: 'failed' }],
       }).state,
     ).toBe('waiting'));
   it('keeps all matching signals and chooses highest priority', () => {
@@ -103,7 +102,7 @@ describe('dashboard rules', () => {
       activeUnresolvedThreads: 2,
       reviewDecision: 'CHANGES_REQUESTED',
       mergeable: 'CONFLICTING',
-      checks: [{ name: 'CI', required: true, state: 'failed' }],
+      checks: [{ name: 'CI', state: 'failed' }],
     });
     expect(result.primary).toBe('Review requested');
     expect(result.statuses).toHaveLength(5);

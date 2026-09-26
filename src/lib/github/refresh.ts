@@ -1,7 +1,9 @@
 import { exactIgnoredRepositories, ignoresRepository } from '../pr/ignore';
 import type { AppState } from '../store/app-state';
 import type { PullRequest, TrackingReason } from '../pr/types';
-import type { GitHubService } from './types';
+import { parsePullRequest } from '../store/app-state';
+import { completeSeed } from './normalize';
+import type { GitHubService, RawPR } from './types';
 export interface DashboardSnapshot {
   prs: PullRequest[];
   sources: Record<string, string[]>;
@@ -18,7 +20,7 @@ export async function refreshDashboard(
     staleIds: string[] = [];
   const ignored = exactIgnoredRepositories(local.ignoreRules);
   const include = (id: string) => !ignoresRepository(id.split('#')[0], local.ignoreRules);
-  const jobs: { key: string; reason: TrackingReason; run: () => Promise<string[]> }[] = [
+  const jobs: { key: string; reason: TrackingReason; run: () => Promise<RawPR[]> }[] = [
     {
       key: 'owned',
       reason: 'owned',
@@ -34,7 +36,6 @@ export async function refreshDashboard(
       reason: 'tracked-repository' as const,
       run: () => service.getRepositoryPullRequests(repo),
     })),
-    { key: 'watched', reason: 'watched', run: async () => local.watchedPullRequests },
   ];
   // Bounded concurrency avoids spawning one gh process per PR at once.
   async function pool<T>(items: T[], work: (item: T) => Promise<void>) {
@@ -45,17 +46,33 @@ export async function refreshDashboard(
       }),
     );
   }
+  const discoveries = new Map<string, RawPR[]>();
   await pool(jobs, async (job) => {
     try {
-      sources[job.key] = (await job.run()).filter(include);
+      const found = (await job.run()).filter((pr) => include(parsePullRequest(pr.url)));
+      discoveries.set(job.key, found);
+      sources[job.key] = [...new Set(found.map((pr) => parsePullRequest(pr.url)))];
     } catch (e) {
       sources[job.key] = (previous?.sources[job.key] ?? []).filter(include);
       warnings.push(`${job.key}: ${String(e)} Previous results retained.`);
       staleIds.push(...sources[job.key]);
     }
   });
-  const reasons = new Map<string, Set<TrackingReason>>();
+  const seeds = new Map<string, RawPR>();
   for (const job of jobs)
+    for (const candidate of discoveries.get(job.key) ?? []) {
+      const id = parsePullRequest(candidate.url),
+        old = seeds.get(id);
+      if (
+        !old ||
+        Date.parse(candidate.updatedAt) > Date.parse(old.updatedAt) ||
+        (candidate.updatedAt === old.updatedAt && completeSeed(candidate) && !completeSeed(old))
+      )
+        seeds.set(id, candidate);
+    }
+  sources.watched = [...new Set(local.watchedPullRequests.map(parsePullRequest).filter(include))];
+  const reasons = new Map<string, Set<TrackingReason>>();
+  for (const job of [...jobs, { key: 'watched', reason: 'watched' as const }])
     for (const id of sources[job.key]) {
       if (!reasons.has(id)) reasons.set(id, new Set());
       reasons.get(id)!.add(job.reason);
@@ -63,7 +80,7 @@ export async function refreshDashboard(
   const prs: PullRequest[] = [];
   await pool([...reasons], async ([id, why]) => {
     try {
-      prs.push({ ...(await service.getPullRequest(id)), reasons: [...why] });
+      prs.push({ ...(await service.getPullRequest(id, seeds.get(id))), reasons: [...why] });
     } catch (e) {
       warnings.push(`${id}: ${String(e)}`);
       staleIds.push(id);
