@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.0.0](https://github.com/pablaber/pr-desk/compare/v0.8.0...v1.0.0) (2026-09-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* load dashboard from discovery and evaluate all checks ([#55](https://github.com/pablaber/pr-desk/issues/55))
+
+### Features
+
+* load dashboard from discovery and evaluate all checks ([#55](https://github.com/pablaber/pr-desk/issues/55)) ([8d11e4d](https://github.com/pablaber/pr-desk/commit/8d11e4dbdca287c2afd7fb98b53d8a96723fa456))
+* save settings changes explicitly instead of refreshing on every edit ([#54](https://github.com/pablaber/pr-desk/issues/54)) ([65a8d7c](https://github.com/pablaber/pr-desk/commit/65a8d7c7c966fc9b20ddbebe382ce176957cfad2))
+* spin the refresh icon while a refresh is running ([#60](https://github.com/pablaber/pr-desk/issues/60)) ([0c13105](https://github.com/pablaber/pr-desk/commit/0c13105770c71a6fa021928914742ee2997c3afd))
+* use a pink Dock icon for development builds ([#58](https://github.com/pablaber/pr-desk/issues/58)) ([aea3ec9](https://github.com/pablaber/pr-desk/commit/aea3ec9e6d1928f5d8dd4bd6ff875cca01ae5f89))
+
+
+### Bug Fixes
+
+* show readable repository errors beside the settings input ([#57](https://github.com/pablaber/pr-desk/issues/57)) ([1acb056](https://github.com/pablaber/pr-desk/commit/1acb056cb4949b4c832f441255a414f6d429e0d9))
+
 ## [0.8.0](https://github.com/pablaber/pr-desk/compare/v0.7.0...v0.8.0) (2026-09-26)
 
 
