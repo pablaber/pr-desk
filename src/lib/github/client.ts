@@ -24,8 +24,10 @@ export class GhGitHubService implements GitHubService {
   }
   async getCurrentUser() {
     return (
-      await this.query<{ viewer: { login: string } }>('query DeskViewer { viewer { login } }')
-    ).viewer.login;
+      await this.query<{ viewer: { login: string; avatarUrl: string } }>(
+        'query DeskViewer { viewer { login avatarUrl } }',
+      )
+    ).viewer;
   }
   private async search(search: string, ignoredRepositories: string[]): Promise<RawPR[]> {
     search = [

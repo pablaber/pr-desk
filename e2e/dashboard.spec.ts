@@ -105,7 +105,10 @@ test.beforeEach(async ({ page }) => {
         if (command !== 'github') throw new Error(`Unexpected command ${command}`);
         if (args.operation === 'auth') return null;
         const query = args.query as string;
-        if (query.includes('DeskViewer')) return { viewer: { login: 'alex' } };
+        if (query.includes('DeskViewer'))
+          return {
+            viewer: { login: 'alex', avatarUrl: 'https://avatars.githubusercontent.com/u/1' },
+          };
         if (query.includes('author:@me')) w.refreshCount++;
         if (query.includes('DeskSearch'))
           return {
