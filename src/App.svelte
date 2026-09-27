@@ -396,7 +396,6 @@
       <span class="connection-dot" class:connected={initialized}></span>{login
         ? `@${login}`
         : 'GitHub CLI'}<small>One place for your pull requests.</small>
-      <span class="version">v{version}</span>
       {#if shortcutsHotkey}
         <div class="shortcuts-row">
           <button
@@ -409,6 +408,7 @@
           >
         </div>
       {/if}
+      <span class="version">v{version}</span>
     </div>
   </aside>
   <main>
