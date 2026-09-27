@@ -181,6 +181,10 @@ Enforced by `.github/workflows/pr-validate.yml` (`amannn/action-semantic-pull-re
 Choose the prefix matching the largest user-visible impact in the PR — a PR that adds a
 feature and also refactors is `feat:`.
 
+A title carrying `!`, or a `BREAKING CHANGE:` footer, forces a major version bump.
+Confirm with the user before opening a PR with either — don't open a major-bump PR
+unprompted.
+
 ### Prefix → release effect
 
 From `release-please-config.json` (`release-type: node`, `bump-minor-pre-major: false`,
