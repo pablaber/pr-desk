@@ -912,22 +912,32 @@ footer {
   color: #a15f4c;
   margin-top: 5px;
 }
+.shortcuts-row {
+  margin: 14px -8px 0;
+  padding: 10px 8px 0;
+  border-top: 1px solid #e4e9e1;
+}
 .shortcuts-button {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  margin-top: 16px;
   border: 0;
   background: transparent;
-  color: #6e7a6c;
-  font-size: 12px;
-  padding: 8px 12px;
+  color: #9aa398;
+  font-size: 11px;
+  padding: 2px 0;
   text-align: left;
   white-space: nowrap;
 }
 .shortcuts-button:hover {
-  background: #eef2ec;
+  background: transparent;
+  color: #62725e;
+}
+.shortcuts-key {
+  margin-left: auto;
+  font-size: 10px;
+  color: #a8b0a5;
 }
 .hotkey-help {
   border: 0;

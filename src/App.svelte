@@ -391,22 +391,24 @@
             >{/if}</button
         >
       </nav>
-      {#if shortcutsHotkey}
-        <button
-          class="shortcuts-button"
-          onclick={() => (showHotkeys = true)}
-          aria-keyshortcuts={ariaKeyShortcut(shortcutsHotkey)}
-          >Keyboard shortcuts<span class="nav-hotkey" aria-hidden="true"
-            >{compactKeys(shortcutsHotkey)}</span
-          ></button
-        >
-      {/if}
     </div>
     <div class="sidebar-bottom">
       <span class="connection-dot" class:connected={initialized}></span>{login
         ? `@${login}`
         : 'GitHub CLI'}<small>One place for your pull requests.</small>
       <span class="version">v{version}</span>
+      {#if shortcutsHotkey}
+        <div class="shortcuts-row">
+          <button
+            class="shortcuts-button"
+            onclick={() => (showHotkeys = true)}
+            aria-keyshortcuts={ariaKeyShortcut(shortcutsHotkey)}
+            >Keyboard shortcuts<span class="shortcuts-key" aria-hidden="true"
+              >{compactKeys(shortcutsHotkey)}</span
+            ></button
+          >
+        </div>
+      {/if}
     </div>
   </aside>
   <main>
