@@ -107,13 +107,14 @@ aside {
 .brand-user {
   display: flex;
   align-items: center;
+  justify-content: center;
   margin: 8px 10px 0;
-  padding-left: 41px;
   color: #79857a;
   font-size: 12px;
   min-height: 20px;
 }
 .brand-user-login {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
