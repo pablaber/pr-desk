@@ -408,7 +408,7 @@
           class="avatar"
           src={avatarUrl}
           alt=""
-        />{/if}{login ? `@${login}` : 'GitHub CLI'}<small>One place for your pull requests.</small>
+        />{/if}{login || 'GitHub CLI'}<small>One place for your pull requests.</small>
       <span class="version">v{version}</span>
     </div>
   </aside>
