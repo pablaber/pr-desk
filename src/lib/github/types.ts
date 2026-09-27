@@ -40,3 +40,8 @@ export interface GitHubService {
   validateRepository(repo: string): Promise<void>;
   getPullRequest(id: string, seed?: RawPR): Promise<PullRequest>;
 }
+
+export interface GhCliInfo {
+  version: string;
+  path: string;
+}
