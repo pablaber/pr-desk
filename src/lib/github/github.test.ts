@@ -31,7 +31,7 @@ function raw(): RawPR {
 function service(): GitHubService {
   return {
     authenticate: vi.fn(async () => {}),
-    getCurrentUser: vi.fn(async () => 'me'),
+    getCurrentUser: vi.fn(async () => ({ login: 'me', avatarUrl: '' })),
     getOwnedPullRequests: vi.fn(async () => [raw()]),
     getDirectReviewRequests: vi.fn(async () => [raw()]),
     getRepositoryPullRequests: vi.fn(async () => [raw()]),

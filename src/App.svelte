@@ -51,6 +51,7 @@
   let snapshot = $state<DashboardSnapshot>({ prs: [], sources: {}, warnings: [], staleIds: [] });
   type Screen = 'dashboard' | 'snoozed' | 'settings' | 'ignored';
   let login = $state(''),
+    avatarUrl = $state(''),
     screen = $state<Screen>('dashboard');
   // Settings edits live here until Save, so leaving and returning through the Ignored sub-screen
   // keeps them, and a refresh never fires for a half-finished list of repositories.
@@ -133,7 +134,7 @@
         );
       preferences = await loadState();
       await service.authenticate();
-      login = await service.getCurrentUser();
+      ({ login, avatarUrl } = await service.getCurrentUser());
       initialized = true;
     } catch (e) {
       setupError = String(e);
@@ -393,9 +394,13 @@
       </nav>
     </div>
     <div class="sidebar-bottom">
-      <span class="connection-dot" class:connected={initialized}></span>{login
-        ? `@${login}`
-        : 'GitHub CLI'}
+      {#if avatarUrl}<span class="avatar-wrap"
+          ><img class="avatar" src={avatarUrl} alt="" /><span
+            class="connection-dot"
+            class:connected={initialized}
+          ></span></span
+        >{:else}<span class="connection-dot" class:connected={initialized}></span>{/if}{login ||
+        'GitHub CLI'}
       {#if shortcutsHotkey}
         <div class="shortcuts-row">
           <button
