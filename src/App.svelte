@@ -378,6 +378,16 @@
       <img class="brand-mark" src={appIcon} alt="" width="32" height="32" />
       <span>PR Desk</span>
     </div>
+    <div class="brand-user">
+      {#if avatarUrl}<span class="avatar-wrap"
+          ><img class="avatar" src={avatarUrl} alt="" /><span
+            class="connection-dot"
+            class:connected={initialized}
+          ></span></span
+        >{:else}<span class="connection-dot" class:connected={initialized}></span>{/if}<span
+        class="brand-user-login">{login || 'GitHub CLI'}</span
+      >
+    </div>
     <div class="nav-label">WORKSPACE</div>
     <nav aria-label="Main navigation">
       <button
@@ -414,13 +424,6 @@
       </nav>
     </div>
     <div class="sidebar-bottom">
-      {#if avatarUrl}<span class="avatar-wrap"
-          ><img class="avatar" src={avatarUrl} alt="" /><span
-            class="connection-dot"
-            class:connected={initialized}
-          ></span></span
-        >{:else}<span class="connection-dot" class:connected={initialized}></span>{/if}{login ||
-        'GitHub CLI'}
       {#if shortcutsHotkey}
         <div class="shortcuts-row">
           <button
