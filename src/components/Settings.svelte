@@ -5,7 +5,11 @@
   import RefreshInterval from './RefreshInterval.svelte';
   import SnoozeOptions from './SnoozeOptions.svelte';
   import type { AppState, SnoozeOption, IgnoreRuleKind } from '../lib/store/app-state';
+  import type { GhCliInfo } from '../lib/github/types';
   let {
+    login,
+    cliInfo,
+    cliInfoError,
     preferences,
     busy,
     dirty,
@@ -17,6 +21,9 @@
     onsnoozeoptions,
     onopenignored,
   }: {
+    login: string;
+    cliInfo: GhCliInfo | null;
+    cliInfoError: boolean;
     preferences: AppState;
     busy: boolean;
     dirty: boolean;
@@ -38,10 +45,8 @@
   // draft, so each of those two fields shows its own in-field progress while that check runs.
   let checking = $state({ repo: false, pr: false });
 
-  // Automatic refresh is a commonly adjusted, compact setting, so it starts open; the
-  // management-heavy sections start collapsed.
   let open = $state({
-    refresh: true,
+    refresh: false,
     snooze: false,
     tracked: false,
     ignoredRules: false,
@@ -74,6 +79,35 @@
     <h1>Settings</h1>
     <p>Choose what belongs on your desk.</p>
   </header>
+  <section class="settings-section github-info" aria-labelledby="github-info-heading">
+    <h2 id="github-info-heading">GitHub connection</h2>
+    <dl>
+      <div>
+        <dt>Dashboard account</dt>
+        <dd>@{login}</dd>
+      </div>
+      <div>
+        <dt>Host</dt>
+        <dd>github.com</dd>
+      </div>
+      <div>
+        <dt>GitHub CLI</dt>
+        <dd aria-live="polite">
+          {cliInfo ? cliInfo.version : cliInfoError ? 'Unavailable' : 'Loading…'}
+        </dd>
+      </div>
+      {#if cliInfo}
+        <div>
+          <dt>Executable</dt>
+          <dd><code>{cliInfo.path}</code></dd>
+        </div>
+      {/if}
+    </dl>
+    {#if cliInfoError}
+      <p role="status">Couldn’t read GitHub CLI details. Reopen Settings to try again.</p>
+    {/if}
+    <p>Authentication is managed by gh. Restart PR Desk after switching accounts in Terminal.</p>
+  </section>
   <section class="settings-section">
     <h2>
       <button

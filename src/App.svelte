@@ -23,6 +23,7 @@
   import Settings from './components/Settings.svelte';
   import UnsavedChanges from './components/UnsavedChanges.svelte';
   import HotkeyHelp from './components/HotkeyHelp.svelte';
+  import type { GhCliInfo } from './lib/github/types';
   import { GhGitHubService } from './lib/github/client';
   import { refreshDashboard, type DashboardSnapshot } from './lib/github/refresh';
   import {
@@ -99,6 +100,25 @@
   let visible = $derived(
     classified.filter((p) => filter === 'all' || p.pr.reasons.includes(filter)),
   );
+  let cliInfo = $state<GhCliInfo | null>(null);
+  let cliInfoError = $state(false);
+  $effect(() => {
+    if (screen !== 'settings' || !initialized) return;
+    let active = true;
+    cliInfo = null;
+    cliInfoError = false;
+    void service.getCliInfo().then(
+      (info) => {
+        if (active) cliInfo = info;
+      },
+      () => {
+        if (active) cliInfoError = true;
+      },
+    );
+    return () => {
+      active = false;
+    };
+  });
   onMount(() => {
     void start();
     const timer = setInterval(() => (now = Date.now()), 15000);
@@ -479,6 +499,9 @@
       />
     {:else if screen === 'settings'}
       <Settings
+        {login}
+        {cliInfo}
+        {cliInfoError}
         preferences={settingsView}
         busy={saving}
         dirty={settingsDirty}

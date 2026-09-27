@@ -104,6 +104,7 @@ test.beforeEach(async ({ page }) => {
         }
         if (command !== 'github') throw new Error(`Unexpected command ${command}`);
         if (args.operation === 'auth') return null;
+        if (args.operation === 'info') return { version: '2.80.0', path: '/opt/homebrew/bin/gh' };
         const query = args.query as string;
         if (query.includes('DeskViewer'))
           return {
@@ -398,6 +399,7 @@ test('auto refresh defaults to five minutes, reschedules, and persists Never', a
   await expect.poll(count).toBe(2);
   await expect(refresh).toBeEnabled();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Automatic refresh');
   const interval = page.getByRole('spinbutton', { name: 'Refresh interval in minutes' });
   await expect(interval).toHaveValue('5');
   await interval.fill('1');
@@ -430,6 +432,7 @@ test('auto refresh defaults to five minutes, reschedules, and persists Never', a
   await page.reload();
   await expect(refresh).toBeEnabled();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Automatic refresh');
   await expect(page.getByLabel('Never', { exact: true })).toBeChecked();
   await expect(interval).toBeDisabled();
   await page.clock.fastForward(2 * 60 * 60_000);
@@ -471,6 +474,7 @@ test('refresh slider and numeric input stay synchronized and validate exact valu
 }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Automatic refresh');
   const slider = page.getByRole('slider', { name: 'Refresh interval', exact: true });
   const number = page.getByRole('spinbutton', { name: 'Refresh interval in minutes' });
   await expect(number).toHaveValue('5');
@@ -497,6 +501,7 @@ test('refresh slider and numeric input stay synchronized and validate exact valu
   await expect(number).toHaveValue('37');
   await page.reload();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Automatic refresh');
   await expect(number).toHaveValue('37');
   await page.screenshot({ path: '.context/refresh-settings.png', fullPage: true });
 });
@@ -554,12 +559,10 @@ test('settings sections default to accordion states, expand/collapse by mouse an
         name: typeof name === 'string' ? new RegExp(`^${name}( · [0-9]+)?$`) : name,
       }),
     });
-  // Automatic refresh is expanded by default; the management-heavy sections start collapsed.
-  await expect(section('Automatic refresh').getByRole('button')).toHaveAttribute(
-    'aria-expanded',
-    'true',
-  );
+  // All editable settings start collapsed beneath the connection metadata.
+  await expect(page.getByRole('spinbutton', { name: 'Refresh interval in minutes' })).toBeHidden();
   for (const heading of [
+    'Automatic refresh',
     'Snooze options · 4',
     'Tracked repositories',
     'Ignored',
@@ -1366,4 +1369,35 @@ test('repository validation errors stay beside the input and allow correction', 
   expect(
     await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!).trackedRepositories),
   ).toEqual(['acme/platform']);
+});
+
+test('settings shows read-only GitHub connection details and handles CLI lookup failure', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const settings = page.getByRole('button', { name: 'Settings', exact: true });
+  await settings.click();
+  const info = page.getByRole('region', { name: 'GitHub connection' });
+  await expect(info).toContainText('@alex');
+  await expect(info).toContainText('github.com');
+  await expect(info).toContainText('2.80.0');
+  await expect(info).toContainText('/opt/homebrew/bin/gh');
+  await expect(info.locator('input, button, select')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeHidden();
+  await page.screenshot({ path: '.context/settings-github-info.png', fullPage: true });
+  await page.evaluate(() => {
+    const w = window as any;
+    const invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command === 'github' && args?.operation === 'info') throw new Error('unavailable');
+      return invoke(command, args);
+    };
+  });
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await settings.click();
+  await expect(info).toContainText('Unavailable');
+  await expect(info).toContainText('@alex');
+  await expect(info.getByRole('status')).toContainText('Reopen Settings');
+  await expect(page.getByRole('button', { name: 'Automatic refresh', exact: true })).toBeEnabled();
 });

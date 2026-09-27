@@ -20,12 +20,15 @@ fn gh_path() -> Result<PathBuf, String> {
 #[tauri::command]
 async fn github(operation: String, query: Option<String>) -> Result<serde_json::Value, String> {
     let path = gh_path()?;
-    let mut command = Command::new(path);
+    let mut command = Command::new(&path);
     command
         .env("GH_PROMPT_DISABLED", "1")
         .env("GH_PAGER", "cat")
         .kill_on_drop(true);
     match operation.as_str() {
+        "info" => {
+            command.arg("--version");
+        }
         "auth" => {
             command.args(["auth", "status", "--hostname", "github.com"]);
         }
@@ -66,12 +69,35 @@ async fn github(operation: String, query: Option<String>) -> Result<serde_json::
     if operation == "auth" {
         return Ok(serde_json::Value::Null);
     }
+    if operation == "info" {
+        return Ok(serde_json::json!({
+            "version": parse_gh_version(&output.stdout)?,
+            "path": path.to_string_lossy(),
+        }));
+    }
     let value: serde_json::Value =
         serde_json::from_slice(&output.stdout).map_err(|_| "Invalid GitHub response")?;
     if value.get("errors").is_some() {
         return Err("GitHub could not complete this query. Check access and try again.".into());
     }
     Ok(value["data"].clone())
+}
+
+fn parse_gh_version(output: &[u8]) -> Result<String, String> {
+    let output = std::str::from_utf8(output).map_err(|_| "Invalid GitHub CLI version")?;
+    output
+        .lines()
+        .next()
+        .and_then(|line| line.strip_prefix("gh version "))
+        .and_then(|version| version.split_whitespace().next())
+        .filter(|version| {
+            version.starts_with(|c: char| c.is_ascii_digit())
+                && version
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b".-+".contains(&b))
+        })
+        .map(str::to_owned)
+        .ok_or_else(|| "Invalid GitHub CLI version".into())
 }
 
 fn validate_pr_url(url: &str) -> Result<(), String> {
@@ -143,6 +169,26 @@ async fn close_stale_pr(url: String) -> Result<(), String> {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn reads_only_the_cli_version() {
+        assert_eq!(
+            parse_gh_version(b"gh version 2.80.0 (2025-09-23)\nhttps://github.com/cli/cli/releases/tag/v2.80.0\n").unwrap(),
+            "2.80.0"
+        );
+        assert_eq!(
+            parse_gh_version(b"gh version 2.80.0-dev+abc\n").unwrap(),
+            "2.80.0-dev+abc"
+        );
+        for output in [
+            b"".as_slice(),
+            b"unexpected output",
+            b"gh version ",
+            b"gh version invalid",
+            b"\xff",
+        ] {
+            assert!(parse_gh_version(output).is_err());
+        }
+    }
     #[test]
     fn validates_only_github_pr_urls() {
         assert!(validate_pr_url("https://github.com/acme/platform/pull/12").is_ok());

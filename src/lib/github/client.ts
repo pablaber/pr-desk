@@ -3,7 +3,7 @@ import { parsePullRequest, parseRepository } from '../store/app-state';
 import { githubErrorMessage } from './errors';
 import { normalize, rawConnections } from './normalize';
 import { pullRequestQuery, repositoryQuery, searchQuery } from './queries';
-import type { Connection, GitHubService, RawPR } from './types';
+import type { Connection, GitHubService, GhCliInfo, RawPR } from './types';
 export type QueryRunner = <T>(query: string) => Promise<T>;
 export class GhGitHubService implements GitHubService {
   constructor(
@@ -18,6 +18,9 @@ export class GhGitHubService implements GitHubService {
   async closeStalePullRequest(input: string) {
     const [repository, number] = parsePullRequest(input).split('#');
     await invoke('close_stale_pr', { url: `https://github.com/${repository}/pull/${number}` });
+  }
+  getCliInfo() {
+    return invoke<GhCliInfo>('github', { operation: 'info' });
   }
   async authenticate() {
     await invoke('github', { operation: 'auth' });
