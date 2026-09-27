@@ -404,11 +404,13 @@
       {/if}
     </div>
     <div class="sidebar-bottom">
-      <span class="connection-dot" class:connected={initialized}></span>{#if avatarUrl}<img
-          class="avatar"
-          src={avatarUrl}
-          alt=""
-        />{/if}{login || 'GitHub CLI'}<small>One place for your pull requests.</small>
+      {#if avatarUrl}<span class="avatar-wrap"
+          ><img class="avatar" src={avatarUrl} alt="" /><span
+            class="connection-dot"
+            class:connected={initialized}
+          ></span></span
+        >{:else}<span class="connection-dot" class:connected={initialized}></span>{/if}{login ||
+        'GitHub CLI'}<small>One place for your pull requests.</small>
       <span class="version">v{version}</span>
     </div>
   </aside>
