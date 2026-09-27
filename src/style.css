@@ -157,12 +157,6 @@ nav button.active {
   color: #62725e;
   font-size: 12px;
 }
-.sidebar-bottom small {
-  display: block;
-  font-size: 10px;
-  margin-top: 10px;
-  color: #939b8f;
-}
 .connection-dot {
   display: inline-block;
   width: 6px;

@@ -395,7 +395,7 @@
     <div class="sidebar-bottom">
       <span class="connection-dot" class:connected={initialized}></span>{login
         ? `@${login}`
-        : 'GitHub CLI'}<small>One place for your pull requests.</small>
+        : 'GitHub CLI'}
       {#if shortcutsHotkey}
         <div class="shortcuts-row">
           <button
