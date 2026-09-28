@@ -182,6 +182,10 @@
           <span class="settings-field">
             <input
               aria-label="Repository"
+              autocapitalize="off"
+              autocomplete="off"
+              autocorrect="off"
+              spellcheck="false"
               aria-invalid={repositoryError ? true : undefined}
               aria-describedby={repositoryError ? 'repository-error' : undefined}
               oninput={() => (repositoryError = '')}
@@ -242,6 +246,10 @@
           </select>
           <input
             aria-label="Ignore rule"
+            autocapitalize="off"
+            autocomplete="off"
+            autocorrect="off"
+            spellcheck="false"
             aria-describedby="ignore-rule-help"
             placeholder={ignoreKind === 'repository'
               ? 'acme/*'
@@ -313,6 +321,10 @@
           <span class="settings-field">
             <input
               aria-label="Pull request URL"
+              autocapitalize="off"
+              autocomplete="off"
+              autocorrect="off"
+              spellcheck="false"
               placeholder="https://github.com/owner/repo/pull/123"
               bind:value={pr}
               required
