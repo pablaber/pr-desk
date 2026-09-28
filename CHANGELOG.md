@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/pablaber/pr-desk/compare/v1.0.0...v1.1.0) (2026-09-27)
+
+
+### Features
+
+* show GitHub avatar next to the logged-in user ([#61](https://github.com/pablaber/pr-desk/issues/61)) ([116889c](https://github.com/pablaber/pr-desk/commit/116889cf078cdd77646a1f59e142cf46413573e9))
+* show GitHub CLI metadata in settings ([#65](https://github.com/pablaber/pr-desk/issues/65)) ([7c96c07](https://github.com/pablaber/pr-desk/commit/7c96c07fab3dccab37b01f536dc673d35c3104f2))
+
 ## [1.0.0](https://github.com/pablaber/pr-desk/compare/v0.8.0...v1.0.0) (2026-09-26)
 
 
