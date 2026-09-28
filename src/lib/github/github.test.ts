@@ -446,3 +446,10 @@ it('treats absent commits and null rollups as empty passing check sets', () => {
     expect(classify(result, 'me', defaultState())?.state).toBe('ready-to-merge');
   }
 });
+
+it('preserves the displayed commit for merge confirmation and leaves missing heads empty', () => {
+  const input = raw();
+  expect(normalize(input).headOid).toBe('');
+  input.commits.nodes = [{ commit: { oid: 'a'.repeat(40), statusCheckRollup: null } }];
+  expect(normalize(input).headOid).toBe('a'.repeat(40));
+});

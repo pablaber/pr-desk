@@ -14,7 +14,7 @@
   import X from '@lucide/svelte/icons/x';
   // The app's CSP blocks data URLs, so keep the logo as a bundled file.
   import appIcon from '../src-tauri/icons/source.svg?no-inline';
-  import CloseStale from './components/CloseStale.svelte';
+  import PRConfirmation from './components/PRConfirmation.svelte';
   import { stalenessLevel } from './lib/pr/card-view-model';
   import type { PullRequest } from './lib/pr/types';
   import PRCard from './components/PRCard.svelte';
@@ -60,8 +60,9 @@
   let settingsDirty = $derived(settingsDraft !== null && draftDiffers(settingsDraft, preferences));
   let settingsView = $derived(settingsDraft ? { ...preferences, ...settingsDraft } : preferences);
   let pendingScreen = $state<Screen | null>(null);
-  let closingPR = $state<PullRequest | null>(null);
-  let closeError = $state('');
+  let actionPR = $state<PullRequest | null>(null);
+  let actionError = $state('');
+  let pendingAction = $state<'close-stale' | 'merge'>('close-stale');
   let showHotkeys = $state(false);
   let filter = $state<TrackingReason | 'all'>('all'),
     loading = $state(false),
@@ -304,12 +305,19 @@
     if (to) screen = to;
   }
   async function action(id: string, action: string, until?: string) {
-    if (action === 'close-stale') {
+    if (action === 'close-stale' || action === 'merge') {
       if (saving || loading) return;
       const pr = snapshot.prs.find((pr) => pr.id === id);
-      if (pr && stalenessLevel(pr.updatedAt, Date.now()) === 'high') {
-        closeError = '';
-        closingPR = pr;
+      if (
+        pr &&
+        (action === 'merge'
+          ? !snapshot.staleIds.includes(id) &&
+            classify(pr, login, preferences, Date.now())?.state === 'ready-to-merge'
+          : stalenessLevel(pr.updatedAt, Date.now()) === 'high')
+      ) {
+        pendingAction = action;
+        actionError = '';
+        actionPR = pr;
       }
       return;
     }
@@ -325,17 +333,29 @@
     });
     if (action === 'watch' || action === 'unwatch') await refresh();
   }
-  async function confirmClose() {
-    if (!closingPR || saving || loading) return;
-    const pr = closingPR;
+  async function confirmAction(method: string) {
+    if (!actionPR || saving || loading) return;
+    const pr = actionPR;
     saving = true;
-    closeError = '';
+    actionError = '';
     try {
-      await service.closeStalePullRequest(pr.id);
+      if (pendingAction === 'merge') {
+        const fresh = await service.getPullRequest(pr.id);
+        if (
+          fresh.headOid !== pr.headOid ||
+          classify(fresh, login, preferences, Date.now())?.state !== 'ready-to-merge'
+        )
+          throw new Error(
+            'This PR changed or is no longer ready to merge. Cancel and refresh before trying again.',
+          );
+        await service.mergePullRequest(pr.id, pr.headOid, method);
+      } else {
+        await service.closeStalePullRequest(pr.id);
+      }
       snapshot.prs = snapshot.prs.filter((item) => item.id !== pr.id);
-      closingPR = null;
+      actionPR = null;
     } catch (e) {
-      closeError = String(e);
+      actionError = String(e);
     } finally {
       saving = false;
     }
@@ -348,7 +368,7 @@
     await refresh();
   }
   function handleHotkey(event: KeyboardEvent) {
-    if (closingPR || pendingScreen) return;
+    if (actionPR || pendingScreen) return;
     const hotkey = resolveHotkey(event, event.target as HTMLElement | null);
     if (!hotkey) return;
     event.preventDefault();
@@ -618,12 +638,13 @@
 />
 <HotkeyHelp open={showHotkeys} onclose={() => (showHotkeys = false)} />
 
-<CloseStale
-  pr={closingPR}
+<PRConfirmation
+  action={pendingAction}
+  pr={actionPR}
   busy={saving || loading}
-  error={closeError}
-  onconfirm={confirmClose}
+  error={actionError}
+  onconfirm={confirmAction}
   oncancel={() => {
-    if (!saving) closingPR = null;
+    if (!saving) actionPR = null;
   }}
 />

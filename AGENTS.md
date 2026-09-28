@@ -8,7 +8,8 @@ setup; this file covers how to work in the repository without re-reading all of 
 
 PR Desk is a macOS pull request dashboard: a Tauri 2 (Rust) shell around a Svelte 5 +
 TypeScript + Vite frontend. All GitHub access goes through the user's authenticated
-`gh` CLI — the app never handles tokens itself. Reviewing and merging happen on GitHub; the app opens PRs in the browser.
+`gh` CLI — the app never handles tokens itself. Reviewing happens on GitHub; the app opens PRs in the browser.
+Ready PRs can be merged after confirmation through the dedicated merge_pr command.
 The confirmed Close as stale action closes stale PRs with a fixed automatic comment.
 
 Pinned and expected versions: Rust 1.94.0 (`rust-toolchain.toml`, installed by rustup
@@ -81,7 +82,9 @@ Inspect the generated screenshot and include the updated image in the change.
 - The Rust bridge is deliberately narrow: argument arrays rather than a shell, a
   45-second timeout, read-only GraphQL, and it never returns authentication output or
   tokens. The separate close_stale_pr command only closes open PRs with red staleness
-  and a fixed comment; keep mutations limited to that action.
+  and a fixed comment. The merge_pr command only merges ready PRs after confirmation,
+  revalidates readiness, and pins the mutation to the confirmed commit. Keep mutations
+  limited to these actions.
 
 ## Code style
 

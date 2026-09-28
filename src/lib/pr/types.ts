@@ -6,6 +6,7 @@ export interface PullRequest {
   repository: string;
   number: number;
   title: string;
+  headOid: string;
   author: string;
   state: 'OPEN' | 'CLOSED' | 'MERGED';
   draft: boolean;

@@ -31,6 +31,7 @@ export function normalize(raw: RawPR): PullRequest {
     repository: raw.repository.nameWithOwner,
     number: raw.number,
     title: raw.title,
+    headOid: raw.commits.nodes[0]?.commit.oid ?? '',
     author: raw.author?.login ?? '',
     state: raw.state,
     draft: raw.isDraft,

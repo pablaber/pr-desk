@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod errors;
+mod merge;
 
 use std::{path::PathBuf, time::Duration};
 use tokio::process::Command;
@@ -222,7 +223,11 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![github, close_stale_pr])
+        .invoke_handler(tauri::generate_handler![
+            github,
+            close_stale_pr,
+            merge::merge_pr
+        ])
         .run(tauri::generate_context!())
         .expect("error running PR Desk");
 }

@@ -5,8 +5,11 @@
 </p>
 
 A compact macOS pull request dashboard. PR Desk shows what needs your attention, what
-is ready to merge, and what can wait. GitHub remains the place to review, comment, and
-merge; selecting a card opens the pull request in your default browser.
+is ready to merge, and what can wait. Select a card to review or comment on GitHub. Ready to merge cards have a green
+**Merge…** button with a confirmation and a choice of squash, merge commit, or rebase.
+PR Desk rechecks readiness and the commit before merging through your authenticated
+GitHub CLI. Repository permissions and merge rules still apply; repositories requiring
+a merge queue may need to be merged on GitHub.
 
 ## Installation
 
