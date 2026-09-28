@@ -398,6 +398,26 @@ i.waiting {
 .card-main:hover {
   background: #fdfefb;
 }
+.merge-confirm-button,
+.merge-button {
+  background: #287a3e;
+  border-color: #287a3e;
+  color: white;
+}
+.merge-button {
+  margin: 0 15px 15px;
+  font-weight: 600;
+}
+.merge-confirm-button:hover:not(:disabled),
+.merge-button:hover:not(:disabled) {
+  background: #216533;
+  border-color: #216533;
+}
+.merge-confirm-button:focus-visible,
+.merge-button:focus-visible {
+  outline: 2px solid #287a3e;
+  outline-offset: 3px;
+}
 .repo {
   font-size: 10px;
   color: #7b8a73;

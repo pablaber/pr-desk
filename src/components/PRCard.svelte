@@ -3,6 +3,7 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
+  import GitMerge from '@lucide/svelte/icons/git-merge';
   import PRDetails from './PRDetails.svelte';
   import SnoozeChoices from './SnoozeChoices.svelte';
   import { cardViewModel } from '../lib/pr/card-view-model';
@@ -69,6 +70,14 @@
     aria-expanded={menu}
     onclick={() => (menu ? close() : (menu = true))}><Ellipsis size={14} /></button
   >
+  {#if card.state === 'ready-to-merge'}
+    <button
+      class="merge-button"
+      disabled={busy || stale}
+      onclick={() => act('merge')}
+      aria-label={`Merge ${card.pr.title}`}><GitMerge size={14} /> Merge…</button
+    >
+  {/if}
   {#if menu}
     <!-- The backdrop swallows the dismissing click so it cannot also open the PR behind it. -->
     <div class="menu-backdrop" onclick={close} role="presentation"></div>

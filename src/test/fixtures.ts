@@ -6,6 +6,7 @@ export function pr(overrides: Partial<PullRequest> = {}): PullRequest {
     repository: 'acme/api',
     number: 1,
     title: 'Improve caching',
+    headOid: 'a'.repeat(40),
     author: 'me',
     state: 'OPEN',
     draft: false,

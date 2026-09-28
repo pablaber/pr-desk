@@ -63,7 +63,7 @@ test.beforeEach(async ({ page }) => {
         nodes: [
           {
             commit: {
-              oid: 'commit-1',
+              oid: 'a'.repeat(40),
               statusCheckRollup: {
                 contexts: connection([
                   {
@@ -93,6 +93,15 @@ test.beforeEach(async ({ page }) => {
         if (command === 'plugin:store|save') return;
         if (command === 'plugin:opener|open_url') {
           w.opened.push(args.url);
+          return;
+        }
+        if (command === 'merge_pr') {
+          const calls = JSON.parse(localStorage.getItem('mergeCalls') ?? '[]');
+          calls.push(args);
+          localStorage.setItem('mergeCalls', JSON.stringify(calls));
+          if (localStorage.getItem('mergeFailure'))
+            throw new Error('Merge rejected by repository rules');
+          await new Promise((resolve) => setTimeout(resolve, 200));
           return;
         }
         if (command === 'close_stale_pr') {
@@ -1268,7 +1277,7 @@ test('check continuation gates the initial snapshot and preserves cards during r
                 nodes: [
                   {
                     commit: {
-                      oid: 'commit-1',
+                      oid: 'a'.repeat(40),
                       statusCheckRollup: {
                         contexts: {
                           nodes: [
@@ -1400,4 +1409,78 @@ test('settings shows read-only GitHub connection details and handles CLI lookup 
   await expect(info).toContainText('@alex');
   await expect(info.getByRole('status')).toContainText('Reopen Settings');
   await expect(page.getByRole('button', { name: 'Automatic refresh', exact: true })).toBeEnabled();
+});
+
+test('ready PRs merge only after confirmation with the selected method', async ({ page }) => {
+  await page.goto('/');
+  const merge = page.getByRole('button', {
+    name: 'Merge Reduce cache lookup latency',
+    exact: true,
+  });
+  await expect(page.locator('.merge-button')).toHaveCount(1);
+  await merge.click();
+  const dialog = page.getByRole('dialog', { name: 'Merge pull request?' });
+  await expect(dialog).toBeVisible();
+  await page.screenshot({ path: '.context/merge-confirmation.png', fullPage: true });
+  expect(await page.evaluate(() => localStorage.getItem('mergeCalls'))).toBeNull();
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await merge.click();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await merge.click();
+  await dialog.getByLabel('Merge method').selectOption('rebase');
+  await dialog.getByRole('button', { name: 'Confirm merge', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Merging…' })).toBeDisabled();
+  await expect(dialog).toBeHidden();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mergeCalls') ?? '[]'))).toEqual(
+    [{ url: 'https://github.com/acme/platform/pull/1', headOid: 'a'.repeat(40), method: 'rebase' }],
+  );
+  await expect(page.locator('.pr-card')).toHaveCount(3);
+  expect(await page.evaluate(() => (window as any).opened)).toEqual([]);
+});
+
+test('merge failures keep the dialog and card available', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => localStorage.setItem('mergeFailure', '1'));
+  await page
+    .getByRole('button', { name: 'Merge Reduce cache lookup latency', exact: true })
+    .click();
+  const dialog = page.getByRole('dialog', { name: 'Merge pull request?' });
+  await dialog.getByRole('button', { name: 'Confirm merge', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Merge rejected by repository rules');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeEnabled();
+});
+
+test('merge rechecks reject a changed commit or newly pending checks', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    const w = window as any;
+    const original = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      const result = await original(command, args);
+      if (command === 'github' && args.query?.includes('DeskPullRequest')) {
+        const commit = result.repository.pullRequest.commits.nodes[0].commit;
+        if (localStorage.getItem('changedHead')) commit.oid = 'b'.repeat(40);
+        else commit.statusCheckRollup.contexts.nodes[0].status = 'IN_PROGRESS';
+      }
+      return result;
+    };
+  });
+  for (const changedHead of [true, false]) {
+    await page.evaluate(
+      (changed) =>
+        changed ? localStorage.setItem('changedHead', '1') : localStorage.removeItem('changedHead'),
+      changedHead,
+    );
+    await page
+      .getByRole('button', { name: 'Merge Reduce cache lookup latency', exact: true })
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'Merge pull request?' });
+    await dialog.getByRole('button', { name: 'Confirm merge', exact: true }).click();
+    await expect(dialog.getByRole('alert')).toContainText('changed or is no longer ready');
+    expect(await page.evaluate(() => localStorage.getItem('mergeCalls'))).toBeNull();
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  }
 });
