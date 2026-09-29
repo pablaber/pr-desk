@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0](https://github.com/pablaber/pr-desk/compare/v1.1.0...v1.2.0) (2026-09-29)
+
+
+### Features
+
+* add all-clear state when there is nothing to do ([#71](https://github.com/pablaber/pr-desk/issues/71)) ([3cf1a4b](https://github.com/pablaber/pr-desk/commit/3cf1a4b68e96a8f4755da3d294153ffbfe43bb3c))
+* add per-repository non-blocking check rules ([#70](https://github.com/pablaber/pr-desk/issues/70)) ([66d1dd8](https://github.com/pablaber/pr-desk/commit/66d1dd87a9e04e164801c13b05d2f94a94264026))
+* merge ready pull requests with confirmation ([#69](https://github.com/pablaber/pr-desk/issues/69)) ([a6e9cd2](https://github.com/pablaber/pr-desk/commit/a6e9cd27bb67b216a35f1be70522264a2e0a6fc0))
+
+
+### Bug Fixes
+
+* stop autocorrecting settings text inputs ([#67](https://github.com/pablaber/pr-desk/issues/67)) ([3a1a4ac](https://github.com/pablaber/pr-desk/commit/3a1a4ac4b199efc9aa004f31dec3527cf4f0a703))
+
 ## [1.1.0](https://github.com/pablaber/pr-desk/compare/v1.0.0...v1.1.0) (2026-09-27)
 
 
