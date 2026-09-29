@@ -1523,3 +1523,31 @@ test('merge rechecks reject a changed commit or newly pending checks', async ({ 
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   }
 });
+
+test('an all-clear message replaces the columns only when nothing is tracked', async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as unknown as {
+      __TAURI_INTERNALS__: { invoke: (c: string, a: Record<string, any>) => Promise<unknown> };
+    };
+    const invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command, args) => {
+      const query = (args?.query ?? '') as string;
+      if (command === 'github' && query.includes('DeskSearch'))
+        return {
+          search: { issueCount: 0, nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+        };
+      if (command === 'github' && query.includes('DeskRepository')) return { repository: null };
+      return invoke(command, args);
+    };
+  });
+  await page.goto('/');
+  const clear = page.getByRole('status').filter({ hasText: 'Nothing to do' });
+  await expect(clear).toBeVisible();
+  await expect(page.locator('.column')).toHaveCount(0);
+  await page.screenshot({ path: '.context/all-clear.png', fullPage: true });
+  // A source filter that matches nothing is not "nothing to do": the columns and their
+  // filter hint come back.
+  await page.getByRole('button', { name: 'Watching', exact: true }).click();
+  await expect(clear).toBeHidden();
+  await expect(page.locator('.column')).toHaveCount(3);
+});
