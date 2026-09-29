@@ -25,7 +25,7 @@
     aria-label={`Open ${row.item?.pr.title ?? row.id} on GitHub`}
     onclick={() => onopen(row.url)}
   >
-    <RowSummary item={row.item} {now} {stale}>
+    <RowSummary item={row.item} {now} {stale} labels={row.labels}>
       {#snippet unavailable()}
         <span class="repo">{row.repository} <span class="number">#{row.number}</span></span><strong
           >Pull request details unavailable</strong

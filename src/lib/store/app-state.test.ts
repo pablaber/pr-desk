@@ -15,6 +15,10 @@ import {
   snoozeOptionLabel,
   preferenceDraft,
   draftDiffers,
+  parseLabelName,
+  nextLabelColor,
+  labelNameTaken,
+  LABEL_COLORS,
   type SnoozeOption,
 } from './app-state';
 it('validates and canonicalizes input', () => {
@@ -108,7 +112,7 @@ it('defaults to five minutes and migrates reserved v1 settings without losing pr
     settings: { automaticRefreshMinutes: 0 },
   };
   expect(migrateState(legacy)).toMatchObject({
-    schemaVersion: 7,
+    schemaVersion: 8,
     watchedPullRequests: ['acme/api#1'],
     settings: { automaticRefreshMinutes: 5, snoozeOptions: defaultSnoozeOptions() },
   });
@@ -127,7 +131,7 @@ it('preserves Never and all valid intervals, and repairs invalid stored interval
         .automaticRefreshMinutes,
     ).toBe(5);
   }
-  expect(() => migrateState({ ...defaultState(), schemaVersion: 8 })).toThrow('Unsupported');
+  expect(() => migrateState({ ...defaultState(), schemaVersion: 9 })).toThrow('Unsupported');
 });
 
 it('migrates older preferences and validates ignored repositories', () => {
@@ -141,7 +145,7 @@ it('migrates older preferences and validates ignored repositories', () => {
         settings: { automaticRefreshMinutes: 0 },
       }),
     ).toMatchObject({
-      schemaVersion: 7,
+      schemaVersion: 8,
       ignoreRules: [],
       trackedRepositories: ['acme/api'],
       settings: { automaticRefreshMinutes: schemaVersion === 1 ? 5 : 0 },
@@ -205,7 +209,7 @@ it('migrates all supported versions without losing independently saved preferenc
       settings: { automaticRefreshMinutes: 12, snoozeOptions: [] },
     };
     const migrated = migrateState(legacy);
-    expect(migrated.schemaVersion).toBe(7);
+    expect(migrated.schemaVersion).toBe(8);
     expect(migrated.checkRules).toEqual([]);
     expect(migrated.ignoreRules).toEqual(
       schemaVersion >= 3 ? [{ kind: 'repository', value: 'acme/api' }] : [],
@@ -361,4 +365,63 @@ it('validates dock badge modes', () => {
   for (const mode of ['off', 'ready-to-merge', 'needs-attention', 'both'])
     expect(isDockBadgeMode(mode)).toBe(true);
   for (const mode of ['', 'Both', null, undefined, 1]) expect(isDockBadgeMode(mode)).toBe(false);
+});
+
+const label = (id: string, name: string, color = 'blue') => ({ id, name, color });
+it('loads pre-v8 preferences without labels', () => {
+  for (const schemaVersion of [1, 5, 7]) {
+    const migrated = migrateState({
+      ...defaultState(),
+      schemaVersion,
+      ignoredRepositories: [],
+      labels: [label('x', 'Ignored')],
+      labeledPullRequests: { 'acme/api#1': ['x'] },
+    });
+    expect(migrated).toMatchObject({ schemaVersion: 8, labels: [], labeledPullRequests: {} });
+  }
+});
+it('round-trips v8 labels and canonicalizes their assignments', () => {
+  const stored = {
+    ...defaultState(),
+    labels: [label('a', 'Backend'), label('b', 'Urgent', 'red'), label('a', 'Backend')],
+    labeledPullRequests: {
+      'acme/api#1': ['a', 'a', 'gone', 'b'],
+      'acme/api#2': ['gone'],
+      'acme/api#3': [],
+    },
+  };
+  const migrated = migrateState(stored);
+  expect(migrated.labels.map((l) => l.id)).toEqual(['a', 'b']);
+  expect(migrated.labeledPullRequests).toEqual({ 'acme/api#1': ['a', 'b'] });
+  expect(migrateState(migrated)).toEqual(migrated);
+});
+it('refuses malformed labels rather than overwriting them', () => {
+  const bad: unknown[] = [
+    'nope',
+    [label('', 'Empty id')],
+    [label('a', '')],
+    [label('a', 'x'.repeat(33))],
+    [label('a', 'Two\nlines')],
+    [label('a', 'Odd', 'teal')],
+    [null],
+    [label('a', 'Dup'), label('b', 'dup')],
+  ];
+  for (const labels of bad)
+    expect(() => migrateState({ ...defaultState(), labels })).toThrow('left intact');
+  for (const labeledPullRequests of [null, 'x', { 'acme/api#1': 'a' }, { 'acme/api#1': [1] }])
+    expect(() => migrateState({ ...defaultState(), labeledPullRequests })).toThrow('left intact');
+});
+it('validates label names, colors and uniqueness', () => {
+  expect(parseLabelName('  Backend  ')).toBe('Backend');
+  expect(parseLabelName('x'.repeat(32))).toHaveLength(32);
+  for (const name of ['', '   ', 'x'.repeat(33), 'a\nb', 'a\tb', 3 as unknown as string])
+    expect(() => parseLabelName(name)).toThrow();
+  expect(nextLabelColor([])).toBe(LABEL_COLORS[0]);
+  expect(nextLabelColor(LABEL_COLORS.map((c, i) => label(String(i), c)) as never)).toBe(
+    LABEL_COLORS[0],
+  );
+  const labels = [label('a', 'Backend')] as never;
+  expect(labelNameTaken(labels, ' backend ')).toBe(true);
+  expect(labelNameTaken(labels, 'backend', 'a')).toBe(false);
+  expect(labelNameTaken(labels, 'Frontend')).toBe(false);
 });

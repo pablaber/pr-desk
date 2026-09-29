@@ -14,15 +14,33 @@ export interface CheckRule {
   repository: string;
   check: string;
 }
+export const LABEL_COLORS = [
+  'gray',
+  'blue',
+  'green',
+  'yellow',
+  'orange',
+  'red',
+  'purple',
+  'pink',
+] as const;
+export type LabelColor = (typeof LABEL_COLORS)[number];
+export interface PRLabel {
+  id: string;
+  name: string;
+  color: LabelColor;
+}
 export type DockBadgeMode = 'off' | 'ready-to-merge' | 'needs-attention' | 'both';
 export interface AppState {
-  schemaVersion: 7;
+  schemaVersion: 8;
   trackedRepositories: string[];
   ignoreRules: IgnoreRule[];
   checkRules: CheckRule[];
   watchedPullRequests: string[];
   ignoredPullRequests: Record<string, { ignoredAt: string }>;
   snoozedPullRequests: Record<string, { until: string }>;
+  labels: PRLabel[];
+  labeledPullRequests: Record<string, string[]>;
   settings: {
     automaticRefreshMinutes: number;
     snoozeOptions: SnoozeOption[];
@@ -37,13 +55,15 @@ export const defaultSnoozeOptions = (): SnoozeOption[] => [
   { kind: 'duration', amount: 1, unit: 'weeks' },
 ];
 export const defaultState = (): AppState => ({
-  schemaVersion: 7,
+  schemaVersion: 8,
   trackedRepositories: [],
   ignoreRules: [],
   checkRules: [],
   watchedPullRequests: [],
   ignoredPullRequests: {},
   snoozedPullRequests: {},
+  labels: [],
+  labeledPullRequests: {},
   settings: {
     automaticRefreshMinutes: 5,
     snoozeOptions: defaultSnoozeOptions(),
@@ -62,8 +82,10 @@ export function migrateState(value: unknown): AppState {
     schemaVersion: number;
     ignoredRepositories?: string[];
     checkRules?: unknown;
+    labels?: unknown;
+    labeledPullRequests?: unknown;
   };
-  if (![1, 2, 3, 4, 5, 6, 7].includes(stored.schemaVersion))
+  if (![1, 2, 3, 4, 5, 6, 7, 8].includes(stored.schemaVersion))
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
@@ -89,9 +111,10 @@ export function migrateState(value: unknown): AppState {
     watchedPullRequests: stored.watchedPullRequests,
     ignoredPullRequests: stored.ignoredPullRequests,
     snoozedPullRequests: stored.snoozedPullRequests,
-    schemaVersion: 7,
+    schemaVersion: 8,
     ignoreRules: readStoredIgnoreRules(stored),
     checkRules: readStoredCheckRules(stored),
+    ...readStoredLabels(stored),
     settings: {
       automaticRefreshMinutes:
         stored.schemaVersion !== 1 && isRefreshInterval(minutes) ? minutes : 5,
@@ -292,6 +315,58 @@ function readStoredCheckRules(stored: {
     if (!Array.isArray(stored.checkRules)) throw new Error('Invalid rules');
     const parsed = stored.checkRules.map((rule) => parseCheckRule(rule?.repository, rule?.check));
     return [...new Map(parsed.map((rule) => [checkRuleKey(rule), rule])).values()];
+  } catch {
+    throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
+  }
+}
+
+export function parseLabelName(input: string): string {
+  if (typeof input !== 'string') throw new Error('Enter a label name.');
+  const name = input.trim();
+  if (!name || /[\u0000-\u001f\u007f\u2028\u2029]/.test(name) || name.length > 32)
+    throw new Error('Enter a single-line label name of 1 to 32 characters.');
+  return name;
+}
+function isLabelColor(value: unknown): value is LabelColor {
+  return LABEL_COLORS.includes(value as LabelColor);
+}
+export function nextLabelColor(labels: PRLabel[]): LabelColor {
+  return LABEL_COLORS[labels.length % LABEL_COLORS.length];
+}
+export function labelNameTaken(labels: PRLabel[], name: string, exceptId?: string): boolean {
+  const key = name.trim().toLowerCase();
+  return labels.some((label) => label.id !== exceptId && label.name.toLowerCase() === key);
+}
+// Like the ignore rules, malformed label data stops loading so the file is never overwritten.
+// Assignments are canonicalized instead: ones pointing at a deleted label carry no information.
+function readStoredLabels(stored: {
+  schemaVersion: number;
+  labels?: unknown;
+  labeledPullRequests?: unknown;
+}): Pick<AppState, 'labels' | 'labeledPullRequests'> {
+  if (stored.schemaVersion < 8) return { labels: [], labeledPullRequests: {} };
+  try {
+    const { labels, labeledPullRequests } = stored;
+    if (!Array.isArray(labels)) throw new Error('Invalid labels');
+    if (!labeledPullRequests || typeof labeledPullRequests !== 'object')
+      throw new Error('Invalid labels');
+    const parsed = labels.map((label: Partial<PRLabel> | null): PRLabel => {
+      if (typeof label?.id !== 'string' || !label.id || !isLabelColor(label.color))
+        throw new Error('Invalid label');
+      return { id: label.id, name: parseLabelName(label.name as string), color: label.color };
+    });
+    const unique = [...new Map(parsed.map((label) => [label.id, label])).values()];
+    if (new Set(unique.map((label) => label.name.toLowerCase())).size !== unique.length)
+      throw new Error('Duplicate label');
+    const known = new Set(unique.map((label) => label.id));
+    const assignments: Record<string, string[]> = {};
+    for (const [prId, ids] of Object.entries(labeledPullRequests)) {
+      if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string'))
+        throw new Error('Invalid assignments');
+      const kept = [...new Set(ids as string[])].filter((id) => known.has(id));
+      if (kept.length) assignments[prId] = kept;
+    }
+    return { labels: unique, labeledPullRequests: assignments };
   } catch {
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
   }

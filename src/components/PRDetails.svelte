@@ -4,7 +4,13 @@
   import Clock from '@lucide/svelte/icons/clock';
   import { cardViewModel } from '../lib/pr/card-view-model';
   import type { ClassifiedPR } from '../lib/pr/classify';
-  let { item, now, stale }: { item: ClassifiedPR; now: number; stale: boolean } = $props();
+  import type { PRLabel } from '../lib/store/app-state';
+  let {
+    item,
+    now,
+    stale,
+    labels = [],
+  }: { item: ClassifiedPR; now: number; stale: boolean; labels?: PRLabel[] } = $props();
   let card = $derived(cardViewModel(item, now));
 </script>
 
@@ -16,7 +22,10 @@
 <span class="badges"
   >{#each card.badges as badge}<span class="badge">{badge}</span>{/each}{#if card.reviewBadge}<span
       class="badge review {card.reviewBadge.tone}">{card.reviewBadge.label}</span
-    >{/if}{#if card.staleness}<span class="badge staleness {card.staleness}">Stale</span>{/if}</span
+    >{/if}{#if card.staleness}<span class="badge staleness {card.staleness}">Stale</span
+    >{/if}{#each labels as label (label.id)}<span class="badge label {label.color}"
+      ><i class="label-dot"></i>{label.name}</span
+    >{/each}</span
 >
 <span class="status {card.state}"
   >{#if card.state === 'ready-to-merge'}<Check

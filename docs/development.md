@@ -79,7 +79,7 @@ Tauri Store writes `preferences.json` to the app data directory (on macOS,
 
 ```json
 {
-  "schemaVersion": 4,
+  "schemaVersion": 8,
   "trackedRepositories": ["owner/repository"],
   "watchedPullRequests": ["owner/repository#123"],
   "ignoredRepositories": [],
@@ -89,6 +89,8 @@ Tauri Store writes `preferences.json` to the app data directory (on macOS,
   "snoozedPullRequests": {
     "owner/repository#789": { "until": "2026-09-25T13:00:00Z" }
   },
+  "labels": [{ "id": "5b1c…", "name": "Backend", "color": "blue" }],
+  "labeledPullRequests": { "owner/repository#123": ["5b1c…"] },
   "settings": {
     "automaticRefreshMinutes": 5,
     "snoozeOptions": [
@@ -101,8 +103,17 @@ Tauri Store writes `preferences.json` to the app data directory (on macOS,
 
 No PR titles, GitHub status, or credentials are persisted. Repository and PR
 identifiers are canonicalized to lowercase. Unsupported storage versions stop loading
-without overwriting the file. Closed, merged, deleted, or temporarily inaccessible PRs
-do not erase their saved preferences.
+without overwriting the file. Temporarily inaccessible PRs do not erase their saved
+preferences, and neither do ignore rules, snoozes, or individual ignores.
+
+Watches and labels are pruned after a successful refresh (`src/lib/pr/prune.ts`). A PR that
+is merged or closed, with fresh data, is unwatched and loses its labels. A labeled PR that no
+source discovered also loses its labels, but only when every discovery job succeeded and no
+repository ignore rule excludes it. Failed fetches prune nothing.
+
+Labels are referenced by id, so renaming one keeps its assignments. The palette is fixed
+(`LABEL_COLORS`), names are unique case-insensitively, and label edits save immediately
+rather than going through the Settings draft.
 
 Ignoring a repository overrides every source, including owned PRs, direct review
 requests, tracked repositories, and watched PRs. Removing the ignore restores normal

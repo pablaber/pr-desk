@@ -30,6 +30,12 @@ export const hotkeys: Hotkey[] = [
     description: 'Open snoozed pull requests',
   },
   {
+    action: 'open-labels',
+    key: 'l',
+    shift: true,
+    description: 'Open labels',
+  },
+  {
     // Shift is 'any' because reaching ? needs it on some layouts and not on others.
     action: 'toggle-shortcuts',
     key: '?',

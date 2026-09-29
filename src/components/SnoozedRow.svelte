@@ -50,7 +50,7 @@
     onclick={() =>
       onopen(row.item?.pr.url ?? `https://github.com/${row.id.replace('#', '/pull/')}`)}
   >
-    <RowSummary item={row.item} {now} {stale}>
+    <RowSummary item={row.item} {now} {stale} labels={row.labels}>
       {#snippet unavailable()}
         <span class="repo">{row.id}</span><strong>Pull request details unavailable</strong><span
           class="secondary">You can still open, reschedule, or restore this pull request.</span

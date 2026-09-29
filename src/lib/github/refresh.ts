@@ -9,6 +9,8 @@ export interface DashboardSnapshot {
   sources: Record<string, string[]>;
   warnings: string[];
   staleIds: string[];
+  // False when any discovery job failed, so a PR missing from `sources` may just be unseen.
+  discoveryComplete: boolean;
 }
 export async function refreshDashboard(
   service: GitHubService,
@@ -18,6 +20,7 @@ export async function refreshDashboard(
   const warnings: string[] = [],
     sources: Record<string, string[]> = {},
     staleIds: string[] = [];
+  let discoveryComplete = true;
   const ignored = exactIgnoredRepositories(local.ignoreRules);
   const include = (id: string) => !ignoresRepository(id.split('#')[0], local.ignoreRules);
   const jobs: { key: string; reason: TrackingReason; run: () => Promise<RawPR[]> }[] = [
@@ -53,6 +56,7 @@ export async function refreshDashboard(
       discoveries.set(job.key, found);
       sources[job.key] = [...new Set(found.map((pr) => parsePullRequest(pr.url)))];
     } catch (e) {
+      discoveryComplete = false;
       sources[job.key] = (previous?.sources[job.key] ?? []).filter(include);
       warnings.push(`${job.key}: ${String(e)} Previous results retained.`);
       staleIds.push(...sources[job.key]);
@@ -88,5 +92,5 @@ export async function refreshDashboard(
       if (old) prs.push({ ...old, reasons: [...why] });
     }
   });
-  return { prs, sources, warnings, staleIds: [...new Set(staleIds)] };
+  return { prs, sources, warnings, staleIds: [...new Set(staleIds)], discoveryComplete };
 }

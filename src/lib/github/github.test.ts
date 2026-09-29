@@ -110,6 +110,10 @@ describe('GitHub adapter', () => {
     expect(result.prs).toHaveLength(1);
     expect(result.warnings).toHaveLength(2);
     expect(result.staleIds).toEqual(['acme/api#1']);
+    expect(result.discoveryComplete).toBe(false);
+  });
+  it('reports discovery as complete when every job succeeds', async () => {
+    expect((await refreshDashboard(service(), defaultState())).discoveryComplete).toBe(true);
   });
   it('removes stale sources after a successful empty refresh', async () => {
     const api = service(),

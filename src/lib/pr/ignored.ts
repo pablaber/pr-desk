@@ -1,6 +1,7 @@
 import type { AppState } from '../store/app-state';
 import type { PullRequest } from './types';
 import { describePullRequest } from './classify';
+import { labelsFor } from './labels';
 
 // Saved entries only hold the identifier and when it was ignored, so repository and number
 // come from the identifier and the rest from whatever the last refresh could fetch.
@@ -21,6 +22,7 @@ export function ignoredPullRequests(local: AppState, prs: PullRequest[], login: 
         number,
         url: pr?.url ?? `https://github.com/${repository}/pull/${number}`,
         item: pr ? describePullRequest(pr, login, local.checkRules) : null,
+        labels: labelsFor(local, id),
       };
     });
 }
