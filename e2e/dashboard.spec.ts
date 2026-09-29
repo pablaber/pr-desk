@@ -22,8 +22,10 @@ test.beforeEach(async ({ page }) => {
       isTauri: boolean;
       opened: string[];
       refreshCount: number;
+      badges: (number | null)[];
     };
     w.opened = [];
+    w.badges = [];
     w.refreshCount = 0;
     w.isTauri = true;
     const connection = (nodes: unknown[]) => ({
@@ -80,7 +82,16 @@ test.beforeEach(async ({ page }) => {
       },
     });
     w.__TAURI_INTERNALS__ = {
+      // getCurrentWindow() reads its label from this metadata.
+      metadata: {
+        currentWindow: { label: 'main' },
+        currentWebview: { windowLabel: 'main', label: 'main' },
+      },
       invoke: async (command: string, args: Record<string, any>) => {
+        if (command === 'plugin:window|set_badge_count') {
+          w.badges.push(args.value ?? null);
+          return;
+        }
         if (command === 'plugin:store|load') return 1;
         if (command === 'plugin:store|get') {
           const value = localStorage.getItem('prefs');
@@ -572,6 +583,7 @@ test('settings sections default to accordion states, expand/collapse by mouse an
   await expect(page.getByRole('spinbutton', { name: 'Refresh interval in minutes' })).toBeHidden();
   for (const heading of [
     'Automatic refresh',
+    'Dock badge',
     'Snooze options · 4',
     'Tracked repositories',
     'Ignored',
@@ -604,6 +616,30 @@ test('settings sections default to accordion states, expand/collapse by mouse an
   await ignoredSummary.click();
   await expect(ignoredSummary).toHaveAttribute('aria-expanded', 'false');
   await page.screenshot({ path: '.context/settings-accordion.png', fullPage: true });
+});
+
+test('the dock badge follows the chosen mode and persists', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.column').nth(0).locator('.pr-card')).toHaveCount(1);
+  await expect(page.locator('.column').nth(1).locator('.pr-card')).toHaveCount(2);
+  const lastBadge = () => page.evaluate(() => (window as any).badges.at(-1) ?? null);
+  await expect.poll(lastBadge).toBe(3);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Dock badge');
+  const expected = {
+    'Ready to merge': 1,
+    'Needs attention': 2,
+    Off: null,
+    Both: 3,
+  };
+  for (const [label, value] of Object.entries(expected)) {
+    await page.getByRole('radio', { name: label, exact: true }).check();
+    await expect.poll(lastBadge).toBe(value);
+  }
+  await page.getByRole('radio', { name: 'Off', exact: true }).check();
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!).settings.dockBadge))
+    .toBe('off');
 });
 
 test('hotkeys switch screens and stay out of the way while typing', async ({ page }) => {
@@ -1127,7 +1163,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
     .click();
   await saveSettings(page);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
-  expect(saved.schemaVersion).toBe(6);
+  expect(saved.schemaVersion).toBe(7);
   expect(saved.ignoreRules).toEqual([]);
   expect(saved.ignoredPullRequests).toHaveProperty('acme/platform#2');
   expect(saved.settings.snoozeOptions).toEqual([]);

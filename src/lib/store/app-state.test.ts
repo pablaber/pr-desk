@@ -9,6 +9,7 @@ import {
   defaultState,
   migrateState,
   isRefreshInterval,
+  isDockBadgeMode,
   defaultSnoozeOptions,
   parseSnoozeOptions,
   snoozeOptionLabel,
@@ -107,7 +108,7 @@ it('defaults to five minutes and migrates reserved v1 settings without losing pr
     settings: { automaticRefreshMinutes: 0 },
   };
   expect(migrateState(legacy)).toMatchObject({
-    schemaVersion: 6,
+    schemaVersion: 7,
     watchedPullRequests: ['acme/api#1'],
     settings: { automaticRefreshMinutes: 5, snoozeOptions: defaultSnoozeOptions() },
   });
@@ -126,7 +127,7 @@ it('preserves Never and all valid intervals, and repairs invalid stored interval
         .automaticRefreshMinutes,
     ).toBe(5);
   }
-  expect(() => migrateState({ ...defaultState(), schemaVersion: 7 })).toThrow('Unsupported');
+  expect(() => migrateState({ ...defaultState(), schemaVersion: 8 })).toThrow('Unsupported');
 });
 
 it('migrates older preferences and validates ignored repositories', () => {
@@ -140,7 +141,7 @@ it('migrates older preferences and validates ignored repositories', () => {
         settings: { automaticRefreshMinutes: 0 },
       }),
     ).toMatchObject({
-      schemaVersion: 6,
+      schemaVersion: 7,
       ignoreRules: [],
       trackedRepositories: ['acme/api'],
       settings: { automaticRefreshMinutes: schemaVersion === 1 ? 5 : 0 },
@@ -204,7 +205,7 @@ it('migrates all supported versions without losing independently saved preferenc
       settings: { automaticRefreshMinutes: 12, snoozeOptions: [] },
     };
     const migrated = migrateState(legacy);
-    expect(migrated.schemaVersion).toBe(6);
+    expect(migrated.schemaVersion).toBe(7);
     expect(migrated.checkRules).toEqual([]);
     expect(migrated.ignoreRules).toEqual(
       schemaVersion >= 3 ? [{ kind: 'repository', value: 'acme/api' }] : [],
@@ -291,7 +292,7 @@ it('drafts only the Settings lists and reports whether they differ from the save
     draftDiffers(preferenceDraft(state), {
       ...state,
       ignoredPullRequests: {},
-      settings: { automaticRefreshMinutes: 0, snoozeOptions: [] },
+      settings: { ...state.settings, automaticRefreshMinutes: 0, snoozeOptions: [] },
     }),
   ).toBe(false);
   // Order matters, so reordering a list is a change worth saving.
@@ -332,4 +333,32 @@ it('detects check rule edits in the draft', () => {
   draft.checkRules.push({ repository: 'acme/*', check: 'policy-bot' });
   expect(draftDiffers(draft, state)).toBe(true);
   expect(draftDiffers(draft, { ...state, checkRules: [...draft.checkRules] })).toBe(false);
+});
+
+it('defaults the dock badge to both, for new and pre-v7 preferences', () => {
+  expect(defaultState().settings.dockBadge).toBe('both');
+  const { dockBadge: _, ...settings } = defaultState().settings;
+  for (const schemaVersion of [5, 6])
+    expect(migrateState({ ...defaultState(), schemaVersion, settings }).settings.dockBadge).toBe(
+      'both',
+    );
+  expect(migrateState({ ...defaultState(), settings }).settings.dockBadge).toBe('both');
+});
+it('keeps each valid dock badge mode and rejects an invalid stored one', () => {
+  for (const dockBadge of ['off', 'ready-to-merge', 'needs-attention', 'both'])
+    expect(
+      migrateState({ ...defaultState(), settings: { ...defaultState().settings, dockBadge } })
+        .settings.dockBadge,
+    ).toBe(dockBadge);
+  expect(() =>
+    migrateState({
+      ...defaultState(),
+      settings: { ...defaultState().settings, dockBadge: 'everything' },
+    }),
+  ).toThrow('Invalid preferences file');
+});
+it('validates dock badge modes', () => {
+  for (const mode of ['off', 'ready-to-merge', 'needs-attention', 'both'])
+    expect(isDockBadgeMode(mode)).toBe(true);
+  for (const mode of ['', 'Both', null, undefined, 1]) expect(isDockBadgeMode(mode)).toBe(false);
 });

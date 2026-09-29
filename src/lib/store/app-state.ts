@@ -14,15 +14,20 @@ export interface CheckRule {
   repository: string;
   check: string;
 }
+export type DockBadgeMode = 'off' | 'ready-to-merge' | 'needs-attention' | 'both';
 export interface AppState {
-  schemaVersion: 6;
+  schemaVersion: 7;
   trackedRepositories: string[];
   ignoreRules: IgnoreRule[];
   checkRules: CheckRule[];
   watchedPullRequests: string[];
   ignoredPullRequests: Record<string, { ignoredAt: string }>;
   snoozedPullRequests: Record<string, { until: string }>;
-  settings: { automaticRefreshMinutes: number; snoozeOptions: SnoozeOption[] };
+  settings: {
+    automaticRefreshMinutes: number;
+    snoozeOptions: SnoozeOption[];
+    dockBadge: DockBadgeMode;
+  };
 }
 export const MAX_SNOOZE_OPTIONS = 5;
 export const defaultSnoozeOptions = (): SnoozeOption[] => [
@@ -32,14 +37,18 @@ export const defaultSnoozeOptions = (): SnoozeOption[] => [
   { kind: 'duration', amount: 1, unit: 'weeks' },
 ];
 export const defaultState = (): AppState => ({
-  schemaVersion: 6,
+  schemaVersion: 7,
   trackedRepositories: [],
   ignoreRules: [],
   checkRules: [],
   watchedPullRequests: [],
   ignoredPullRequests: {},
   snoozedPullRequests: {},
-  settings: { automaticRefreshMinutes: 5, snoozeOptions: defaultSnoozeOptions() },
+  settings: {
+    automaticRefreshMinutes: 5,
+    snoozeOptions: defaultSnoozeOptions(),
+    dockBadge: 'both',
+  },
 });
 export async function loadState(): Promise<AppState> {
   const store = await load('preferences.json', { autoSave: false, defaults: {} });
@@ -54,7 +63,7 @@ export function migrateState(value: unknown): AppState {
     ignoredRepositories?: string[];
     checkRules?: unknown;
   };
-  if (![1, 2, 3, 4, 5, 6].includes(stored.schemaVersion))
+  if (![1, 2, 3, 4, 5, 6, 7].includes(stored.schemaVersion))
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
@@ -80,7 +89,7 @@ export function migrateState(value: unknown): AppState {
     watchedPullRequests: stored.watchedPullRequests,
     ignoredPullRequests: stored.ignoredPullRequests,
     snoozedPullRequests: stored.snoozedPullRequests,
-    schemaVersion: 6,
+    schemaVersion: 7,
     ignoreRules: readStoredIgnoreRules(stored),
     checkRules: readStoredCheckRules(stored),
     settings: {
@@ -90,8 +99,22 @@ export function migrateState(value: unknown): AppState {
         stored.schemaVersion >= 4
           ? readStoredSnoozeOptions(stored.settings?.snoozeOptions)
           : defaultSnoozeOptions(),
+      dockBadge: readStoredDockBadge(stored),
     },
   };
+}
+const DOCK_BADGE_MODES: DockBadgeMode[] = ['off', 'ready-to-merge', 'needs-attention', 'both'];
+export function isDockBadgeMode(value: unknown): value is DockBadgeMode {
+  return DOCK_BADGE_MODES.includes(value as DockBadgeMode);
+}
+// Like the snooze options, an invalid stored mode stops loading so the file is never overwritten.
+function readStoredDockBadge(stored: { schemaVersion: number; settings?: unknown }): DockBadgeMode {
+  if (stored.schemaVersion < 7) return 'both';
+  const mode = (stored.settings as { dockBadge?: unknown } | undefined)?.dockBadge;
+  if (mode === undefined) return 'both';
+  if (!isDockBadgeMode(mode))
+    throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
+  return mode;
 }
 // A saved file that no longer validates must never be silently rewritten with defaults. An
 // absent list is different from an empty one: only the empty list means "the user removed them".

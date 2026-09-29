@@ -2,9 +2,16 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import { githubErrorMessage } from '../lib/github/errors';
+  import DockBadge from './DockBadge.svelte';
   import RefreshInterval from './RefreshInterval.svelte';
   import SnoozeOptions from './SnoozeOptions.svelte';
-  import type { AppState, CheckRule, SnoozeOption, IgnoreRuleKind } from '../lib/store/app-state';
+  import type {
+    AppState,
+    CheckRule,
+    DockBadgeMode,
+    SnoozeOption,
+    IgnoreRuleKind,
+  } from '../lib/store/app-state';
   import type { GhCliInfo } from '../lib/github/types';
   let {
     login,
@@ -20,6 +27,7 @@
     onsave,
     ondiscard,
     onrefreshinterval,
+    ondockbadge,
     onsnoozeoptions,
     onopenignored,
   }: {
@@ -36,6 +44,7 @@
     onsave: () => Promise<boolean>;
     ondiscard: () => void;
     onrefreshinterval: (minutes: number) => Promise<void>;
+    ondockbadge: (mode: DockBadgeMode) => Promise<void>;
     onsnoozeoptions: (options: SnoozeOption[]) => Promise<void>;
     onopenignored: () => void;
   } = $props();
@@ -53,6 +62,7 @@
 
   let open = $state({
     refresh: false,
+    badge: false,
     snooze: false,
     tracked: false,
     ignoredRules: false,
@@ -134,6 +144,24 @@
           {busy}
           onsave={onrefreshinterval}
         />
+      </div>
+    {/if}
+  </section>
+  <section class="settings-section">
+    <h2>
+      <button
+        type="button"
+        class="settings-section-toggle"
+        aria-expanded={open.badge}
+        aria-controls="settings-section-badge"
+        onclick={() => (open.badge = !open.badge)}
+        ><ChevronRight class="chevron" size={13} /> Dock badge</button
+      >
+    </h2>
+    {#if open.badge}
+      <div class="settings-section-body" id="settings-section-badge">
+        <p>Show a count on the PR Desk Dock icon.</p>
+        <DockBadge mode={preferences.settings.dockBadge} {busy} onsave={ondockbadge} />
       </div>
     {/if}
   </section>

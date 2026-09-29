@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { isTauri } from '@tauri-apps/api/core';
+  import { getCurrentWindow } from '@tauri-apps/api/window';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { version } from '../package.json';
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
@@ -40,6 +41,8 @@
     type IgnoreRuleKind,
     parsePullRequest,
     isRefreshInterval,
+    isDockBadgeMode,
+    type DockBadgeMode,
     parseSnoozeOptions,
     preferenceDraft,
     draftDiffers,
@@ -48,6 +51,7 @@
     type SnoozeOption,
   } from './lib/store/app-state';
   import { classify, sortPullRequests } from './lib/pr/classify';
+  import { badgeCount } from './lib/pr/badge';
   import { hotkeyFor, resolveHotkey } from './lib/hotkeys/match';
   import { ariaKeyShortcut, compactKeys } from './lib/hotkeys/format';
   import type { DashboardState, TrackingReason } from './lib/pr/types';
@@ -106,6 +110,16 @@
     classified.filter((p) => filter === 'all' || p.pr.reasons.includes(filter)),
   );
   let allClear = $derived(!showLoading && filter === 'all' && classified.length === 0);
+  let dockBadge = $derived(
+    initialized ? badgeCount(classified, preferences.settings.dockBadge) : 0,
+  );
+  $effect(() => {
+    if (!isTauri()) return;
+    // The badge is cosmetic, so a failure to set it must never surface as a dashboard error.
+    getCurrentWindow()
+      .setBadgeCount(dockBadge || undefined)
+      .catch(() => {});
+  });
   let cliInfo = $state<GhCliInfo | null>(null);
   let cliInfoError = $state(false);
   $effect(() => {
@@ -141,6 +155,12 @@
     if (!isRefreshInterval(minutes)) return;
     await change((next) => {
       next.settings.automaticRefreshMinutes = minutes;
+    });
+  }
+  async function setDockBadge(mode: DockBadgeMode) {
+    if (!isDockBadgeMode(mode)) return;
+    await change((next) => {
+      next.settings.dockBadge = mode;
     });
   }
   async function setSnoozeOptions(options: SnoozeOption[]) {
@@ -563,6 +583,7 @@
         onsave={saveSettings}
         ondiscard={discardSettings}
         onrefreshinterval={setRefreshInterval}
+        ondockbadge={setDockBadge}
         onsnoozeoptions={setSnoozeOptions}
         onopenignored={() => navigate('ignored')}
       />
