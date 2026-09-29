@@ -12,6 +12,7 @@
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import SettingsIcon from '@lucide/svelte/icons/settings';
+  import Tag from '@lucide/svelte/icons/tag';
   import X from '@lucide/svelte/icons/x';
   // The app's CSP blocks data URLs, so keep the logo as a bundled file.
   import appIcon from '../src-tauri/icons/source.svg?no-inline';
@@ -22,6 +23,8 @@
   import AllClear from './components/AllClear.svelte';
   import Ignored from './components/Ignored.svelte';
   import Snoozed from './components/Snoozed.svelte';
+  import Labels from './components/Labels.svelte';
+  import LabelPullRequests from './components/LabelPullRequests.svelte';
   import Settings from './components/Settings.svelte';
   import UnsavedChanges from './components/UnsavedChanges.svelte';
   import HotkeyHelp from './components/HotkeyHelp.svelte';
@@ -52,18 +55,28 @@
   } from './lib/store/app-state';
   import { classify, sortPullRequests } from './lib/pr/classify';
   import { badgeCount } from './lib/pr/badge';
+  import { applyLabelOp, labelsFor, type LabelOp } from './lib/pr/labels';
+  import { prunePreferences } from './lib/pr/prune';
   import { hotkeyFor, resolveHotkey } from './lib/hotkeys/match';
   import { ariaKeyShortcut, compactKeys } from './lib/hotkeys/format';
   import type { DashboardState, TrackingReason } from './lib/pr/types';
   const service = new GhGitHubService();
   let preferences = $state<AppState>(defaultState());
-  let snapshot = $state<DashboardSnapshot>({ prs: [], sources: {}, warnings: [], staleIds: [] });
-  type Screen = 'dashboard' | 'snoozed' | 'settings' | 'ignored';
+  let snapshot = $state<DashboardSnapshot>({
+    prs: [],
+    sources: {},
+    warnings: [],
+    staleIds: [],
+    discoveryComplete: false,
+  });
+  type Screen = 'dashboard' | 'snoozed' | 'labels' | 'label' | 'settings' | 'ignored';
   let login = $state(''),
     avatarUrl = $state(''),
     screen = $state<Screen>('dashboard');
   // Settings edits live here until Save, so leaving and returning through the Ignored sub-screen
   // keeps them, and a refresh never fires for a half-finished list of repositories.
+  let selectedLabelId = $state<string | null>(null);
+  let selectedLabel = $derived(preferences.labels.find((l) => l.id === selectedLabelId) ?? null);
   let settingsDraft = $state<PreferenceDraft | null>(null);
   let settingsDirty = $derived(settingsDraft !== null && draftDiffers(settingsDraft, preferences));
   let settingsView = $derived(settingsDraft ? { ...preferences, ...settingsDraft } : preferences);
@@ -86,6 +99,7 @@
   const refreshHotkey = hotkeyFor('refresh');
   const dashboardHotkey = hotkeyFor('open-dashboard');
   const snoozedHotkey = hotkeyFor('open-snoozed');
+  const labelsHotkey = hotkeyFor('open-labels');
   const settingsHotkey = hotkeyFor('open-settings');
   const shortcutsHotkey = hotkeyFor('toggle-shortcuts');
   const columns: { state: DashboardState; title: string; subtitle: string }[] = [
@@ -119,6 +133,9 @@
     getCurrentWindow()
       .setBadgeCount(dockBadge || undefined)
       .catch(() => {});
+  });
+  $effect(() => {
+    if (screen === 'label' && !selectedLabel) screen = 'labels';
   });
   let cliInfo = $state<GhCliInfo | null>(null);
   let cliInfoError = $state(false);
@@ -201,6 +218,7 @@
     error = '';
     try {
       snapshot = await refreshDashboard(service, preferences, snapshot);
+      await prune();
       now = Date.now();
       refreshed = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } catch (e) {
@@ -212,6 +230,22 @@
       refreshQueued = false;
       await refresh(true);
     }
+  }
+  // Watches and labels for finished or untracked PRs are dropped once a refresh can tell.
+  async function prune() {
+    const pruned = prunePreferences($state.snapshot(preferences), $state.snapshot(snapshot));
+    if (!pruned) return;
+    const kept = new Set(pruned.watchedPullRequests);
+    const dropped = preferences.watchedPullRequests.filter((id) => !kept.has(id));
+    await change((next) => {
+      next.watchedPullRequests = pruned.watchedPullRequests;
+      next.labeledPullRequests = pruned.labeledPullRequests;
+    });
+    // A Settings draft still holding a pruned watch would look dirty and bring it back on Save.
+    if (settingsDraft)
+      settingsDraft.watchedPullRequests = settingsDraft.watchedPullRequests.filter(
+        (id) => !dropped.includes(id),
+      );
   }
   function manualRefresh() {
     if (loading && silentRefresh) {
@@ -381,6 +415,11 @@
     });
     if (action === 'watch' || action === 'unwatch') await refresh();
   }
+  async function label(op: LabelOp) {
+    await change((next) => {
+      Object.assign(next, applyLabelOp(next, op));
+    });
+  }
   async function confirmAction(method: string) {
     if (!actionPR || saving || loading) return;
     const pr = actionPR;
@@ -425,6 +464,7 @@
     if (showHotkeys && hotkey.action !== 'toggle-shortcuts') return;
     if (hotkey.action === 'open-dashboard') navigate('dashboard');
     else if (hotkey.action === 'open-snoozed') navigate('snoozed');
+    else if (hotkey.action === 'open-labels') navigate('labels');
     else if (hotkey.action === 'open-settings') navigate('settings');
     else if (hotkey.action === 'refresh') manualRefresh();
     else if (hotkey.action === 'toggle-shortcuts') showHotkeys = !showHotkeys;
@@ -477,6 +517,16 @@
             >{compactKeys(snoozedHotkey)}</span
           >{/if}
       </button>
+      <button
+        class:active={screen === 'labels' || screen === 'label'}
+        onclick={() => navigate('labels')}
+        aria-keyshortcuts={labelsHotkey ? ariaKeyShortcut(labelsHotkey) : null}
+      >
+        <Tag size={15} /> Labels
+        {#if labelsHotkey}<span class="nav-hotkey" aria-hidden="true"
+            >{compactKeys(labelsHotkey)}</span
+          >{/if}
+      </button>
     </nav>
     <div class="sidebar-utilities">
       <nav aria-label="Preferences">
@@ -514,9 +564,13 @@
           ? 'Dashboard'
           : screen === 'snoozed'
             ? 'Snoozed'
-            : screen === 'ignored'
-              ? 'Settings / Ignored pull requests'
-              : 'Settings'}</span
+            : screen === 'labels'
+              ? 'Labels'
+              : screen === 'label'
+                ? `Labels / ${selectedLabel?.name ?? ''}`
+                : screen === 'ignored'
+                  ? 'Settings / Ignored pull requests'
+                  : 'Settings'}</span
       >
       <div>
         {#if refreshed}<span class="refresh-time">Updated {refreshed}</span>{/if}<button
@@ -556,6 +610,28 @@
         onopen={open}
         onaction={action}
         onrestore={(id) => restore('snoozed', id)}
+      />
+    {:else if screen === 'labels'}
+      <Labels
+        {preferences}
+        busy={saving || loading}
+        onselect={(id) => {
+          selectedLabelId = id;
+          navigate('label');
+        }}
+        onlabel={label}
+      />
+    {:else if screen === 'label' && selectedLabel}
+      <LabelPullRequests
+        {preferences}
+        {snapshot}
+        label={selectedLabel}
+        {login}
+        {now}
+        busy={saving || loading}
+        onopen={open}
+        onlabel={label}
+        onback={() => navigate('labels')}
       />
     {:else if screen === 'ignored'}
       <Ignored
@@ -642,8 +718,11 @@
                     busy={saving || loading}
                     stale={snapshot.staleIds.includes(item.pr.id)}
                     watching={preferences.watchedPullRequests.includes(item.pr.id)}
+                    labels={labelsFor(preferences, item.pr.id)}
+                    allLabels={preferences.labels}
                     onopen={open}
                     onaction={action}
+                    onlabel={label}
                   />{:else}<div class="empty-column">
                     <span>
                       {#if col.state === 'ready-to-merge'}<CircleCheck

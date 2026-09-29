@@ -44,7 +44,9 @@ test.beforeEach(async ({ page }) => {
         ][number - 1] ?? 'A watched pull request',
       repository: { nameWithOwner: 'acme/platform' },
       author: { login: number === 4 ? 'sam' : 'alex' },
-      state: 'OPEN',
+      state: (JSON.parse(localStorage.getItem('mergedPrs') ?? '[]') as number[]).includes(number)
+        ? 'MERGED'
+        : 'OPEN',
       isDraft: false,
       // Days since the last update, chosen to produce one card per staleness level.
       updatedAt: new Date(
@@ -135,7 +137,16 @@ test.beforeEach(async ({ page }) => {
           return {
             search: {
               issueCount: 3,
-              ...connection((query.includes('author:@me') ? [1, 2, 3] : [4]).map(raw)),
+              ...connection(
+                (query.includes('author:@me') ? [1, 2, 3] : [4])
+                  .filter(
+                    (n) =>
+                      !(JSON.parse(localStorage.getItem('hiddenPrs') ?? '[]') as number[]).includes(
+                        n,
+                      ),
+                  )
+                  .map(raw),
+              ),
             },
           };
         if (query.includes('DeskRepository'))
@@ -682,6 +693,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'Open settings',
     'Open the dashboard',
     'Open snoozed pull requests',
+    'Open labels',
     'Show keyboard shortcuts',
   ]);
   // Each key gets its own cap, joined by a plus, and the spelled-out combination is what
@@ -691,6 +703,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     '⌘+,',
     '⇧+D',
     '⇧+S',
+    '⇧+L',
     '?',
   ]);
   await expect(dialog.locator('.hotkey-row .visually-hidden')).toHaveText([
@@ -698,6 +711,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'Command plus Comma',
     'Shift plus D',
     'Shift plus S',
+    'Shift plus L',
     'Question mark',
   ]);
   await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveAttribute(
@@ -922,6 +936,7 @@ test('interface icons render as bundled Lucide SVG and stay out of accessible na
   for (const [name, icon] of [
     ['Dashboard', 'layout-grid'],
     ['Snoozed', 'clock'],
+    ['Labels', 'tag'],
     ['Settings', 'settings'],
   ]) {
     const button = page.getByRole('button', { name, exact: true });
@@ -1163,7 +1178,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
     .click();
   await saveSettings(page);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
-  expect(saved.schemaVersion).toBe(7);
+  expect(saved.schemaVersion).toBe(8);
   expect(saved.ignoreRules).toEqual([]);
   expect(saved.ignoredPullRequests).toHaveProperty('acme/platform#2');
   expect(saved.settings.snoozeOptions).toEqual([]);
@@ -1586,4 +1601,125 @@ test('an all-clear message replaces the columns only when nothing is tracked', a
   await page.getByRole('button', { name: 'Watching', exact: true }).click();
   await expect(clear).toBeHidden();
   await expect(page.locator('.column')).toHaveCount(3);
+});
+
+// The sidebar has a Labels button too, so the card menu's is found through its group.
+const cardMenuLabels = (page: Page) =>
+  page
+    .getByRole('group', { name: 'PR actions' })
+    .getByRole('button', { name: 'Labels', exact: true });
+const sidebarLabels = (page: Page) =>
+  page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Labels' });
+
+async function createCardLabel(page: Page, title: string, name: string) {
+  await page.getByRole('button', { name: `Actions for ${title}`, exact: true }).click();
+  await cardMenuLabels(page).click();
+  await page.getByRole('textbox', { name: 'New label' }).fill(name);
+  await page.getByRole('textbox', { name: 'New label' }).press('Enter');
+}
+
+test('labels are created from the card menu, badge the card, and persist', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const card = page.locator('.pr-card').filter({ hasText: 'Reduce cache lookup latency' });
+  await createCardLabel(page, 'Reduce cache lookup latency', 'Backend');
+  await expect(card.locator('.badge.label')).toHaveText('Backend');
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Backend' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  // Duplicates and empty names are rejected inline.
+  await page.getByRole('textbox', { name: 'New label' }).fill('backend');
+  await page.getByRole('textbox', { name: 'New label' }).press('Enter');
+  await expect(page.getByRole('alert').filter({ hasText: 'exists' })).toBeVisible();
+  await page.getByRole('menuitemcheckbox', { name: 'Backend' }).click();
+  await expect(card.locator('.badge.label')).toHaveCount(0);
+  await page.getByRole('menuitemcheckbox', { name: 'Backend' }).click();
+  await expect(card.locator('.badge.label')).toHaveText('Backend');
+  await page.screenshot({ path: '.context/label-badges.png', fullPage: true });
+  await page.reload();
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect(card.locator('.badge.label')).toHaveText('Backend');
+});
+
+test('the Labels screen lists counts, opens a label, and removes it from a PR', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await createCardLabel(page, 'Reduce cache lookup latency', 'Backend');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Shift+L');
+  await expect(page.getByRole('heading', { name: 'Labels', exact: true })).toBeVisible();
+  const row = page.locator('.label-row').filter({ hasText: 'Backend' });
+  await expect(row).toContainText('1 pull request');
+  await page.screenshot({ path: '.context/labels-screen.png', fullPage: true });
+  await row.getByRole('button', { name: /^Backend/ }).click();
+  await expect(page.locator('.labeled-row')).toHaveCount(1);
+  await expect(page.locator('.snoozed-summary')).toContainText('1 pull request');
+  await page.screenshot({ path: '.context/label-list.png', fullPage: true });
+  await page.getByRole('button', { name: /^Remove Backend from/ }).click();
+  await expect(page.locator('.labeled-row')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Back to labels' }).click();
+  await expect(row).toContainText('0 pull requests');
+});
+
+test('labels can be renamed, recolored and deleted from the Labels screen', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await createCardLabel(page, 'Reduce cache lookup latency', 'Backend');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  const card = page.locator('.pr-card').filter({ hasText: 'Reduce cache lookup latency' });
+  await sidebarLabels(page).click();
+  await page.getByRole('textbox', { name: 'New label name' }).fill('Empty');
+  await page.getByRole('button', { name: 'Create label' }).click();
+  await expect(page.locator('.label-row')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Rename Backend', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Rename Backend' }).fill('API');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByLabel('Color for API').selectOption('purple');
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await expect(card.locator('.badge.label')).toHaveText('API');
+  await expect(card.locator('.badge.label')).toHaveClass(/purple/);
+  await sidebarLabels(page).click();
+  await page.getByRole('button', { name: 'Delete API', exact: true }).click();
+  await expect(page.getByText('Delete label?')).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.locator('.label-row').filter({ hasText: 'API' })).toBeVisible();
+  await page.getByRole('button', { name: 'Delete API', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await expect(card.locator('.badge.label')).toHaveCount(0);
+});
+
+test('a refresh unwatches and unlabels merged PRs and unlabels ones no longer discovered', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await createCardLabel(page, 'Reduce cache lookup latency', 'Backend');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Actions for Refresh session token handling' }).click();
+  await cardMenuLabels(page).click();
+  await page.getByRole('menuitemcheckbox', { name: 'Backend' }).click();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Actions for Refresh session token handling' }).click();
+  await page.getByRole('button', { name: 'Watch PR', exact: true }).click();
+  const stored = () =>
+    page.evaluate(() => {
+      const prefs = JSON.parse(localStorage.getItem('prefs')!);
+      return [prefs.watchedPullRequests, Object.keys(prefs.labeledPullRequests)];
+    });
+  await expect.poll(stored).toEqual([['acme/platform#2'], ['acme/platform#1', 'acme/platform#2']]);
+  // PR 2 is merged and PR 1 drops out of search, but PR 1 is still watched-free and untracked.
+  await page.evaluate(() => {
+    localStorage.setItem('mergedPrs', '[2]');
+    localStorage.setItem('hiddenPrs', '[1]');
+  });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect.poll(stored).toEqual([[], []]);
 });

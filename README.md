@@ -63,6 +63,11 @@ PR Desk has no in-app updater.
   to match text anywhere in a title. Any matching rule hides a PR from every dashboard source.
   Exact repository exclusions still narrow GitHub searches; repository patterns filter before
   detail fetching, and author/title rules use already-fetched details without extra requests.
+- Groups PRs with in-app labels (⇧L). Labels exist only in PR Desk — nothing is written to
+  GitHub — and show as badges on cards. The Labels screen lists every label with its PR count;
+  open one to see its pull requests, and rename, recolor, or delete labels there. A refresh
+  automatically drops the label from PRs that were merged, closed, or are no longer tracked,
+  and stops watching PRs that were merged or closed.
 - Supports per-repository non-blocking check rules (Settings → Non-blocking checks): a matching
   _pending_ check, such as `policy-bot`, no longer keeps an approved PR out of Ready to merge.
   Failures still need attention, and these PRs have no in-app Merge.

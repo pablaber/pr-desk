@@ -1,6 +1,7 @@
 import type { AppState } from '../store/app-state';
 import type { PullRequest } from './types';
 import { describePullRequest } from './classify';
+import { labelsFor } from './labels';
 
 export function snoozedPullRequests(
   local: AppState,
@@ -17,6 +18,11 @@ export function snoozedPullRequests(
     )
     .map(([id, { until }]) => {
       const pr = byId.get(id);
-      return { id, until, item: pr ? describePullRequest(pr, login, local.checkRules) : null };
+      return {
+        id,
+        until,
+        item: pr ? describePullRequest(pr, login, local.checkRules) : null,
+        labels: labelsFor(local, id),
+      };
     });
 }

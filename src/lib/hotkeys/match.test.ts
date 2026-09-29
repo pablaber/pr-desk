@@ -13,6 +13,9 @@ describe('resolveHotkey', () => {
     expect(resolveHotkey(press('D', { shiftKey: true }))?.action).toBe('open-dashboard');
     expect(resolveHotkey(press('S', { shiftKey: true }))?.action).toBe('open-snoozed');
     expect(resolveHotkey(press(',', { metaKey: true }))?.action).toBe('open-settings');
+    expect(resolveHotkey(press('L', { shiftKey: true }))?.action).toBe('open-labels');
+    expect(resolveHotkey(press('l'))).toBeNull();
+    expect(resolveHotkey(press('L', { shiftKey: true }), { tagName: 'INPUT' })).toBeNull();
   });
 
   it('matches Command R while typing and rejects other modifiers', () => {

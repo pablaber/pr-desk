@@ -5,35 +5,43 @@
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import GitMerge from '@lucide/svelte/icons/git-merge';
   import PRDetails from './PRDetails.svelte';
+  import LabelChoices from './LabelChoices.svelte';
   import SnoozeChoices from './SnoozeChoices.svelte';
   import { cardViewModel } from '../lib/pr/card-view-model';
   import type { ClassifiedPR } from '../lib/pr/classify';
-  import { type SnoozeOption } from '../lib/store/app-state';
+  import type { LabelOp } from '../lib/pr/labels';
+  import type { PRLabel, SnoozeOption } from '../lib/store/app-state';
   let {
     item,
     now,
     snoozeOptions,
     stale,
     watching,
+    labels,
+    allLabels,
     busy,
     onopen,
     onaction,
+    onlabel,
   }: {
     item: ClassifiedPR;
     now: number;
     snoozeOptions: SnoozeOption[];
     stale: boolean;
     watching: boolean;
+    labels: PRLabel[];
+    allLabels: PRLabel[];
     busy: boolean;
     onopen: (url: string) => void;
     onaction: (id: string, action: string, until?: string) => void;
+    onlabel: (op: LabelOp) => void;
   } = $props();
   let menu = $state(false),
-    submenu = $state(false);
+    submenu = $state<'snooze' | 'labels' | null>(null);
   let card = $derived(cardViewModel(item, now));
   function close() {
     menu = false;
-    submenu = false;
+    submenu = null;
   }
   function act(action: string, until?: string) {
     if (busy) return;
@@ -51,7 +59,7 @@
 <svelte:window
   onkeydown={(e) => {
     if (e.key !== 'Escape') return;
-    if (submenu) submenu = false;
+    if (submenu) submenu = null;
     else close();
   }}
 />
@@ -61,7 +69,7 @@
     onclick={() => onopen(card.pr.url)}
     aria-label={`Open ${card.pr.title} on GitHub`}
   >
-    <PRDetails {item} {now} {stale} />
+    <PRDetails {item} {now} {stale} {labels} />
   </button>
   <button
     disabled={busy}
@@ -92,13 +100,15 @@
         >{watching ? 'Stop watching' : 'Watch PR'}</button
       >
       <div class="submenu-anchor">
-        <button aria-expanded={submenu} onclick={() => (submenu = !submenu)}
-          >Snooze{#if submenu}<ChevronDown class="chevron" size={12} />{:else}<ChevronRight
+        <button
+          aria-expanded={submenu === 'snooze'}
+          onclick={() => (submenu = submenu === 'snooze' ? null : 'snooze')}
+          >Snooze{#if submenu === 'snooze'}<ChevronDown
               class="chevron"
               size={12}
-            />{/if}</button
+            />{:else}<ChevronRight class="chevron" size={12} />{/if}</button
         >
-        {#if submenu}
+        {#if submenu === 'snooze'}
           <div
             use:keepInView
             class="card-menu card-submenu"
@@ -111,6 +121,21 @@
               {busy}
               onselect={(until) => act('snooze', until)}
             />
+          </div>
+        {/if}
+      </div>
+      <div class="submenu-anchor">
+        <button
+          aria-expanded={submenu === 'labels'}
+          onclick={() => (submenu = submenu === 'labels' ? null : 'labels')}
+          >Labels{#if submenu === 'labels'}<ChevronDown
+              class="chevron"
+              size={12}
+            />{:else}<ChevronRight class="chevron" size={12} />{/if}</button
+        >
+        {#if submenu === 'labels'}
+          <div use:keepInView class="card-menu card-submenu" role="group" aria-label="Labels">
+            <LabelChoices prId={card.pr.id} {allLabels} applied={labels} {busy} {onlabel} />
           </div>
         {/if}
       </div>
