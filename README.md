@@ -72,6 +72,8 @@ PR Desk has no in-app updater.
   with unsaved changes asks whether to save, discard, or keep editing.
 - Offers configurable automatic refresh while keeping failed refresh results visible
   and clearly marked as stale.
+- Shows a Dock icon badge counting Ready to merge, Needs attention, or both (the default);
+  choose Off in Settings to hide it.
 - Stores preferences locally and uses your existing GitHub CLI authentication.
 - Closes PRs with red staleness (over 28 days) after confirmation, leaving an automated
   comment with their inactivity in days. Enter confirms; Escape cancels.
