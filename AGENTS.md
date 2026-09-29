@@ -229,6 +229,10 @@ Consequences worth knowing:
 - Manual verification, with screenshots for UI changes — CI cannot run the native window.
 - Flag preference-schema changes, new dependencies, and anything touching signing.
 - If the change is breaking and the title has no `!`, add a `BREAKING CHANGE:` footer.
+- Write the body with `gh pr create --body-file` (or a quoted heredoc such as `<<'EOF'`) and type
+  backticks plainly. Escaping them as `` \` `` inside a quoted heredoc leaves literal backslashes
+  in the PR text. After creating or editing a PR, read the body back with
+  `gh pr view --json body -q .body` and fix any stray `\`.
 
 ### Required checks
 
@@ -266,4 +270,6 @@ from different commit OIDs.
 All checks count, including optional checks GitHub permits merging without. Failed checks
 create attention for owned PRs; pending or unknown checks prevent readiness. Success,
 neutral, skipped, and no checks pass. Failures on others’ PRs are secondary information
-unless another attention rule applies. Do not restore a required/optional distinction.
+unless another attention rule applies. Do not restore a required/optional distinction. User-configured non-blocking check
+rules let matching _pending_ checks stop blocking readiness; failures still count. Such PRs never
+offer in-app merge.

@@ -4,7 +4,7 @@
   import { githubErrorMessage } from '../lib/github/errors';
   import RefreshInterval from './RefreshInterval.svelte';
   import SnoozeOptions from './SnoozeOptions.svelte';
-  import type { AppState, SnoozeOption, IgnoreRuleKind } from '../lib/store/app-state';
+  import type { AppState, CheckRule, SnoozeOption, IgnoreRuleKind } from '../lib/store/app-state';
   import type { GhCliInfo } from '../lib/github/types';
   let {
     login,
@@ -15,6 +15,8 @@
     dirty,
     onadd,
     onremove,
+    onaddcheckrule,
+    onremovecheckrule,
     onsave,
     ondiscard,
     onrefreshinterval,
@@ -29,6 +31,8 @@
     dirty: boolean;
     onadd: (kind: 'repo' | 'pr' | IgnoreRuleKind, value: string) => Promise<boolean>;
     onremove: (kind: 'repo' | 'pr' | IgnoreRuleKind, value: string) => void;
+    onaddcheckrule: (repository: string, check: string) => boolean;
+    onremovecheckrule: (rule: CheckRule) => void;
     onsave: () => Promise<boolean>;
     ondiscard: () => void;
     onrefreshinterval: (minutes: number) => Promise<void>;
@@ -40,6 +44,8 @@
   let ignoreValue = $state(''),
     repository = $state(''),
     pr = $state('');
+  let checkRepository = $state(''),
+    checkName = $state('');
   let repositoryError = $state('');
   // Adding a repository or a watched PR asks GitHub whether it exists before the value joins the
   // draft, so each of those two fields shows its own in-field progress while that check runs.
@@ -50,6 +56,7 @@
     snooze: false,
     tracked: false,
     ignoredRules: false,
+    checkRules: false,
     watched: false,
   });
 
@@ -294,6 +301,68 @@
             Object.keys(preferences.ignoredPullRequests).length,
           )}<ChevronRight class="chevron" size={14} /></button
         >
+      </div>
+    {/if}
+  </section>
+  <section class="settings-section">
+    <h2>
+      <button
+        type="button"
+        class="settings-section-toggle"
+        aria-expanded={open.checkRules}
+        aria-controls="settings-section-check-rules"
+        onclick={() => (open.checkRules = !open.checkRules)}
+        ><ChevronRight class="chevron" size={13} />
+        {heading('Non-blocking checks', preferences.checkRules.length)}</button
+      >
+    </h2>
+    {#if open.checkRules}
+      <div class="settings-section-body" id="settings-section-check-rules">
+        <p>
+          A pending check matching a rule no longer keeps an approved PR out of Ready to merge.
+          Failed checks still need attention. These PRs have no Merge button here, so open them on
+          GitHub to finish, for example with atlantis apply.
+        </p>
+        <form
+          onsubmit={(e) => {
+            e.preventDefault();
+            if (onaddcheckrule(checkRepository, checkName)) checkRepository = checkName = '';
+          }}
+        >
+          <input
+            aria-label="Check rule repository"
+            autocapitalize="off"
+            autocomplete="off"
+            autocorrect="off"
+            spellcheck="false"
+            placeholder="acme/terraform-*"
+            bind:value={checkRepository}
+            required
+            disabled={busy}
+          />
+          <input
+            aria-label="Check rule check name"
+            autocapitalize="off"
+            autocomplete="off"
+            autocorrect="off"
+            spellcheck="false"
+            placeholder="policy-bot"
+            bind:value={checkName}
+            required
+            disabled={busy}
+          />
+          <button class="primary-button" disabled={busy}>Add check rule</button>
+        </form>
+        <p>
+          Both fields are case-insensitive and accept * and ? wildcards, such as atlantis/* for the
+          check name.
+        </p>
+        {#each preferences.checkRules as rule}<div class="setting-row">
+            <span><code>{rule.repository}</code> · <code>{rule.check}</code></span><button
+              disabled={busy}
+              onclick={() => onremovecheckrule(rule)}>Remove</button
+            >
+          </div>{:else}<p class="empty-setting">No check rules.</p>{/each}
       </div>
     {/if}
   </section>

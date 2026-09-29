@@ -2,7 +2,7 @@ import { ignoresPullRequest } from './ignore';
 import { dashboardRules, type DashboardRule } from './dashboard-rules';
 import { deriveSignals } from './signals';
 import type { PullRequest } from './types';
-import type { AppState } from '../store/app-state';
+import type { AppState, CheckRule } from '../store/app-state';
 export function classify(
   pr: PullRequest,
   login: string,
@@ -18,20 +18,22 @@ export function classify(
   )
     return null;
   if (pr.draft && pr.author.toLowerCase() !== login.toLowerCase()) return null;
-  return describePullRequest(pr, login, rules);
+  return describePullRequest(pr, login, local.checkRules, rules);
 }
 export function describePullRequest(
   pr: PullRequest,
   login: string,
+  checkRules: CheckRule[] = [],
   rules: DashboardRule[] = dashboardRules,
 ) {
-  const signals = deriveSignals(pr, login);
+  const signals = deriveSignals(pr, login, checkRules);
   const matches = rules.filter((r) => r.matches(signals)).sort((a, b) => b.priority - a.priority);
   const primary = matches[0];
   return {
     pr,
     state: primary.state,
     priority: primary.priority,
+    canMerge: signals.ready && primary.state === 'ready-to-merge',
     primary: primary.getLabel(signals),
     statuses: matches.filter((r) => r.showAsStatus !== false).map((r) => r.getLabel(signals)),
   };

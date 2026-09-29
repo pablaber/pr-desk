@@ -17,6 +17,6 @@ export function snoozedPullRequests(
     )
     .map(([id, { until }]) => {
       const pr = byId.get(id);
-      return { id, until, item: pr ? describePullRequest(pr, login) : null };
+      return { id, until, item: pr ? describePullRequest(pr, login, local.checkRules) : null };
     });
 }

@@ -70,7 +70,7 @@
     aria-expanded={menu}
     onclick={() => (menu ? close() : (menu = true))}><Ellipsis size={14} /></button
   >
-  {#if card.state === 'ready-to-merge'}
+  {#if card.canMerge}
     <button
       class="merge-button"
       disabled={busy || stale}

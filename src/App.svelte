@@ -32,6 +32,9 @@
     saveState,
     parseRepository,
     parseIgnoreRule,
+    parseCheckRule,
+    checkRuleKey,
+    type CheckRule,
     ignoreRuleKey,
     type IgnoreRuleKind,
     parsePullRequest,
@@ -256,6 +259,28 @@
       return false;
     }
   }
+  function addCheckRule(repository: string, check: string): boolean {
+    if (saving) return false;
+    error = '';
+    try {
+      const rule = parseCheckRule(repository, check);
+      if (settingsView.checkRules.some((e) => checkRuleKey(e) === checkRuleKey(rule)))
+        throw new Error('That check rule is already configured.');
+      editDraft((next) => {
+        next.checkRules = [...next.checkRules, rule];
+      });
+      return true;
+    } catch (e) {
+      error = String(e);
+      return false;
+    }
+  }
+  function removeCheckRule(rule: CheckRule) {
+    error = '';
+    editDraft((next) => {
+      next.checkRules = next.checkRules.filter((e) => checkRuleKey(e) !== checkRuleKey(rule));
+    });
+  }
   function remove(kind: 'repo' | 'pr' | IgnoreRuleKind, value: string) {
     error = '';
     editDraft((next) => {
@@ -274,6 +299,7 @@
     await change((next) => {
       next.trackedRepositories = draft.trackedRepositories;
       next.ignoreRules = draft.ignoreRules;
+      next.checkRules = draft.checkRules;
       next.watchedPullRequests = draft.watchedPullRequests;
     });
     // change() reports failures through error; keep the draft so the user can try again.
@@ -312,7 +338,7 @@
         pr &&
         (action === 'merge'
           ? !snapshot.staleIds.includes(id) &&
-            classify(pr, login, preferences, Date.now())?.state === 'ready-to-merge'
+            classify(pr, login, preferences, Date.now())?.canMerge
           : stalenessLevel(pr.updatedAt, Date.now()) === 'high')
       ) {
         pendingAction = action;
@@ -343,7 +369,7 @@
         const fresh = await service.getPullRequest(pr.id);
         if (
           fresh.headOid !== pr.headOid ||
-          classify(fresh, login, preferences, Date.now())?.state !== 'ready-to-merge'
+          !classify(fresh, login, preferences, Date.now())?.canMerge
         )
           throw new Error(
             'This PR changed or is no longer ready to merge. Cancel and refresh before trying again.',
@@ -530,6 +556,8 @@
         dirty={settingsDirty}
         onadd={add}
         onremove={remove}
+        onaddcheckrule={addCheckRule}
+        onremovecheckrule={removeCheckRule}
         onsave={saveSettings}
         ondiscard={discardSettings}
         onrefreshinterval={setRefreshInterval}
