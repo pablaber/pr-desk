@@ -18,6 +18,7 @@
   import { stalenessLevel } from './lib/pr/card-view-model';
   import type { PullRequest } from './lib/pr/types';
   import PRCard from './components/PRCard.svelte';
+  import AllClear from './components/AllClear.svelte';
   import Ignored from './components/Ignored.svelte';
   import Snoozed from './components/Snoozed.svelte';
   import Settings from './components/Settings.svelte';
@@ -104,6 +105,7 @@
   let visible = $derived(
     classified.filter((p) => filter === 'all' || p.pr.reasons.includes(filter)),
   );
+  let allClear = $derived(!showLoading && filter === 'all' && classified.length === 0);
   let cliInfo = $state<GhCliInfo | null>(null);
   let cliInfoError = $state(false);
   $effect(() => {
@@ -598,54 +600,55 @@
         class:silent-refresh={loading && silentRefresh && !saving}
         aria-busy={showLoading}
       >
-        {#each columns as col}
-          <section class="column">
-            <header>
-              <div>
-                <i class={col.state}></i>
-                <h2>{col.title}</h2>
-                <span class="column-count"
-                  >{visible.filter((p) => p.state === col.state).length}</span
-                >
-              </div>
-              <p>{col.subtitle}</p>
-            </header>
-            <div class="card-list">
-              {#each visible.filter((p) => p.state === col.state) as item (item.pr.id)}<PRCard
-                  {item}
-                  {now}
-                  snoozeOptions={preferences.settings.snoozeOptions}
-                  busy={saving || loading}
-                  stale={snapshot.staleIds.includes(item.pr.id)}
-                  watching={preferences.watchedPullRequests.includes(item.pr.id)}
-                  onopen={open}
-                  onaction={action}
-                />{:else}<div class="empty-column">
-                  <span>
-                    {#if col.state === 'ready-to-merge'}<CircleCheck
-                        size={24}
-                      />{:else if col.state === 'needs-attention'}<ClipboardCheck
-                        size={24}
-                      />{:else}<Clock size={24} />{/if}
-                  </span>
-                  <p>
-                    {showLoading
-                      ? 'Loading pull requests…'
-                      : col.state === 'needs-attention'
-                        ? 'All clear here'
-                        : 'Nothing here yet'}
-                  </p>
-                  <small
-                    >{filter !== 'all'
-                      ? 'Try another source filter.'
-                      : col.state === 'waiting'
-                        ? 'Track a repository or watch a PR in Settings.'
-                        : 'PRs will appear as their status changes.'}</small
+        {#if allClear}<AllClear />{:else}
+          {#each columns as col}
+            <section class="column">
+              <header>
+                <div>
+                  <i class={col.state}></i>
+                  <h2>{col.title}</h2>
+                  <span class="column-count"
+                    >{visible.filter((p) => p.state === col.state).length}</span
                   >
-                </div>{/each}
-            </div>
-          </section>
-        {/each}
+                </div>
+                <p>{col.subtitle}</p>
+              </header>
+              <div class="card-list">
+                {#each visible.filter((p) => p.state === col.state) as item (item.pr.id)}<PRCard
+                    {item}
+                    {now}
+                    snoozeOptions={preferences.settings.snoozeOptions}
+                    busy={saving || loading}
+                    stale={snapshot.staleIds.includes(item.pr.id)}
+                    watching={preferences.watchedPullRequests.includes(item.pr.id)}
+                    onopen={open}
+                    onaction={action}
+                  />{:else}<div class="empty-column">
+                    <span>
+                      {#if col.state === 'ready-to-merge'}<CircleCheck
+                          size={24}
+                        />{:else if col.state === 'needs-attention'}<ClipboardCheck
+                          size={24}
+                        />{:else}<Clock size={24} />{/if}
+                    </span>
+                    <p>
+                      {showLoading
+                        ? 'Loading pull requests…'
+                        : col.state === 'needs-attention'
+                          ? 'All clear here'
+                          : 'Nothing here yet'}
+                    </p>
+                    <small
+                      >{filter !== 'all'
+                        ? 'Try another source filter.'
+                        : col.state === 'waiting'
+                          ? 'Track a repository or watch a PR in Settings.'
+                          : 'PRs will appear as their status changes.'}</small
+                    >
+                  </div>{/each}
+              </div>
+            </section>
+          {/each}{/if}
       </div>
       <footer>
         <span><ArrowUpRight size={11} /> Select a pull request to open it on GitHub</span><span
