@@ -63,7 +63,10 @@ PR Desk has no in-app updater.
   to match text anywhere in a title. Any matching rule hides a PR from every dashboard source.
   Exact repository exclusions still narrow GitHub searches; repository patterns filter before
   detail fetching, and author/title rules use already-fetched details without extra requests.
-- Batches Settings edits: tracked repositories, ignore rules and watched pull requests are
+- Supports per-repository non-blocking check rules (Settings → Non-blocking checks): a matching
+  _pending_ check, such as `policy-bot`, no longer keeps an approved PR out of Ready to merge.
+  Failures still need attention, and these PRs have no in-app Merge.
+- Batches Settings edits: tracked repositories, ignore rules, check rules and watched pull requests are
   collected as a draft — each new repository or PR is checked against GitHub as you add it —
   and only Save writes them and refreshes the dashboard, in the background. Leaving Settings
   with unsaved changes asks whether to save, discard, or keep editing.

@@ -150,3 +150,78 @@ it('hides ignored repositories immediately regardless of tracking reason', () =>
   ).toBeNull();
   expect(classify(pr({ repository: 'acme/other' }), 'me', preferences)).not.toBeNull();
 });
+
+describe('non-blocking check rules', () => {
+  const blocked = (overrides: Partial<PullRequest> = {}) =>
+    pr({
+      reviewDecision: 'APPROVED',
+      mergeStateStatus: 'BLOCKED',
+      repository: 'acme/terraform-prod',
+      checks: [
+        { name: 'CI', state: 'passing' },
+        { name: 'policy-bot', state: 'pending' },
+      ],
+      ...overrides,
+    });
+  const withRule = (repository = 'acme/terraform-*', check = 'policy-bot') => ({
+    ...local,
+    checkRules: [{ repository, check }],
+  });
+  it('moves the PR to Ready without in-app merge', () =>
+    expect(classify(blocked(), 'me', withRule())).toMatchObject({
+      state: 'ready-to-merge',
+      primary: 'Ready · policy-bot pending',
+      canMerge: false,
+    }));
+  it('keeps waiting without a rule', () =>
+    expect(classify(blocked(), 'me', local)).toMatchObject({
+      state: 'waiting',
+      primary: 'Checks running',
+    }));
+  it.each([
+    ['other/*', 'policy-bot'],
+    ['acme/terraform-*', 'atlantis'],
+  ])('ignores a rule for %s + %s', (repository, check) =>
+    expect(classify(blocked(), 'me', withRule(repository, check))!.state).toBe('waiting'),
+  );
+  it('matches globs on the repository and the check', () => {
+    expect(classify(blocked(), 'me', withRule('acme/terraform-*'))!.state).toBe('ready-to-merge');
+    const atlantis = blocked({ checks: [{ name: 'atlantis/plan', state: 'pending' }] });
+    expect(classify(atlantis, 'me', withRule('acme/*', 'atlantis/*'))!.state).toBe(
+      'ready-to-merge',
+    );
+  });
+  it('still reports a failed non-blocking check', () =>
+    expect(
+      classify(blocked({ checks: [{ name: 'policy-bot', state: 'failed' }] }), 'me', withRule()),
+    ).toMatchObject({ state: 'needs-attention', primary: 'Checks failed' }));
+  it('does not exempt other pending checks', () =>
+    expect(
+      classify(
+        blocked({
+          checks: [
+            { name: 'policy-bot', state: 'pending' },
+            { name: 'build', state: 'pending' },
+          ],
+        }),
+        'me',
+        withRule(),
+      ),
+    ).toMatchObject({ state: 'waiting', primary: 'Checks running' }));
+  it('waits for review when the PR is not approved', () =>
+    expect(
+      classify(blocked({ reviewDecision: 'REVIEW_REQUIRED' }), 'me', withRule()),
+    ).toMatchObject({ state: 'waiting', primary: 'Waiting for review or merge requirements' }));
+  it('does not tolerate BLOCKED without a pending non-blocking check', () =>
+    expect(
+      classify(blocked({ checks: [{ name: 'CI', state: 'passing' }] }), 'me', withRule())!.state,
+    ).toBe('waiting'));
+  it('still allows merge for a strictly ready PR', () =>
+    expect(
+      classify(
+        blocked({ mergeStateStatus: 'CLEAN', checks: [{ name: 'CI', state: 'passing' }] }),
+        'me',
+        withRule(),
+      ),
+    ).toMatchObject({ state: 'ready-to-merge', canMerge: true }));
+});

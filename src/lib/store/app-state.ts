@@ -10,10 +10,15 @@ export interface IgnoreRule {
   kind: IgnoreRuleKind;
   value: string;
 }
+export interface CheckRule {
+  repository: string;
+  check: string;
+}
 export interface AppState {
-  schemaVersion: 5;
+  schemaVersion: 6;
   trackedRepositories: string[];
   ignoreRules: IgnoreRule[];
+  checkRules: CheckRule[];
   watchedPullRequests: string[];
   ignoredPullRequests: Record<string, { ignoredAt: string }>;
   snoozedPullRequests: Record<string, { until: string }>;
@@ -27,9 +32,10 @@ export const defaultSnoozeOptions = (): SnoozeOption[] => [
   { kind: 'duration', amount: 1, unit: 'weeks' },
 ];
 export const defaultState = (): AppState => ({
-  schemaVersion: 5,
+  schemaVersion: 6,
   trackedRepositories: [],
   ignoreRules: [],
+  checkRules: [],
   watchedPullRequests: [],
   ignoredPullRequests: {},
   snoozedPullRequests: {},
@@ -46,8 +52,9 @@ export function migrateState(value: unknown): AppState {
   const stored = value as Omit<AppState, 'schemaVersion'> & {
     schemaVersion: number;
     ignoredRepositories?: string[];
+    checkRules?: unknown;
   };
-  if (![1, 2, 3, 4, 5].includes(stored.schemaVersion))
+  if (![1, 2, 3, 4, 5, 6].includes(stored.schemaVersion))
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
@@ -73,8 +80,9 @@ export function migrateState(value: unknown): AppState {
     watchedPullRequests: stored.watchedPullRequests,
     ignoredPullRequests: stored.ignoredPullRequests,
     snoozedPullRequests: stored.snoozedPullRequests,
-    schemaVersion: 5,
+    schemaVersion: 6,
     ignoreRules: readStoredIgnoreRules(stored),
+    checkRules: readStoredCheckRules(stored),
     settings: {
       automaticRefreshMinutes:
         stored.schemaVersion !== 1 && isRefreshInterval(minutes) ? minutes : 5,
@@ -229,7 +237,7 @@ function readStoredIgnoreRules(stored: {
 }): IgnoreRule[] {
   try {
     const rules =
-      stored.schemaVersion === 5
+      stored.schemaVersion >= 5
         ? stored.ignoreRules
         : (stored.schemaVersion >= 3 ? stored.ignoredRepositories! : []).map((repo) => ({
             kind: 'repository',
@@ -242,18 +250,42 @@ function readStoredIgnoreRules(stored: {
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
   }
 }
+export function parseCheckRule(repository: string, check: string): CheckRule {
+  if (typeof check !== 'string') throw new Error('Enter a check name.');
+  const name = check.trim().toLowerCase();
+  if (!name || /[\u0000-\u001f\u007f]/.test(name))
+    throw new Error('Enter a single-line check name, such as policy-bot or atlantis/*.');
+  return { repository: parseRepositoryPattern(repository), check: name };
+}
+export function checkRuleKey(rule: CheckRule): string {
+  return `${rule.repository}\u0000${rule.check}`;
+}
+function readStoredCheckRules(stored: {
+  schemaVersion: number;
+  checkRules?: unknown;
+}): CheckRule[] {
+  if (stored.schemaVersion < 6) return [];
+  try {
+    if (!Array.isArray(stored.checkRules)) throw new Error('Invalid rules');
+    const parsed = stored.checkRules.map((rule) => parseCheckRule(rule?.repository, rule?.check));
+    return [...new Map(parsed.map((rule) => [checkRuleKey(rule), rule])).values()];
+  } catch {
+    throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
+  }
+}
 
-// The Settings screen edits these three lists locally and only writes them back on Save, so
+// The Settings screen edits these lists locally and only writes them back on Save, so
 // every other part of the preferences file — snoozes, individual ignores, refresh settings —
 // stays free to change underneath an unsaved draft.
 export type PreferenceDraft = Pick<
   AppState,
-  'trackedRepositories' | 'ignoreRules' | 'watchedPullRequests'
+  'trackedRepositories' | 'ignoreRules' | 'checkRules' | 'watchedPullRequests'
 >;
 export function preferenceDraft(state: AppState): PreferenceDraft {
   return {
     trackedRepositories: [...state.trackedRepositories],
     ignoreRules: state.ignoreRules.map((rule) => ({ ...rule })),
+    checkRules: state.checkRules.map((rule) => ({ ...rule })),
     watchedPullRequests: [...state.watchedPullRequests],
   };
 }
@@ -263,6 +295,7 @@ export function draftDiffers(draft: PreferenceDraft, state: AppState): boolean {
   return !(
     same(draft.trackedRepositories, state.trackedRepositories) &&
     same(draft.watchedPullRequests, state.watchedPullRequests) &&
-    same(draft.ignoreRules.map(ignoreRuleKey), state.ignoreRules.map(ignoreRuleKey))
+    same(draft.ignoreRules.map(ignoreRuleKey), state.ignoreRules.map(ignoreRuleKey)) &&
+    same(draft.checkRules.map(checkRuleKey), state.checkRules.map(checkRuleKey))
   );
 }

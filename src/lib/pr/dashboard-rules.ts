@@ -54,6 +54,13 @@ export const dashboardRules: DashboardRule[] = [
     getLabel: () => 'Ready to merge',
   },
   {
+    id: 'ready-pending-checks',
+    state: 'ready-to-merge',
+    priority: 50,
+    matches: (s) => s.readyPendingChecks,
+    getLabel: (s) => `Ready · ${s.waitingOn.join(', ')} pending`,
+  },
+  {
     id: 'tracked-repository',
     state: 'needs-attention',
     priority: 10,
@@ -70,7 +77,7 @@ export const dashboardRules: DashboardRule[] = [
     getLabel: (s) =>
       s.pr.draft
         ? 'Draft'
-        : s.pr.checks.some((c) => c.state === 'pending')
+        : s.checksRunning
           ? 'Checks running'
           : s.owned
             ? 'Waiting for review or merge requirements'

@@ -1127,7 +1127,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
     .click();
   await saveSettings(page);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
-  expect(saved.schemaVersion).toBe(5);
+  expect(saved.schemaVersion).toBe(6);
   expect(saved.ignoreRules).toEqual([]);
   expect(saved.ignoredPullRequests).toHaveProperty('acme/platform#2');
   expect(saved.settings.snoozeOptions).toEqual([]);
@@ -1257,6 +1257,45 @@ test('ordinary discovery needs no detail calls and all failed or pending checks 
   await expect(pending).toContainText('Checks running');
   await expect(page.locator('.column').nth(0).locator('.pr-card')).toHaveCount(0);
   expect(await page.evaluate(() => (window as any).detailCalls)).toBe(0);
+});
+
+test('non-blocking check rules move an approved PR to Ready without a Merge button', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const w = window as any,
+      invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      const result = await invoke(command, args);
+      for (const pr of result?.search?.nodes ?? []) {
+        if (pr.number !== 1) continue;
+        pr.mergeStateStatus = 'BLOCKED';
+        pr.commits.nodes[0].commit.statusCheckRollup.contexts.nodes.push({
+          __typename: 'CheckRun',
+          name: 'policy-bot',
+          status: 'IN_PROGRESS',
+          conclusion: null,
+        });
+      }
+      return result;
+    };
+  });
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const card = page.locator('.pr-card').filter({ hasText: 'Reduce cache lookup latency' });
+  await expect(page.locator('.column').nth(0).locator('.pr-card')).toHaveCount(0);
+  await expect(card).toContainText('Checks running');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Non-blocking checks');
+  await page.getByRole('textbox', { name: 'Check rule repository' }).fill('acme/*');
+  await page.getByRole('textbox', { name: 'Check rule check name' }).fill('policy-bot');
+  await page.getByRole('button', { name: 'Add check rule', exact: true }).click();
+  await expect(page.locator('#settings-section-check-rules .setting-row')).toContainText('acme/*');
+  await saveSettings(page);
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await expect(page.locator('.column').nth(0).locator('.pr-card')).toHaveCount(1);
+  await expect(card).toContainText('Ready · policy-bot pending');
+  await expect(card.getByRole('button', { name: /^Merge / })).toHaveCount(0);
 });
 
 test('check continuation gates the initial snapshot and preserves cards during refresh', async ({

@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import {
   parsePullRequest,
   parseIgnoreRule,
+  parseCheckRule,
   parseRepositoryPattern,
   parseRepository,
   snoozeUntil,
@@ -106,7 +107,7 @@ it('defaults to five minutes and migrates reserved v1 settings without losing pr
     settings: { automaticRefreshMinutes: 0 },
   };
   expect(migrateState(legacy)).toMatchObject({
-    schemaVersion: 5,
+    schemaVersion: 6,
     watchedPullRequests: ['acme/api#1'],
     settings: { automaticRefreshMinutes: 5, snoozeOptions: defaultSnoozeOptions() },
   });
@@ -125,7 +126,7 @@ it('preserves Never and all valid intervals, and repairs invalid stored interval
         .automaticRefreshMinutes,
     ).toBe(5);
   }
-  expect(() => migrateState({ ...defaultState(), schemaVersion: 6 })).toThrow('Unsupported');
+  expect(() => migrateState({ ...defaultState(), schemaVersion: 7 })).toThrow('Unsupported');
 });
 
 it('migrates older preferences and validates ignored repositories', () => {
@@ -139,7 +140,7 @@ it('migrates older preferences and validates ignored repositories', () => {
         settings: { automaticRefreshMinutes: 0 },
       }),
     ).toMatchObject({
-      schemaVersion: 5,
+      schemaVersion: 6,
       ignoreRules: [],
       trackedRepositories: ['acme/api'],
       settings: { automaticRefreshMinutes: schemaVersion === 1 ? 5 : 0 },
@@ -203,7 +204,8 @@ it('migrates all supported versions without losing independently saved preferenc
       settings: { automaticRefreshMinutes: 12, snoozeOptions: [] },
     };
     const migrated = migrateState(legacy);
-    expect(migrated.schemaVersion).toBe(5);
+    expect(migrated.schemaVersion).toBe(6);
+    expect(migrated.checkRules).toEqual([]);
     expect(migrated.ignoreRules).toEqual(
       schemaVersion >= 3 ? [{ kind: 'repository', value: 'acme/api' }] : [],
     );
@@ -273,6 +275,7 @@ it('drafts only the Settings lists and reports whether they differ from the save
   };
   const draft = preferenceDraft(state);
   expect(Object.keys(draft).sort()).toEqual([
+    'checkRules',
     'ignoreRules',
     'trackedRepositories',
     'watchedPullRequests',
@@ -299,4 +302,34 @@ it('drafts only the Settings lists and reports whether they differ from the save
     ),
   ).toBe(true);
   expect(draftDiffers({ ...preferenceDraft(state), watchedPullRequests: [] }, state)).toBe(true);
+});
+
+it('validates check rules and canonicalizes them', () => {
+  expect(parseCheckRule(' ACME/Terraform-* ', ' Policy-Bot ')).toEqual({
+    repository: 'acme/terraform-*',
+    check: 'policy-bot',
+  });
+  expect(parseCheckRule('acme/api', 'atlantis/*').check).toBe('atlantis/*');
+  expect(() => parseCheckRule('acme', 'policy-bot')).toThrow('owner/repository');
+  expect(() => parseCheckRule('acme/api', '  ')).toThrow('check name');
+  expect(() => parseCheckRule('acme/api', 'bad\nname')).toThrow('check name');
+});
+
+it('migrates check rules without overwriting an invalid saved list', () => {
+  expect(migrateState({ ...defaultState(), schemaVersion: 5 }).checkRules).toEqual([]);
+  const rule = { repository: 'acme/*', check: 'policy-bot' };
+  const stored = { ...defaultState(), checkRules: [rule, { ...rule, check: 'POLICY-BOT' }] };
+  const migrated = migrateState(stored);
+  expect(migrated.checkRules).toEqual([rule]);
+  expect(migrateState(migrated)).toEqual(migrated);
+  for (const checkRules of [undefined, 'x', [{ repository: 'nope', check: 'a' }], [{}]])
+    expect(() => migrateState({ ...defaultState(), checkRules })).toThrow('left intact');
+});
+
+it('detects check rule edits in the draft', () => {
+  const state = defaultState();
+  const draft = preferenceDraft(state);
+  draft.checkRules.push({ repository: 'acme/*', check: 'policy-bot' });
+  expect(draftDiffers(draft, state)).toBe(true);
+  expect(draftDiffers(draft, { ...state, checkRules: [...draft.checkRules] })).toBe(false);
 });
