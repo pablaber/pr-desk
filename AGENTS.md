@@ -229,6 +229,10 @@ Consequences worth knowing:
 - Manual verification, with screenshots for UI changes — CI cannot run the native window.
 - Flag preference-schema changes, new dependencies, and anything touching signing.
 - If the change is breaking and the title has no `!`, add a `BREAKING CHANGE:` footer.
+- Write the body with `gh pr create --body-file` (or a quoted heredoc such as `<<'EOF'`) and type
+  backticks plainly. Escaping them as `` \` `` inside a quoted heredoc leaves literal backslashes
+  in the PR text. After creating or editing a PR, read the body back with
+  `gh pr view --json body -q .body` and fix any stray `\`.
 
 ### Required checks
 
