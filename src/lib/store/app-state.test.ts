@@ -16,9 +16,9 @@ import {
   preferenceDraft,
   draftDiffers,
   parseLabelName,
-  nextLabelColor,
+  parseLabelColor,
+  randomLabelColor,
   labelNameTaken,
-  LABEL_COLORS,
   type SnoozeOption,
 } from './app-state';
 it('validates and canonicalizes input', () => {
@@ -112,7 +112,7 @@ it('defaults to five minutes and migrates reserved v1 settings without losing pr
     settings: { automaticRefreshMinutes: 0 },
   };
   expect(migrateState(legacy)).toMatchObject({
-    schemaVersion: 8,
+    schemaVersion: 9,
     watchedPullRequests: ['acme/api#1'],
     settings: { automaticRefreshMinutes: 5, snoozeOptions: defaultSnoozeOptions() },
   });
@@ -131,7 +131,7 @@ it('preserves Never and all valid intervals, and repairs invalid stored interval
         .automaticRefreshMinutes,
     ).toBe(5);
   }
-  expect(() => migrateState({ ...defaultState(), schemaVersion: 9 })).toThrow('Unsupported');
+  expect(() => migrateState({ ...defaultState(), schemaVersion: 10 })).toThrow('Unsupported');
 });
 
 it('migrates older preferences and validates ignored repositories', () => {
@@ -145,7 +145,7 @@ it('migrates older preferences and validates ignored repositories', () => {
         settings: { automaticRefreshMinutes: 0 },
       }),
     ).toMatchObject({
-      schemaVersion: 8,
+      schemaVersion: 9,
       ignoreRules: [],
       trackedRepositories: ['acme/api'],
       settings: { automaticRefreshMinutes: schemaVersion === 1 ? 5 : 0 },
@@ -209,7 +209,7 @@ it('migrates all supported versions without losing independently saved preferenc
       settings: { automaticRefreshMinutes: 12, snoozeOptions: [] },
     };
     const migrated = migrateState(legacy);
-    expect(migrated.schemaVersion).toBe(8);
+    expect(migrated.schemaVersion).toBe(9);
     expect(migrated.checkRules).toEqual([]);
     expect(migrated.ignoreRules).toEqual(
       schemaVersion >= 3 ? [{ kind: 'repository', value: 'acme/api' }] : [],
@@ -367,7 +367,7 @@ it('validates dock badge modes', () => {
   for (const mode of ['', 'Both', null, undefined, 1]) expect(isDockBadgeMode(mode)).toBe(false);
 });
 
-const label = (id: string, name: string, color = 'blue') => ({ id, name, color });
+const label = (id: string, name: string, color = '#3b82c4') => ({ id, name, color });
 it('loads pre-v8 preferences without labels', () => {
   for (const schemaVersion of [1, 5, 7]) {
     const migrated = migrateState({
@@ -377,13 +377,13 @@ it('loads pre-v8 preferences without labels', () => {
       labels: [label('x', 'Ignored')],
       labeledPullRequests: { 'acme/api#1': ['x'] },
     });
-    expect(migrated).toMatchObject({ schemaVersion: 8, labels: [], labeledPullRequests: {} });
+    expect(migrated).toMatchObject({ schemaVersion: 9, labels: [], labeledPullRequests: {} });
   }
 });
 it('round-trips v8 labels and canonicalizes their assignments', () => {
   const stored = {
     ...defaultState(),
-    labels: [label('a', 'Backend'), label('b', 'Urgent', 'red'), label('a', 'Backend')],
+    labels: [label('a', 'Backend'), label('b', 'Urgent', '#d1483b'), label('a', 'Backend')],
     labeledPullRequests: {
       'acme/api#1': ['a', 'a', 'gone', 'b'],
       'acme/api#2': ['gone'],
@@ -395,6 +395,18 @@ it('round-trips v8 labels and canonicalizes their assignments', () => {
   expect(migrated.labeledPullRequests).toEqual({ 'acme/api#1': ['a', 'b'] });
   expect(migrateState(migrated)).toEqual(migrated);
 });
+it('converts v8 palette names to hex colors', () => {
+  const migrated = migrateState({
+    ...defaultState(),
+    schemaVersion: 8,
+    labels: [label('a', 'Backend', 'blue'), label('b', 'Urgent', 'red')],
+  });
+  expect(migrated.labels.map((l) => l.color)).toEqual(['#3b82c4', '#d1483b']);
+  for (const color of ['teal', '#3b82c4', 'toString'])
+    expect(() =>
+      migrateState({ ...defaultState(), schemaVersion: 8, labels: [label('a', 'A', color)] }),
+    ).toThrow('left intact');
+});
 it('refuses malformed labels rather than overwriting them', () => {
   const bad: unknown[] = [
     'nope',
@@ -403,6 +415,9 @@ it('refuses malformed labels rather than overwriting them', () => {
     [label('a', 'x'.repeat(33))],
     [label('a', 'Two\nlines')],
     [label('a', 'Odd', 'teal')],
+    [label('a', 'Odd', 'blue')],
+    [label('a', 'Odd', '#ABCDEF')],
+    [label('a', 'Odd', '#abc')],
     [null],
     [label('a', 'Dup'), label('b', 'dup')],
   ];
@@ -416,10 +431,13 @@ it('validates label names, colors and uniqueness', () => {
   expect(parseLabelName('x'.repeat(32))).toHaveLength(32);
   for (const name of ['', '   ', 'x'.repeat(33), 'a\nb', 'a\tb', 3 as unknown as string])
     expect(() => parseLabelName(name)).toThrow();
-  expect(nextLabelColor([])).toBe(LABEL_COLORS[0]);
-  expect(nextLabelColor(LABEL_COLORS.map((c, i) => label(String(i), c)) as never)).toBe(
-    LABEL_COLORS[0],
-  );
+  expect(parseLabelColor(' #3B82C4 ')).toBe('#3b82c4');
+  expect(parseLabelColor('abc')).toBe('#aabbcc');
+  for (const color of ['', '#12345', '#ggg', 'blue', '#1234567', 3 as unknown as string])
+    expect(() => parseLabelColor(color)).toThrow('hex color');
+  for (const r of [0, 0.25, 0.5, 0.999])
+    expect(randomLabelColor(() => r)).toMatch(/^#[0-9a-f]{6}$/);
+  expect(randomLabelColor(() => 0)).toBe('#a13636');
   const labels = [label('a', 'Backend')] as never;
   expect(labelNameTaken(labels, ' backend ')).toBe(true);
   expect(labelNameTaken(labels, 'backend', 'a')).toBe(false);

@@ -1,14 +1,13 @@
 <script lang="ts">
   import Tag from '@lucide/svelte/icons/tag';
   import {
-    LABEL_COLORS,
     labelNameTaken,
-    nextLabelColor,
     parseLabelName,
+    randomLabelColor,
     type AppState,
-    type LabelColor,
   } from '../lib/store/app-state';
   import { labelSummaries, type LabelOp } from '../lib/pr/labels';
+  import LabelColorPicker from './LabelColorPicker.svelte';
   let {
     preferences,
     busy,
@@ -22,9 +21,8 @@
   } = $props();
   let rows = $derived(labelSummaries(preferences));
   let name = $state(''),
-    color = $state<LabelColor | null>(null),
+    color = $state(randomLabelColor()),
     problem = $state('');
-  let chosenColor = $derived(color ?? nextLabelColor(preferences.labels));
   let renaming = $state<{ id: string; name: string } | null>(null),
     renameProblem = $state(''),
     deleting = $state<string | null>(null);
@@ -42,9 +40,9 @@
   function create() {
     problem = problemFor(name);
     if (problem || busy) return;
-    onlabel({ type: 'create', name, color: chosenColor });
+    onlabel({ type: 'create', name, color });
     name = '';
-    color = null;
+    color = randomLabelColor();
   }
   function rename() {
     if (!renaming || busy) return;
@@ -79,13 +77,7 @@
       aria-invalid={problem ? 'true' : undefined}
       oninput={() => (problem = '')}
     />
-    <select
-      aria-label="New label color"
-      value={chosenColor}
-      onchange={(e) => (color = e.currentTarget.value as LabelColor)}
-    >
-      {#each LABEL_COLORS as option}<option value={option}>{option}</option>{/each}
-    </select>
+    <LabelColorPicker {color} name="New label color" onchange={(next) => (color = next)} />
     <button type="submit" class="primary-button" disabled={busy}>Create label</button>
   </form>
   {#if problem}<span class="field-error" role="alert">{problem}</span>{/if}
@@ -99,7 +91,7 @@
             rename();
           }}
         >
-          <i class="label-dot {label.color}"></i>
+          <i class="label-dot" style:--label-color={label.color}></i>
           <input
             type="text"
             aria-label={`Rename ${label.name}`}
@@ -119,7 +111,7 @@
         </form>
       {:else}
         <button class="label-open" onclick={() => onselect(label.id)}>
-          <i class="label-dot {label.color}"></i><strong>{label.name}</strong>
+          <i class="label-dot" style:--label-color={label.color}></i><strong>{label.name}</strong>
           <span class="label-count">{count} pull request{count === 1 ? '' : 's'}</span>
         </button>
         {#if deleting === label.id}
@@ -145,19 +137,12 @@
                 renameProblem = '';
               }}>Rename</button
             >
-            <select
-              aria-label={`Color for ${label.name}`}
+            <LabelColorPicker
+              color={label.color}
+              name={`Color for ${label.name}`}
               disabled={busy}
-              value={label.color}
-              onchange={(e) =>
-                onlabel({
-                  type: 'recolor',
-                  labelId: label.id,
-                  color: e.currentTarget.value as LabelColor,
-                })}
-            >
-              {#each LABEL_COLORS as option}<option value={option}>{option}</option>{/each}
-            </select>
+              onchange={(next) => onlabel({ type: 'recolor', labelId: label.id, color: next })}
+            />
             <button
               class="danger"
               disabled={busy}

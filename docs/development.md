@@ -79,7 +79,7 @@ Tauri Store writes `preferences.json` to the app data directory (on macOS,
 
 ```json
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "trackedRepositories": ["owner/repository"],
   "watchedPullRequests": ["owner/repository#123"],
   "ignoredRepositories": [],
@@ -89,7 +89,7 @@ Tauri Store writes `preferences.json` to the app data directory (on macOS,
   "snoozedPullRequests": {
     "owner/repository#789": { "until": "2026-09-25T13:00:00Z" }
   },
-  "labels": [{ "id": "5b1c…", "name": "Backend", "color": "blue" }],
+  "labels": [{ "id": "5b1c…", "name": "Backend", "color": "#3b82c4" }],
   "labeledPullRequests": { "owner/repository#123": ["5b1c…"] },
   "settings": {
     "automaticRefreshMinutes": 5,
@@ -111,8 +111,9 @@ is merged or closed, with fresh data, is unwatched and loses its labels. A label
 source discovered also loses its labels, but only when every discovery job succeeded and no
 repository ignore rule excludes it. Failed fetches prune nothing.
 
-Labels are referenced by id, so renaming one keeps its assignments. The palette is fixed
-(`LABEL_COLORS`), names are unique case-insensitively, and label edits save immediately
+Labels are referenced by id, so renaming one keeps its assignments. Colors are any
+lowercase `#rrggbb` hex; new labels start with a random color, and version 8's palette names
+migrate to their hex values. Names are unique case-insensitively, and label edits save immediately
 rather than going through the Settings draft.
 
 Ignoring a repository overrides every source, including owned PRs, direct review

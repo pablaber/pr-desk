@@ -1,7 +1,8 @@
 import {
   labelNameTaken,
-  nextLabelColor,
+  parseLabelColor,
   parseLabelName,
+  randomLabelColor,
   type AppState,
   type LabelColor,
   type PRLabel,
@@ -85,7 +86,7 @@ export function createLabel(
   const label = {
     id: crypto.randomUUID(),
     name: parsed,
-    color: color ?? nextLabelColor(local.labels),
+    color: color === undefined ? randomLabelColor() : parseLabelColor(color),
   };
   const created = {
     labels: [...local.labels, label],
@@ -106,7 +107,8 @@ export function renameLabel(local: LabelSlice, labelId: string, name: string): L
   };
 }
 
-export function recolorLabel(local: LabelSlice, labelId: string, color: LabelColor): LabelSlice {
+export function recolorLabel(local: LabelSlice, labelId: string, input: LabelColor): LabelSlice {
+  const color = parseLabelColor(input);
   return {
     labels: local.labels.map((label) => (label.id === labelId ? { ...label, color } : label)),
     labeledPullRequests: local.labeledPullRequests,
