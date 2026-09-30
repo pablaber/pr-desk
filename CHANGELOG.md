@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.5.0](https://github.com/pablaber/pr-desk/compare/v1.4.0...v1.5.0) (2026-09-30)
+
+
+### Features
+
+* add copy debug info to settings and card menu ([#82](https://github.com/pablaber/pr-desk/issues/82)) ([e76e757](https://github.com/pablaber/pr-desk/commit/e76e75714eab8a972dc3d77a5ba0dfb9caa0981e))
+* add toasts and confirm copied PR URL ([#81](https://github.com/pablaber/pr-desk/issues/81)) ([48e05e5](https://github.com/pablaber/pr-desk/commit/48e05e59bb547aa65354ab908da5178714684f79))
+* open hovered PR with enter and group shortcuts into sections ([#84](https://github.com/pablaber/pr-desk/issues/84)) ([95e513b](https://github.com/pablaber/pr-desk/commit/95e513bcdd6eeb84f91112b591f62da4d1236ab2))
+* restyle dock badge setting as a segmented control ([#83](https://github.com/pablaber/pr-desk/issues/83)) ([1081d17](https://github.com/pablaber/pr-desk/commit/1081d179567cbb323c77fdab70c7988bb39b063c))
+
+
+### Bug Fixes
+
+* label color picker menu overflow ([#79](https://github.com/pablaber/pr-desk/issues/79)) ([f22fe77](https://github.com/pablaber/pr-desk/commit/f22fe77ef055c7b2704327914b3838e043b1e529))
+
 ## [1.4.0](https://github.com/pablaber/pr-desk/compare/v1.3.0...v1.4.0) (2026-09-30)
 
 
