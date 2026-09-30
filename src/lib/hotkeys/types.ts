@@ -5,6 +5,7 @@ export type HotkeyAction =
   | 'open-settings'
   | 'toggle-shortcuts'
   | 'open-pr'
+  | 'copy-pr'
   | 'snooze-pr'
   | 'ignore-pr'
   | 'label-pr'

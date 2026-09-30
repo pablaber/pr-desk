@@ -1,5 +1,6 @@
 <script lang="ts">
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
+  import Copy from '@lucide/svelte/icons/copy';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
@@ -24,6 +25,7 @@
     allLabels,
     busy,
     onopen,
+    oncopy,
     onaction,
     onlabel,
     onhover,
@@ -37,11 +39,13 @@
     allLabels: PRLabel[];
     busy: boolean;
     onopen: (url: string) => void;
+    oncopy: (url: string) => void;
     onaction: (id: string, action: string, until?: string) => void;
     onlabel: (op: LabelOp) => void;
     onhover: (id: string | null) => void;
   } = $props();
   const openHotkey = hotkeyFor('open-pr');
+  const copyHotkey = hotkeyFor('copy-pr');
   const snoozeHotkey = hotkeyFor('snooze-pr');
   const labelHotkey = hotkeyFor('label-pr');
   const ignoreHotkey = hotkeyFor('ignore-pr');
@@ -119,6 +123,13 @@
           close();
           onopen(card.pr.url);
         }}>Open on GitHub <ArrowUpRight size={12} />{@render hint(openHotkey)}</button
+      >
+      <button
+        aria-keyshortcuts={copyHotkey ? ariaKeyShortcut(copyHotkey) : null}
+        onclick={() => {
+          close();
+          oncopy(card.pr.url);
+        }}>Copy PR URL <Copy size={12} />{@render hint(copyHotkey)}</button
       >
       <button onclick={() => act(watching ? 'unwatch' : 'watch')}
         >{watching ? 'Stop watching' : 'Watch PR'}</button

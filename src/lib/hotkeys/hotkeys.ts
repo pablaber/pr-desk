@@ -44,6 +44,7 @@ export const hotkeys: Hotkey[] = [
   },
   // Card actions apply to the card under the pointer (or holding focus).
   { action: 'open-pr', key: 'o', description: 'Open the hovered PR on GitHub' },
+  { action: 'copy-pr', key: 'c', description: 'Copy the hovered PR URL' },
   { action: 'snooze-pr', key: 's', description: 'Snooze the hovered PR' },
   { action: 'ignore-pr', key: 'i', description: 'Ignore the hovered PR' },
   { action: 'label-pr', key: 'l', description: 'Label the hovered PR' },

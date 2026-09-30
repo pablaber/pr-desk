@@ -20,6 +20,7 @@ describe('resolveHotkey', () => {
 
   it('matches plain card keys and suppresses them while typing', () => {
     expect(resolveHotkey(press('o'))?.action).toBe('open-pr');
+    expect(resolveHotkey(press('c'))?.action).toBe('copy-pr');
     expect(resolveHotkey(press('s'))?.action).toBe('snooze-pr');
     expect(resolveHotkey(press('i'))?.action).toBe('ignore-pr');
     expect(resolveHotkey(press('l'))?.action).toBe('label-pr');
