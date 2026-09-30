@@ -14,17 +14,20 @@ export interface CheckRule {
   repository: string;
   check: string;
 }
-export const LABEL_COLORS = [
-  'gray',
-  'blue',
-  'green',
-  'yellow',
-  'orange',
-  'red',
-  'purple',
-  'pink',
-] as const;
-export type LabelColor = (typeof LABEL_COLORS)[number];
+// A lowercase #rrggbb hex value.
+export type LabelColor = string;
+export const SUGGESTED_LABEL_COLORS: LabelColor[] = [
+  '#8a9483',
+  '#3b82c4',
+  '#2a9d8f',
+  '#3f9b5a',
+  '#d1a416',
+  '#e0812b',
+  '#d1483b',
+  '#d0578f',
+  '#8a5cc7',
+  '#5b5fc7',
+];
 export interface PRLabel {
   id: string;
   name: string;
@@ -32,7 +35,7 @@ export interface PRLabel {
 }
 export type DockBadgeMode = 'off' | 'ready-to-merge' | 'needs-attention' | 'both';
 export interface AppState {
-  schemaVersion: 8;
+  schemaVersion: 9;
   trackedRepositories: string[];
   ignoreRules: IgnoreRule[];
   checkRules: CheckRule[];
@@ -55,7 +58,7 @@ export const defaultSnoozeOptions = (): SnoozeOption[] => [
   { kind: 'duration', amount: 1, unit: 'weeks' },
 ];
 export const defaultState = (): AppState => ({
-  schemaVersion: 8,
+  schemaVersion: 9,
   trackedRepositories: [],
   ignoreRules: [],
   checkRules: [],
@@ -85,7 +88,7 @@ export function migrateState(value: unknown): AppState {
     labels?: unknown;
     labeledPullRequests?: unknown;
   };
-  if (![1, 2, 3, 4, 5, 6, 7, 8].includes(stored.schemaVersion))
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(stored.schemaVersion))
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
@@ -111,7 +114,7 @@ export function migrateState(value: unknown): AppState {
     watchedPullRequests: stored.watchedPullRequests,
     ignoredPullRequests: stored.ignoredPullRequests,
     snoozedPullRequests: stored.snoozedPullRequests,
-    schemaVersion: 8,
+    schemaVersion: 9,
     ignoreRules: readStoredIgnoreRules(stored),
     checkRules: readStoredCheckRules(stored),
     ...readStoredLabels(stored),
@@ -327,11 +330,43 @@ export function parseLabelName(input: string): string {
     throw new Error('Enter a single-line label name of 1 to 32 characters.');
   return name;
 }
-function isLabelColor(value: unknown): value is LabelColor {
-  return LABEL_COLORS.includes(value as LabelColor);
+export function parseLabelColor(input: string): LabelColor {
+  const match = typeof input === 'string' && /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(input.trim());
+  if (!match) throw new Error('Enter a hex color such as #3b82c4.');
+  const hex = match[1].toLowerCase();
+  return '#' + (hex.length === 3 ? [...hex].map((c) => c + c).join('') : hex);
 }
-export function nextLabelColor(labels: PRLabel[]): LabelColor {
-  return LABEL_COLORS[labels.length % LABEL_COLORS.length];
+// Hue is free; saturation and lightness stay in a band that reads as a small dot on white.
+export function randomLabelColor(random: () => number = Math.random): LabelColor {
+  const h = random() * 360,
+    s = 0.5 + random() * 0.25,
+    l = 0.42 + random() * 0.14;
+  const channel = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const value = l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(value * 255)
+      .toString(16)
+      .padStart(2, '0');
+  };
+  return `#${channel(0)}${channel(8)}${channel(4)}`;
+}
+// Version 8 stored one of eight palette names; version 9 stores any hex color.
+const V8_LABEL_COLORS: Record<string, LabelColor> = {
+  gray: '#8a9483',
+  blue: '#3b82c4',
+  green: '#3f9b5a',
+  yellow: '#d1a416',
+  orange: '#e0812b',
+  red: '#d1483b',
+  purple: '#8a5cc7',
+  pink: '#d0578f',
+};
+function readStoredLabelColor(schemaVersion: number, value: unknown): LabelColor {
+  if (schemaVersion === 8) {
+    if (typeof value === 'string' && Object.hasOwn(V8_LABEL_COLORS, value))
+      return V8_LABEL_COLORS[value];
+  } else if (typeof value === 'string' && /^#[0-9a-f]{6}$/.test(value)) return value;
+  throw new Error('Invalid label color');
 }
 export function labelNameTaken(labels: PRLabel[], name: string, exceptId?: string): boolean {
   const key = name.trim().toLowerCase();
@@ -351,9 +386,12 @@ function readStoredLabels(stored: {
     if (!labeledPullRequests || typeof labeledPullRequests !== 'object')
       throw new Error('Invalid labels');
     const parsed = labels.map((label: Partial<PRLabel> | null): PRLabel => {
-      if (typeof label?.id !== 'string' || !label.id || !isLabelColor(label.color))
-        throw new Error('Invalid label');
-      return { id: label.id, name: parseLabelName(label.name as string), color: label.color };
+      if (typeof label?.id !== 'string' || !label.id) throw new Error('Invalid label');
+      return {
+        id: label.id,
+        name: parseLabelName(label.name as string),
+        color: readStoredLabelColor(stored.schemaVersion, label.color),
+      };
     });
     const unique = [...new Map(parsed.map((label) => [label.id, label])).values()];
     if (new Set(unique.map((label) => label.name.toLowerCase())).size !== unique.length)

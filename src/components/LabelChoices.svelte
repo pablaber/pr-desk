@@ -40,9 +40,8 @@
     aria-checked={checked}
     disabled={busy}
     onclick={() => onlabel({ type: 'toggle', prId, labelId: label.id })}
-    ><i class="label-dot {label.color}"></i><span>{label.name}</span>{#if checked}<Check
-        size={12}
-      />{/if}</button
+    ><i class="label-dot" style:--label-color={label.color}></i><span>{label.name}</span
+    >{#if checked}<Check size={12} />{/if}</button
   >
 {/each}
 <form

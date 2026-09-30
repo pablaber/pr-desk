@@ -32,7 +32,11 @@
 <div class="dashboard-heading">
   <div>
     <div class="eyebrow">LABEL</div>
-    <h1><span class="badge label {label.color}"><i class="label-dot"></i>{label.name}</span></h1>
+    <h1>
+      <span class="badge label"
+        ><i class="label-dot" style:--label-color={label.color}></i>{label.name}</span
+      >
+    </h1>
     <p>Pull requests carrying this label.</p>
   </div>
   <button class="quiet" onclick={onback}><ChevronLeft size={13} /> Back to labels</button>

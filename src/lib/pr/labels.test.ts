@@ -16,8 +16,8 @@ import {
 function withLabels(): AppState {
   const local = defaultState();
   local.labels = [
-    { id: 'b', name: 'Backend', color: 'blue' },
-    { id: 'a', name: 'alpha', color: 'red' },
+    { id: 'b', name: 'Backend', color: '#3b82c4' },
+    { id: 'a', name: 'alpha', color: '#d1483b' },
   ];
   local.labeledPullRequests = { 'acme/api#1': ['b', 'a'], 'acme/api#2': ['b'] };
   return local;
@@ -40,9 +40,11 @@ it('creates a label, optionally assigning it, and rejects duplicates', () => {
   const local = withLabels();
   const created = createLabel(local, ' Fresh ', undefined, 'acme/api#5');
   const fresh = created.labels.at(-1)!;
-  expect(fresh).toMatchObject({ name: 'Fresh', color: 'green' });
+  expect(fresh.name).toBe('Fresh');
+  expect(fresh.color).toMatch(/^#[0-9a-f]{6}$/);
   expect(created.labeledPullRequests['acme/api#5']).toEqual([fresh.id]);
-  expect(createLabel(local, 'Solo', 'pink').labels.at(-1)?.color).toBe('pink');
+  expect(createLabel(local, 'Solo', '#D0578F').labels.at(-1)?.color).toBe('#d0578f');
+  expect(() => createLabel(local, 'Solo', 'pink')).toThrow('hex color');
   expect(() => createLabel(local, 'BACKEND')).toThrow('exists');
   expect(() => createLabel(local, ' ')).toThrow();
 });
@@ -54,7 +56,8 @@ it('renames and recolors without touching assignments', () => {
   expect(renamed.labeledPullRequests).toEqual(local.labeledPullRequests);
   expect(renameLabel(local, 'b', 'backend').labels[0].name).toBe('backend');
   expect(() => renameLabel(local, 'b', 'ALPHA')).toThrow('exists');
-  expect(recolorLabel(local, 'a', 'pink').labels[1].color).toBe('pink');
+  expect(recolorLabel(local, 'a', '#D0578F').labels[1].color).toBe('#d0578f');
+  expect(() => recolorLabel(local, 'a', '#nope')).toThrow('hex color');
 });
 
 it('deletes a label together with its assignments', () => {
@@ -74,8 +77,8 @@ it('dispatches operations', () => {
   expect(applyLabelOp(local, { type: 'create', name: 'New' }).labels).toHaveLength(3);
   expect(applyLabelOp(local, { type: 'rename', labelId: 'a', name: 'z' }).labels[1].name).toBe('z');
   expect(
-    applyLabelOp(local, { type: 'recolor', labelId: 'a', color: 'gray' }).labels[1].color,
-  ).toBe('gray');
+    applyLabelOp(local, { type: 'recolor', labelId: 'a', color: '#8a9483' }).labels[1].color,
+  ).toBe('#8a9483');
 });
 
 it('summarizes labels by name with assignment counts', () => {

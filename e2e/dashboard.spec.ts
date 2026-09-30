@@ -1236,7 +1236,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
     .click();
   await saveSettings(page);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
-  expect(saved.schemaVersion).toBe(8);
+  expect(saved.schemaVersion).toBe(9);
   expect(saved.ignoreRules).toEqual([]);
   expect(saved.ignoredPullRequests).toHaveProperty('acme/platform#2');
   expect(saved.settings.snoozeOptions).toEqual([]);
@@ -1737,10 +1737,30 @@ test('labels can be renamed, recolored and deleted from the Labels screen', asyn
   await page.getByRole('button', { name: 'Rename Backend', exact: true }).click();
   await page.getByRole('textbox', { name: 'Rename Backend' }).fill('API');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
-  await page.getByLabel('Color for API').selectOption('purple');
+  await page.getByRole('button', { name: 'Color for API', exact: true }).click();
+  await page.getByRole('button', { name: '#8a5cc7', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Color for API' })).toHaveText('#8a5cc7');
+  // Custom hex colors apply on Enter; invalid ones stay in the field unapplied.
+  const emptyColor = page.getByRole('button', { name: 'Color for Empty', exact: true });
+  await emptyColor.click();
+  const hex = page.getByRole('textbox', { name: 'Hex color' });
+  await hex.fill('#12345');
+  await hex.press('Enter');
+  await expect(hex).toHaveAttribute('aria-invalid', 'true');
+  await hex.fill('1A2B3C');
+  await hex.press('Enter');
+  await expect(emptyColor).toHaveText('#1a2b3c');
+  await page.getByRole('button', { name: 'Random color' }).click();
+  await expect(emptyColor).not.toHaveText('#1a2b3c');
+  await expect(emptyColor).toHaveText(/^#[0-9a-f]{6}$/);
+  await page.screenshot({ path: '.context/label-color-picker.png', fullPage: true });
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
   await expect(card.locator('.badge.label')).toHaveText('API');
-  await expect(card.locator('.badge.label')).toHaveClass(/purple/);
+  await expect(card.locator('.badge.label .label-dot')).toHaveCSS(
+    'background-color',
+    'rgb(138, 92, 199)',
+  );
   await sidebarLabels(page).click();
   await page.getByRole('button', { name: 'Delete API', exact: true }).click();
   await expect(page.getByText('Delete label?')).toBeVisible();
