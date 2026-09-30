@@ -8,6 +8,7 @@
   import ClipboardCheck from '@lucide/svelte/icons/clipboard-check';
   import Clock from '@lucide/svelte/icons/clock';
   import CircleCheck from '@lucide/svelte/icons/circle-check';
+  import Link from '@lucide/svelte/icons/link';
   import GitPullRequest from '@lucide/svelte/icons/git-pull-request';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
@@ -28,6 +29,8 @@
   import Settings from './components/Settings.svelte';
   import UnsavedChanges from './components/UnsavedChanges.svelte';
   import HotkeyHelp from './components/HotkeyHelp.svelte';
+  import Toaster from './components/Toaster.svelte';
+  import { showToast } from './lib/toast/toasts.svelte';
   import type { GhCliInfo } from './lib/github/types';
   import { GhGitHubService } from './lib/github/client';
   import { refreshDashboard, type DashboardSnapshot } from './lib/github/refresh';
@@ -476,7 +479,7 @@
     else if (hotkey.action === 'toggle-shortcuts') showHotkeys = !showHotkeys;
     else if (target) {
       if (hotkey.action === 'open-pr') open(target.pr.url);
-      else if (hotkey.action === 'copy-pr') copyUrl(target.pr.url);
+      else if (hotkey.action === 'copy-pr') copyUrl(target.pr);
       else if (hotkey.action === 'ignore-pr') {
         if (!saving && !loading) action(target.pr.id, 'ignore');
       } else cards[target.pr.id]?.openSubmenu(hotkey.action === 'snooze-pr' ? 'snooze' : 'labels');
@@ -489,9 +492,10 @@
       (event.target as HTMLElement | null)?.closest?.('[data-pr-id]')?.getAttribute('data-pr-id');
     return visible.find((p) => p.pr.id === id) ?? null;
   }
-  async function copyUrl(url: string) {
+  async function copyUrl(pr: PullRequest) {
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(pr.url);
+      showToast(Link, `PR ${pr.repository}#${pr.number} URL copied to clipboard`);
     } catch (e) {
       error = `Could not copy the PR URL: ${String(e)}`;
     }
@@ -791,6 +795,7 @@
     {/if}
   </main>
 </div>
+<Toaster />
 <UnsavedChanges
   open={pendingScreen !== null}
   busy={saving}

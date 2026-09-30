@@ -791,10 +791,30 @@ test('hovering a card and pressing a letter acts on it', async ({ page }) => {
   expect(await page.evaluate(() => (window as any).copied)).toEqual([
     'https://github.com/acme/platform/pull/1',
   ]);
+  await expect(
+    page.getByRole('status').filter({ hasText: 'PR acme/platform#1 URL copied to clipboard' }),
+  ).toBeVisible();
 
   await card.hover();
   await page.keyboard.press('i');
   await expect(page.locator('.pr-card')).toHaveCount(3);
+});
+
+test('copying a PR URL from the card menu shows a toast', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async () => {} },
+    });
+  });
+  const card = page.locator('.pr-card').first();
+  await card.getByRole('button', { name: /^Actions for/ }).click();
+  await page.getByRole('button', { name: /Copy PR URL/ }).click();
+  const toast = page.getByRole('status').filter({ hasText: 'URL copied to clipboard' });
+  await expect(toast).toBeVisible();
+  await expect(toast.locator('.toast')).toHaveCSS('opacity', '1');
+  await page.screenshot({ path: '.context/copy-toast.png' });
 });
 
 test('the card menu shows the hover hotkeys', async ({ page }) => {

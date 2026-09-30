@@ -14,6 +14,7 @@
   import type { Hotkey } from '../lib/hotkeys/types';
   import type { ClassifiedPR } from '../lib/pr/classify';
   import type { LabelOp } from '../lib/pr/labels';
+  import type { PullRequest } from '../lib/pr/types';
   import type { PRLabel, SnoozeOption } from '../lib/store/app-state';
   let {
     item,
@@ -39,7 +40,7 @@
     allLabels: PRLabel[];
     busy: boolean;
     onopen: (url: string) => void;
-    oncopy: (url: string) => void;
+    oncopy: (pr: PullRequest) => void;
     onaction: (id: string, action: string, until?: string) => void;
     onlabel: (op: LabelOp) => void;
     onhover: (id: string | null) => void;
@@ -128,7 +129,7 @@
         aria-keyshortcuts={copyHotkey ? ariaKeyShortcut(copyHotkey) : null}
         onclick={() => {
           close();
-          oncopy(card.pr.url);
+          oncopy(card.pr);
         }}>Copy PR URL <Copy size={12} />{@render hint(copyHotkey)}</button
       >
       <button onclick={() => act(watching ? 'unwatch' : 'watch')}
