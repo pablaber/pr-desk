@@ -10,15 +10,22 @@ export function classify(
   now = Date.now(),
   rules: DashboardRule[] = dashboardRules,
 ) {
-  if (
-    pr.state !== 'OPEN' ||
-    ignoresPullRequest(pr, local.ignoreRules) ||
-    local.ignoredPullRequests[pr.id] ||
-    Date.parse(local.snoozedPullRequests[pr.id]?.until ?? '') > now
-  )
-    return null;
-  if (pr.draft && pr.author.toLowerCase() !== login.toLowerCase()) return null;
+  if (hiddenReason(pr, login, local, now)) return null;
   return describePullRequest(pr, login, local.checkRules, rules);
+}
+export type HiddenReason = 'not-open' | 'ignore-rule' | 'ignored' | 'snoozed' | 'others-draft';
+export function hiddenReason(
+  pr: PullRequest,
+  login: string,
+  local: AppState,
+  now = Date.now(),
+): HiddenReason | null {
+  if (pr.state !== 'OPEN') return 'not-open';
+  if (ignoresPullRequest(pr, local.ignoreRules)) return 'ignore-rule';
+  if (local.ignoredPullRequests[pr.id]) return 'ignored';
+  if (Date.parse(local.snoozedPullRequests[pr.id]?.until ?? '') > now) return 'snoozed';
+  if (pr.draft && pr.author.toLowerCase() !== login.toLowerCase()) return 'others-draft';
+  return null;
 }
 export function describePullRequest(
   pr: PullRequest,

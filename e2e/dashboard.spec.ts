@@ -817,6 +817,53 @@ test('copying a PR URL from the card menu shows a toast', async ({ page }) => {
   await page.screenshot({ path: '.context/copy-toast.png' });
 });
 
+async function captureClipboard(page: Page) {
+  await page.evaluate(() => {
+    (window as any).copied = [];
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (text: string) => (window as any).copied.push(text) },
+    });
+  });
+  return async () => JSON.parse((await page.evaluate(() => (window as any).copied))[0]);
+}
+
+test('copies debug info for the whole board from Settings', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const copied = await captureClipboard(page);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Troubleshooting');
+  await page.getByRole('button', { name: 'Copy debug info' }).click();
+  await page.screenshot({ path: '.context/debug-settings.png' });
+  await expect(page.getByRole('status').filter({ hasText: 'Debug info copied' })).toBeVisible();
+  const info = await copied();
+  expect(info).toMatchObject({ login: 'alex', refresh: { discoveryComplete: true } });
+  expect(info.pullRequests).toHaveLength(4);
+  expect(info.pullRequests.find((p: any) => p.pr.number === 1)).toMatchObject({
+    column: 'ready-to-merge',
+    matchedRules: expect.arrayContaining(['ready']),
+  });
+});
+
+test('copies debug info for one PR from the card menu', async ({ page }) => {
+  await page.goto('/');
+  const copied = await captureClipboard(page);
+  const card = page.locator('.pr-card[data-pr-id="acme/platform#2"]');
+  await card.getByRole('button', { name: /^Actions for/ }).click();
+  await page.getByRole('button', { name: /Copy debug info/ }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Debug info for acme/platform#2 copied' }),
+  ).toBeVisible();
+  const info = await copied();
+  expect(info.pullRequests).toHaveLength(1);
+  expect(info.pullRequests[0]).toMatchObject({
+    column: 'needs-attention',
+    primary: '3 unresolved threads',
+    signals: { activeThreads: 3, changesRequested: true },
+  });
+});
+
 test('the card menu shows the hover hotkeys', async ({ page }) => {
   await page.goto('/');
   await page

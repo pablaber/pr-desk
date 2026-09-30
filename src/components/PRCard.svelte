@@ -1,5 +1,6 @@
 <script lang="ts">
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
+  import Bug from '@lucide/svelte/icons/bug';
   import Copy from '@lucide/svelte/icons/copy';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -27,6 +28,7 @@
     busy,
     onopen,
     oncopy,
+    oncopydebuginfo,
     onaction,
     onlabel,
     onhover,
@@ -41,6 +43,7 @@
     busy: boolean;
     onopen: (url: string) => void;
     oncopy: (pr: PullRequest) => void;
+    oncopydebuginfo: (pr: PullRequest) => void;
     onaction: (id: string, action: string, until?: string) => void;
     onlabel: (op: LabelOp) => void;
     onhover: (id: string | null) => void;
@@ -131,6 +134,12 @@
           close();
           oncopy(card.pr);
         }}>Copy PR URL <Copy size={12} />{@render hint(copyHotkey)}</button
+      >
+      <button
+        onclick={() => {
+          close();
+          oncopydebuginfo(card.pr);
+        }}>Copy debug info <Bug size={12} /></button
       >
       <button onclick={() => act(watching ? 'unwatch' : 'watch')}
         >{watching ? 'Stop watching' : 'Watch PR'}</button

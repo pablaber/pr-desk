@@ -31,11 +31,13 @@ export function ignoresRepository(repository: string, rules: IgnoreRule[]): bool
   return rules.some((rule) => rule.kind === 'repository' && matchesGlob(repository, rule.value));
 }
 
+export function ignoreRuleMatches(pr: PullRequest, rule: IgnoreRule): boolean {
+  if (rule.kind === 'author') return pr.author.toLowerCase() === rule.value.toLowerCase();
+  return matchesGlob(rule.kind === 'repository' ? pr.repository : pr.title, rule.value);
+}
+
 export function ignoresPullRequest(pr: PullRequest, rules: IgnoreRule[]): boolean {
-  return rules.some((rule) => {
-    if (rule.kind === 'author') return pr.author.toLowerCase() === rule.value.toLowerCase();
-    return matchesGlob(rule.kind === 'repository' ? pr.repository : pr.title, rule.value);
-  });
+  return rules.some((rule) => ignoreRuleMatches(pr, rule));
 }
 
 export function exactIgnoredRepositories(rules: IgnoreRule[]): string[] {

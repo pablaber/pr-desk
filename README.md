@@ -81,6 +81,10 @@ PR Desk has no in-app updater.
   and clearly marked as stale.
 - Shows a Dock icon badge counting Ready to merge, Needs attention, or both (the default);
   choose Off in Settings to hide it.
+- Copies debug info as JSON (Settings → Troubleshooting for the whole board, or a card's menu
+  for one PR): each PR's normalized GitHub state, matched dashboard rules, derived signals and
+  why it landed in its column or was hidden, alongside preferences and refresh warnings — ready
+  to paste into an issue or a coding agent.
 - Stores preferences locally and uses your existing GitHub CLI authentication.
 - Closes PRs with red staleness (over 28 days) after confirmation, leaving an automated
   comment with their inactivity in days. Enter confirms; Escape cancels.
