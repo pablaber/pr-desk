@@ -72,6 +72,11 @@ want; icon-only controls carry their own `aria-label` on the surrounding button.
 The PR Desk brand mark (`src-tauri/icons/source.svg`) and the Tauri app icons are
 project artwork and are not part of this set.
 
+## Toasts
+
+Call `showToast(icon, message)` from `src/lib/toast/toasts.svelte.ts` for low-stakes success
+confirmations only. Errors stay in the persistent alert banner so they can be read and acted on.
+
 ## Local state
 
 Tauri Store writes `preferences.json` to the app data directory (on macOS,

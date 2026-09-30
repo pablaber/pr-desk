@@ -1462,3 +1462,42 @@ footer {
     0 0 0 2px #fff,
     0 0 0 4px var(--label-color);
 }
+
+.toasts {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  border-radius: 7px;
+  font-size: 12px;
+  background: #eaf4ec;
+  color: #294d36;
+  border: 1px solid #cfe3d4;
+  box-shadow: 0 6px 28px #26332e25;
+  animation: toast-in 0.18s ease-out;
+}
+.toast .lucide {
+  color: #287a3e;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
