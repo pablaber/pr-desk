@@ -476,6 +476,7 @@
     else if (hotkey.action === 'toggle-shortcuts') showHotkeys = !showHotkeys;
     else if (target) {
       if (hotkey.action === 'open-pr') open(target.pr.url);
+      else if (hotkey.action === 'copy-pr') copyUrl(target.pr.url);
       else if (hotkey.action === 'ignore-pr') {
         if (!saving && !loading) action(target.pr.id, 'ignore');
       } else cards[target.pr.id]?.openSubmenu(hotkey.action === 'snooze-pr' ? 'snooze' : 'labels');
@@ -487,6 +488,13 @@
       hoveredId ??
       (event.target as HTMLElement | null)?.closest?.('[data-pr-id]')?.getAttribute('data-pr-id');
     return visible.find((p) => p.pr.id === id) ?? null;
+  }
+  async function copyUrl(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch (e) {
+      error = `Could not copy the PR URL: ${String(e)}`;
+    }
   }
   async function open(url: string) {
     try {
@@ -745,6 +753,7 @@
                     labels={labelsFor(preferences, item.pr.id)}
                     allLabels={preferences.labels}
                     onopen={open}
+                    oncopy={copyUrl}
                     onaction={action}
                     onlabel={label}
                   />{:else}<div class="empty-column">

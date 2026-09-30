@@ -696,6 +696,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'Open labels',
     'Show keyboard shortcuts',
     'Open the hovered PR on GitHub',
+    'Copy the hovered PR URL',
     'Snooze the hovered PR',
     'Ignore the hovered PR',
     'Label the hovered PR',
@@ -710,6 +711,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     '⇧+L',
     '?',
     'O',
+    'C',
     'S',
     'I',
     'L',
@@ -722,6 +724,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'Shift plus L',
     'Question mark',
     'O',
+    'C',
     'S',
     'I',
     'L',
@@ -776,6 +779,19 @@ test('hovering a card and pressing a letter acts on it', async ({ page }) => {
     'https://github.com/acme/platform/pull/1',
   ]);
 
+  await page.evaluate(() => {
+    (window as any).copied = [];
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (text: string) => (window as any).copied.push(text) },
+    });
+  });
+  await card.hover();
+  await page.keyboard.press('c');
+  expect(await page.evaluate(() => (window as any).copied)).toEqual([
+    'https://github.com/acme/platform/pull/1',
+  ]);
+
   await card.hover();
   await page.keyboard.press('i');
   await expect(page.locator('.pr-card')).toHaveCount(3);
@@ -789,7 +805,7 @@ test('the card menu shows the hover hotkeys', async ({ page }) => {
     .getByRole('button', { name: /^Actions for/ })
     .click();
   const menu = page.getByRole('group', { name: 'PR actions' });
-  await expect(menu.locator('.menu-hotkey')).toHaveText(['O', 'S', 'L', 'I']);
+  await expect(menu.locator('.menu-hotkey')).toHaveText(['O', 'C', 'S', 'L', 'I']);
   await page.screenshot({ path: '.context/card-menu-hotkeys.png' });
 });
 
