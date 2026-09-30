@@ -13,6 +13,8 @@ export type HotkeyAction =
 
 // A modifier must be absent unless the binding asks for it; 'any' means the binding does
 // not care, which is what layout-dependent keys like ? need.
+export type HotkeySection = 'navigation' | 'pr-actions' | 'other';
+
 export type Modifier = boolean | 'any';
 
 // The parts of a KeyboardEvent a binding is matched against, so matching stays a pure
@@ -36,6 +38,8 @@ export interface Hotkey {
   // Compared against event.key, case-insensitively. Every modifier left unset must be
   // absent from the event, so 'd' never fires on ⌘D.
   key: string;
+  // Extra keys that fire the same action, such as Enter beside O; the help lists them too.
+  alternateKeys?: string[];
   meta?: Modifier;
   ctrl?: Modifier;
   shift?: Modifier;
@@ -43,5 +47,6 @@ export interface Hotkey {
   // Plain-key hotkeys stay out of the way while the user types in a field; set this for
   // bindings that should fire anyway, like the system-standard ⌘,.
   whileTyping?: boolean;
+  section: HotkeySection;
   description: string;
 }

@@ -79,11 +79,20 @@ describe('resolveHotkey', () => {
         key: 's',
         alt: true,
         label: '⌥S',
+        section: 'other' as const,
         description: 'Settings',
       },
     ];
     expect(resolveHotkey(press('s', { altKey: true }), null, custom)?.action).toBe('open-settings');
     expect(resolveHotkey(press('d', { shiftKey: true }), null, custom)).toBeNull();
+  });
+});
+
+describe('alternate keys', () => {
+  it('fires open-pr on Enter as well as O', () => {
+    expect(resolveHotkey(press('Enter'), null)?.action).toBe('open-pr');
+    expect(resolveHotkey(press('o'), null)?.action).toBe('open-pr');
+    expect(resolveHotkey(press('Enter', { shiftKey: true }), null)).toBeNull();
   });
 });
 

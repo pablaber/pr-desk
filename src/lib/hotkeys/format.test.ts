@@ -26,6 +26,7 @@ describe('displayKeys', () => {
       shift: true,
       alt: true,
       ctrl: true,
+      section: 'other' as const,
       description: 'Everything',
     };
     expect(displayKeys(all)).toEqual(['⌃', '⌥', '⇧', '⌘', 'K']);
