@@ -1405,6 +1405,7 @@ footer {
   top: calc(100% + 6px);
   z-index: 5;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   width: 204px;
   padding: 10px;
