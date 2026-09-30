@@ -16,17 +16,18 @@
 
 <fieldset class="dock-badge-control" disabled={busy}>
   <legend>Dock badge count</legend>
-  {#each options as option (option.value)}
-    <label
-      ><input
-        type="radio"
-        name="dock-badge"
-        value={option.value}
-        checked={mode === option.value}
-        onchange={() => onsave(option.value)}
-      />
-      {option.label}</label
-    >
-  {/each}
+  <div class="segmented-control">
+    {#each options as option (option.value)}
+      <label
+        ><input
+          type="radio"
+          name="dock-badge"
+          value={option.value}
+          checked={mode === option.value}
+          onchange={() => onsave(option.value)}
+        /><span>{option.label}</span></label
+      >
+    {/each}
+  </div>
   <p class="refresh-help">Default: Both. Changes save automatically.</p>
 </fieldset>
