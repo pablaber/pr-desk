@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.0](https://github.com/pablaber/pr-desk/compare/v1.3.0...v1.4.0) (2026-09-30)
+
+
+### Features
+
+* add copy pr url to card menu with c hotkey ([#78](https://github.com/pablaber/pr-desk/issues/78)) ([1cbdf16](https://github.com/pablaber/pr-desk/commit/1cbdf165b87c63e35db9bea29b59af26a46cd1de))
+* add hover hotkeys for pr cards ([#75](https://github.com/pablaber/pr-desk/issues/75)) ([9ae9cdd](https://github.com/pablaber/pr-desk/commit/9ae9cdd9e1a272694ea709b63ebfd92eecd0bec8))
+* pick label colors from swatches, random, or custom hex ([#77](https://github.com/pablaber/pr-desk/issues/77)) ([235c2c3](https://github.com/pablaber/pr-desk/commit/235c2c3b68940a1c116031abd9cde4fd08ac0d86))
+
 ## [1.3.0](https://github.com/pablaber/pr-desk/compare/v1.2.0...v1.3.0) (2026-09-29)
 
 
