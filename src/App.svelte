@@ -5,6 +5,7 @@
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { version } from '../package.json';
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
+  import Bug from '@lucide/svelte/icons/bug';
   import ClipboardCheck from '@lucide/svelte/icons/clipboard-check';
   import Clock from '@lucide/svelte/icons/clock';
   import CircleCheck from '@lucide/svelte/icons/circle-check';
@@ -58,6 +59,7 @@
   } from './lib/store/app-state';
   import { classify, sortPullRequests } from './lib/pr/classify';
   import { badgeCount } from './lib/pr/badge';
+  import { buildDebugInfo } from './lib/debug/debug-info';
   import { applyLabelOp, labelsFor, type LabelOp } from './lib/pr/labels';
   import { prunePreferences } from './lib/pr/prune';
   import { hotkeyFor, resolveHotkey } from './lib/hotkeys/match';
@@ -500,6 +502,29 @@
       error = `Could not copy the PR URL: ${String(e)}`;
     }
   }
+  async function copyDebugInfo(pr?: PullRequest) {
+    const info = buildDebugInfo(
+      {
+        version,
+        login,
+        now: Date.now(),
+        filter,
+        preferences: $state.snapshot(preferences) as AppState,
+        snapshot: $state.snapshot(snapshot) as DashboardSnapshot,
+        cliInfo: $state.snapshot(cliInfo),
+      },
+      pr?.id,
+    );
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(info, null, 2));
+      showToast(
+        Bug,
+        pr ? `Debug info for ${pr.repository}#${pr.number} copied` : 'Debug info copied',
+      );
+    } catch (e) {
+      error = `Could not copy debug info: ${String(e)}`;
+    }
+  }
   async function open(url: string) {
     try {
       await openUrl(url);
@@ -693,6 +718,7 @@
         ondockbadge={setDockBadge}
         onsnoozeoptions={setSnoozeOptions}
         onopenignored={() => navigate('ignored')}
+        oncopydebuginfo={() => void copyDebugInfo()}
       />
     {:else}
       <div class="dashboard-heading">
@@ -758,6 +784,7 @@
                     allLabels={preferences.labels}
                     onopen={open}
                     oncopy={copyUrl}
+                    oncopydebuginfo={copyDebugInfo}
                     onaction={action}
                     onlabel={label}
                   />{:else}<div class="empty-column">

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Bug from '@lucide/svelte/icons/bug';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import { githubErrorMessage } from '../lib/github/errors';
@@ -30,6 +31,7 @@
     ondockbadge,
     onsnoozeoptions,
     onopenignored,
+    oncopydebuginfo,
   }: {
     login: string;
     cliInfo: GhCliInfo | null;
@@ -47,6 +49,7 @@
     ondockbadge: (mode: DockBadgeMode) => Promise<void>;
     onsnoozeoptions: (options: SnoozeOption[]) => Promise<void>;
     onopenignored: () => void;
+    oncopydebuginfo: () => void;
   } = $props();
   let ignoreKind = $state<IgnoreRuleKind>('repository');
   const ignoreLabels = { repository: 'Repository', author: 'PR author', title: 'PR title' };
@@ -68,6 +71,7 @@
     ignoredRules: false,
     checkRules: false,
     watched: false,
+    troubleshooting: false,
   });
 
   function heading(label: string, count: number): string {
@@ -440,6 +444,27 @@
               >Remove</button
             >
           </div>{:else}<p class="empty-setting">No individually watched PRs.</p>{/each}
+      </div>
+    {/if}
+  </section>
+  <section class="settings-section">
+    <h2>
+      <button
+        type="button"
+        class="settings-section-toggle"
+        aria-expanded={open.troubleshooting}
+        aria-controls="settings-section-troubleshooting"
+        onclick={() => (open.troubleshooting = !open.troubleshooting)}
+        ><ChevronRight class="chevron" size={13} /> Troubleshooting</button
+      >
+    </h2>
+    {#if open.troubleshooting}
+      <div class="settings-section-body" id="settings-section-troubleshooting">
+        <p>
+          Copy the current board, refresh results and saved preferences as JSON, including how each
+          PR was placed. It contains repository names, PR titles and logins, but no credentials.
+        </p>
+        <button type="button" onclick={oncopydebuginfo}><Bug size={13} /> Copy debug info</button>
       </div>
     {/if}
   </section>
