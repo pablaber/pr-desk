@@ -4,6 +4,10 @@ export type HotkeyAction =
   | 'open-labels'
   | 'open-settings'
   | 'toggle-shortcuts'
+  | 'open-pr'
+  | 'snooze-pr'
+  | 'ignore-pr'
+  | 'label-pr'
   | 'refresh';
 
 // A modifier must be absent unless the binding asks for it; 'any' means the binding does

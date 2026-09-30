@@ -7,7 +7,10 @@
   import PRDetails from './PRDetails.svelte';
   import LabelChoices from './LabelChoices.svelte';
   import SnoozeChoices from './SnoozeChoices.svelte';
+  import { ariaKeyShortcut, compactKeys } from '../lib/hotkeys/format';
+  import { hotkeyFor } from '../lib/hotkeys/match';
   import { cardViewModel } from '../lib/pr/card-view-model';
+  import type { Hotkey } from '../lib/hotkeys/types';
   import type { ClassifiedPR } from '../lib/pr/classify';
   import type { LabelOp } from '../lib/pr/labels';
   import type { PRLabel, SnoozeOption } from '../lib/store/app-state';
@@ -23,6 +26,7 @@
     onopen,
     onaction,
     onlabel,
+    onhover,
   }: {
     item: ClassifiedPR;
     now: number;
@@ -35,13 +39,23 @@
     onopen: (url: string) => void;
     onaction: (id: string, action: string, until?: string) => void;
     onlabel: (op: LabelOp) => void;
+    onhover: (id: string | null) => void;
   } = $props();
+  const openHotkey = hotkeyFor('open-pr');
+  const snoozeHotkey = hotkeyFor('snooze-pr');
+  const labelHotkey = hotkeyFor('label-pr');
+  const ignoreHotkey = hotkeyFor('ignore-pr');
   let menu = $state(false),
     submenu = $state<'snooze' | 'labels' | null>(null);
   let card = $derived(cardViewModel(item, now));
   function close() {
     menu = false;
     submenu = null;
+  }
+  export function openSubmenu(which: 'snooze' | 'labels') {
+    if (busy) return;
+    menu = true;
+    submenu = which;
   }
   function act(action: string, until?: string) {
     if (busy) return;
@@ -56,6 +70,10 @@
   }
 </script>
 
+{#snippet hint(hotkey: Hotkey | null)}
+  {#if hotkey}<span class="menu-hotkey" aria-hidden="true">{compactKeys(hotkey)}</span>{/if}
+{/snippet}
+
 <svelte:window
   onkeydown={(e) => {
     if (e.key !== 'Escape') return;
@@ -63,7 +81,12 @@
     else close();
   }}
 />
-<article class="pr-card">
+<article
+  class="pr-card"
+  data-pr-id={card.pr.id}
+  onpointerenter={() => onhover(card.pr.id)}
+  onpointerleave={() => onhover(null)}
+>
   <button
     class="card-main"
     onclick={() => onopen(card.pr.url)}
@@ -91,10 +114,11 @@
     <div class="menu-backdrop" onclick={close} role="presentation"></div>
     <div class="card-menu" role="group" aria-label="PR actions">
       <button
+        aria-keyshortcuts={openHotkey ? ariaKeyShortcut(openHotkey) : null}
         onclick={() => {
           close();
           onopen(card.pr.url);
-        }}>Open on GitHub <ArrowUpRight size={12} /></button
+        }}>Open on GitHub <ArrowUpRight size={12} />{@render hint(openHotkey)}</button
       >
       <button onclick={() => act(watching ? 'unwatch' : 'watch')}
         >{watching ? 'Stop watching' : 'Watch PR'}</button
@@ -102,8 +126,9 @@
       <div class="submenu-anchor">
         <button
           aria-expanded={submenu === 'snooze'}
+          aria-keyshortcuts={snoozeHotkey ? ariaKeyShortcut(snoozeHotkey) : null}
           onclick={() => (submenu = submenu === 'snooze' ? null : 'snooze')}
-          >Snooze{#if submenu === 'snooze'}<ChevronDown
+          >Snooze{@render hint(snoozeHotkey)}{#if submenu === 'snooze'}<ChevronDown
               class="chevron"
               size={12}
             />{:else}<ChevronRight class="chevron" size={12} />{/if}</button
@@ -127,8 +152,9 @@
       <div class="submenu-anchor">
         <button
           aria-expanded={submenu === 'labels'}
+          aria-keyshortcuts={labelHotkey ? ariaKeyShortcut(labelHotkey) : null}
           onclick={() => (submenu = submenu === 'labels' ? null : 'labels')}
-          >Labels{#if submenu === 'labels'}<ChevronDown
+          >Labels{@render hint(labelHotkey)}{#if submenu === 'labels'}<ChevronDown
               class="chevron"
               size={12}
             />{:else}<ChevronRight class="chevron" size={12} />{/if}</button
@@ -142,7 +168,11 @@
       {#if card.staleness === 'high'}
         <button class="danger" onclick={() => act('close-stale')}>Close as stale…</button>
       {/if}
-      <button class="danger" onclick={() => act('ignore')}>Ignore PR</button>
+      <button
+        class="danger"
+        aria-keyshortcuts={ignoreHotkey ? ariaKeyShortcut(ignoreHotkey) : null}
+        onclick={() => act('ignore')}>Ignore PR{@render hint(ignoreHotkey)}</button
+      >
       <button onclick={close}>Close menu</button>
     </div>
   {/if}

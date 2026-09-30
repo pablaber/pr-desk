@@ -695,6 +695,10 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'Open snoozed pull requests',
     'Open labels',
     'Show keyboard shortcuts',
+    'Open the hovered PR on GitHub',
+    'Snooze the hovered PR',
+    'Ignore the hovered PR',
+    'Label the hovered PR',
   ]);
   // Each key gets its own cap, joined by a plus, and the spelled-out combination is what
   // a screen reader reads.
@@ -705,6 +709,10 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     '⇧+S',
     '⇧+L',
     '?',
+    'O',
+    'S',
+    'I',
+    'L',
   ]);
   await expect(dialog.locator('.hotkey-row .visually-hidden')).toHaveText([
     'Command plus R',
@@ -713,6 +721,10 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'Shift plus S',
     'Shift plus L',
     'Question mark',
+    'O',
+    'S',
+    'I',
+    'L',
   ]);
   await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveAttribute(
     'aria-keyshortcuts',
@@ -733,6 +745,52 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
   await page.getByRole('button', { name: 'Keyboard shortcuts', exact: true }).click();
   await dialog.getByRole('button', { name: 'Close keyboard shortcuts' }).click();
   await expect(dialog).toBeHidden();
+});
+
+test('hovering a card and pressing a letter acts on it', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const card = page.locator('.pr-card').first();
+
+  // With nothing hovered, the keys do nothing.
+  await page.mouse.move(0, 0);
+  await page.keyboard.press('i');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+
+  await card.hover();
+  await page.keyboard.press('s');
+  await expect(page.getByRole('group', { name: 'Snooze options' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('group', { name: 'PR actions' })).toBeHidden();
+
+  await card.hover();
+  await page.keyboard.press('l');
+  await expect(page.getByRole('group', { name: 'Labels' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+
+  await card.hover();
+  await page.keyboard.press('o');
+  expect(await page.evaluate(() => (window as any).opened)).toEqual([
+    'https://github.com/acme/platform/pull/1',
+  ]);
+
+  await card.hover();
+  await page.keyboard.press('i');
+  await expect(page.locator('.pr-card')).toHaveCount(3);
+});
+
+test('the card menu shows the hover hotkeys', async ({ page }) => {
+  await page.goto('/');
+  await page
+    .locator('.pr-card')
+    .first()
+    .getByRole('button', { name: /^Actions for/ })
+    .click();
+  const menu = page.getByRole('group', { name: 'PR actions' });
+  await expect(menu.locator('.menu-hotkey')).toHaveText(['O', 'S', 'L', 'I']);
+  await page.screenshot({ path: '.context/card-menu-hotkeys.png' });
 });
 
 test('snoozed rows sort by return date, reschedule, persist, restore, and expire', async ({

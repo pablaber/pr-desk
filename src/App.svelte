@@ -102,6 +102,8 @@
   const labelsHotkey = hotkeyFor('open-labels');
   const settingsHotkey = hotkeyFor('open-settings');
   const shortcutsHotkey = hotkeyFor('toggle-shortcuts');
+  let hoveredId = $state<string | null>(null);
+  let cards: Record<string, PRCard> = {};
   const columns: { state: DashboardState; title: string; subtitle: string }[] = [
     { state: 'ready-to-merge', title: 'Ready to merge', subtitle: 'The finish line' },
     { state: 'needs-attention', title: 'Needs attention', subtitle: 'Your next move' },
@@ -458,6 +460,10 @@
     if (actionPR || pendingScreen) return;
     const hotkey = resolveHotkey(event, event.target as HTMLElement | null);
     if (!hotkey) return;
+    const cardAction = hotkey.action.endsWith('-pr');
+    const target = cardAction ? cardTarget(event) : null;
+    // Without a card under the pointer these keys stay free for the browser.
+    if (cardAction && !target) return;
     event.preventDefault();
     // While the shortcut list is up, the only shortcut that still acts is the one that
     // dismisses it; navigating behind an open dialog would leave the user lost.
@@ -468,6 +474,19 @@
     else if (hotkey.action === 'open-settings') navigate('settings');
     else if (hotkey.action === 'refresh') manualRefresh();
     else if (hotkey.action === 'toggle-shortcuts') showHotkeys = !showHotkeys;
+    else if (target) {
+      if (hotkey.action === 'open-pr') open(target.pr.url);
+      else if (hotkey.action === 'ignore-pr') {
+        if (!saving && !loading) action(target.pr.id, 'ignore');
+      } else cards[target.pr.id]?.openSubmenu(hotkey.action === 'snooze-pr' ? 'snooze' : 'labels');
+    }
+  }
+  function cardTarget(event: KeyboardEvent) {
+    if (screen !== 'dashboard') return null;
+    const id =
+      hoveredId ??
+      (event.target as HTMLElement | null)?.closest?.('[data-pr-id]')?.getAttribute('data-pr-id');
+    return visible.find((p) => p.pr.id === id) ?? null;
   }
   async function open(url: string) {
     try {
@@ -712,7 +731,12 @@
               </header>
               <div class="card-list">
                 {#each visible.filter((p) => p.state === col.state) as item (item.pr.id)}<PRCard
+                    bind:this={cards[item.pr.id]}
                     {item}
+                    onhover={(id) => {
+                      if (id) hoveredId = id;
+                      else if (hoveredId === item.pr.id) hoveredId = null;
+                    }}
                     {now}
                     snoozeOptions={preferences.settings.snoozeOptions}
                     busy={saving || loading}

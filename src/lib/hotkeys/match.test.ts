@@ -14,8 +14,19 @@ describe('resolveHotkey', () => {
     expect(resolveHotkey(press('S', { shiftKey: true }))?.action).toBe('open-snoozed');
     expect(resolveHotkey(press(',', { metaKey: true }))?.action).toBe('open-settings');
     expect(resolveHotkey(press('L', { shiftKey: true }))?.action).toBe('open-labels');
-    expect(resolveHotkey(press('l'))).toBeNull();
+    expect(resolveHotkey(press('l'))?.action).toBe('label-pr');
     expect(resolveHotkey(press('L', { shiftKey: true }), { tagName: 'INPUT' })).toBeNull();
+  });
+
+  it('matches plain card keys and suppresses them while typing', () => {
+    expect(resolveHotkey(press('o'))?.action).toBe('open-pr');
+    expect(resolveHotkey(press('s'))?.action).toBe('snooze-pr');
+    expect(resolveHotkey(press('i'))?.action).toBe('ignore-pr');
+    expect(resolveHotkey(press('l'))?.action).toBe('label-pr');
+    expect(resolveHotkey(press('S', { shiftKey: true }))?.action).toBe('open-snoozed');
+    expect(resolveHotkey(press('o', { metaKey: true }))).toBeNull();
+    for (const key of ['o', 's', 'i', 'l'])
+      expect(resolveHotkey(press(key), { tagName: 'INPUT' })).toBeNull();
   });
 
   it('matches Command R while typing and rejects other modifiers', () => {
@@ -39,7 +50,7 @@ describe('resolveHotkey', () => {
     expect(resolveHotkey(press('x'))).toBeNull();
     expect(resolveHotkey(press('d', { metaKey: true }))).toBeNull();
     expect(resolveHotkey(press('d'))).toBeNull();
-    expect(resolveHotkey(press('s'))).toBeNull();
+    expect(resolveHotkey(press('s', { metaKey: true }))).toBeNull();
     expect(resolveHotkey(press(','))).toBeNull();
     expect(resolveHotkey(press(',', { ctrlKey: true }))).toBeNull();
   });

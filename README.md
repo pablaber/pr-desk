@@ -55,6 +55,8 @@ PR Desk has no in-app updater.
   reviews, all checks, unresolved threads, conflicts, and draft state.
 - Combines your own PRs, direct review requests, tracked repositories, and individually
   watched PRs in one dashboard.
+- Acts on the hovered card from the keyboard: O opens the PR on GitHub, S snoozes, L labels
+  and I ignores it.
 - Filters by source and supports snoozing or individually ignoring PRs. Individually ignored
   PRs live on their own screen, reached from Settings → Ignored, where each can be unignored.
   Settings → Ignored also hides PRs by repository, exact author login (including bots), or title. Repository and
