@@ -14,7 +14,9 @@ function modifierMatches(required: Modifier | undefined, pressed: boolean): bool
 
 function matches(hotkey: Hotkey, event: HotkeyEvent): boolean {
   return (
-    event.key.toLowerCase() === hotkey.key.toLowerCase() &&
+    [hotkey.key, ...(hotkey.alternateKeys ?? [])].some(
+      (key) => key.toLowerCase() === event.key.toLowerCase(),
+    ) &&
     modifierMatches(hotkey.meta, event.metaKey) &&
     modifierMatches(hotkey.ctrl, event.ctrlKey) &&
     modifierMatches(hotkey.shift, event.shiftKey) &&

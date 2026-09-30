@@ -688,46 +688,48 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
   await expect(dialog).toBeHidden();
   await page.keyboard.press('?');
   await expect(dialog).toBeVisible();
+  await expect(dialog.locator('h3')).toHaveText(['Navigation', 'PR actions', 'Other']);
   await expect(dialog.locator('.hotkey-row dt')).toHaveText([
-    'Refresh pull requests',
     'Open settings',
     'Open the dashboard',
     'Open snoozed pull requests',
     'Open labels',
-    'Show keyboard shortcuts',
     'Open the hovered PR on GitHub',
     'Copy the hovered PR URL',
     'Snooze the hovered PR',
     'Ignore the hovered PR',
     'Label the hovered PR',
+    'Refresh pull requests',
+    'Show keyboard shortcuts',
   ]);
   // Each key gets its own cap, joined by a plus, and the spelled-out combination is what
   // a screen reader reads.
   await expect(dialog.locator('.hotkey-row .key-combo')).toHaveText([
-    '⌘+R',
     '⌘+,',
     '⇧+D',
     '⇧+S',
     '⇧+L',
-    '?',
     'O',
+    'Enter',
     'C',
     'S',
     'I',
     'L',
+    '⌘+R',
+    '?',
   ]);
   await expect(dialog.locator('.hotkey-row .visually-hidden')).toHaveText([
-    'Command plus R',
     'Command plus Comma',
     'Shift plus D',
     'Shift plus S',
     'Shift plus L',
-    'Question mark',
-    'O',
+    'O or Enter',
     'C',
     'S',
     'I',
     'L',
+    'Command plus R',
+    'Question mark',
   ]);
   await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveAttribute(
     'aria-keyshortcuts',
@@ -776,6 +778,13 @@ test('hovering a card and pressing a letter acts on it', async ({ page }) => {
   await card.hover();
   await page.keyboard.press('o');
   expect(await page.evaluate(() => (window as any).opened)).toEqual([
+    'https://github.com/acme/platform/pull/1',
+  ]);
+
+  await card.hover();
+  await page.keyboard.press('Enter');
+  expect(await page.evaluate(() => (window as any).opened)).toEqual([
+    'https://github.com/acme/platform/pull/1',
     'https://github.com/acme/platform/pull/1',
   ]);
 

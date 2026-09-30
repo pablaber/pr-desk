@@ -465,6 +465,12 @@
     if (actionPR || pendingScreen) return;
     const hotkey = resolveHotkey(event, event.target as HTMLElement | null);
     if (!hotkey) return;
+    // Enter must keep activating a focused button or link rather than open the hovered PR.
+    if (
+      event.key === 'Enter' &&
+      (event.target as HTMLElement | null)?.closest?.('button, a, summary, [role="menuitem"]')
+    )
+      return;
     const cardAction = hotkey.action.endsWith('-pr');
     const target = cardAction ? cardTarget(event) : null;
     // Without a card under the pointer these keys stay free for the browser.
