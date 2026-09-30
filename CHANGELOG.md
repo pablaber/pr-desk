@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0](https://github.com/pablaber/pr-desk/compare/v1.2.0...v1.3.0) (2026-09-29)
+
+
+### Features
+
+* add in-app labels with a labels screen ([#74](https://github.com/pablaber/pr-desk/issues/74)) ([925a75c](https://github.com/pablaber/pr-desk/commit/925a75c504e554db7d2f5239a393206c3c25b189))
+* show ready and attention counts on the dock icon ([#72](https://github.com/pablaber/pr-desk/issues/72)) ([f331162](https://github.com/pablaber/pr-desk/commit/f331162d614c3844fd91760a4966b955afca2ff9))
+
 ## [1.2.0](https://github.com/pablaber/pr-desk/compare/v1.1.0...v1.2.0) (2026-09-29)
 
 
