@@ -548,9 +548,20 @@ i.waiting {
   gap: 2px;
 }
 .card-menu button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   text-align: left;
   border: 0;
   font-size: 11px;
+}
+.menu-hotkey {
+  margin-left: auto;
+  font-size: 10px;
+  color: #939b8f;
+  border: 1px solid #dde3d8;
+  border-radius: 4px;
+  padding: 0 5px;
 }
 .submenu-anchor {
   position: relative;
