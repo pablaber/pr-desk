@@ -47,6 +47,20 @@ export const dashboardRules: DashboardRule[] = [
     getLabel: () => 'Merge conflict',
   },
   {
+    id: 'queued',
+    state: 'waiting',
+    priority: 55,
+    matches: (s) => s.queued,
+    getLabel: (s) => `Queued to merge${s.pr.mergeQueue ? ` · #${s.pr.mergeQueue.position}` : ''}`,
+  },
+  {
+    id: 'auto-merge',
+    state: 'waiting',
+    priority: 54,
+    matches: (s) => s.autoMerge && !s.queued,
+    getLabel: () => 'Auto-merge enabled',
+  },
+  {
     id: 'ready',
     state: 'ready-to-merge',
     priority: 50,

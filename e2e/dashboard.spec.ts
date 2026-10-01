@@ -1539,6 +1539,26 @@ test('non-blocking check rules move an approved PR to Ready without a Merge butt
   await expect(card.getByRole('button', { name: /^Merge / })).toHaveCount(0);
 });
 
+test('a queued approved PR waits with its queue position and no Merge button', async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as any,
+      invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      const result = await invoke(command, args);
+      for (const pr of result?.search?.nodes ?? []) {
+        if (pr.number === 1) pr.mergeQueueEntry = { state: 'QUEUED', position: 2 };
+      }
+      return result;
+    };
+  });
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect(page.locator('.column').nth(0).locator('.pr-card')).toHaveCount(0);
+  const card = page.locator('.pr-card').filter({ hasText: 'Reduce cache lookup latency' });
+  await expect(card).toContainText('Queued to merge · #2');
+  await expect(card.getByRole('button', { name: /^Merge / })).toHaveCount(0);
+});
+
 test('check continuation gates the initial snapshot and preserves cards during refresh', async ({
   page,
 }) => {

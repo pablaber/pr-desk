@@ -24,6 +24,8 @@ export function deriveSignals(pr: PullRequest, login: string, checkRules: CheckR
     pr.reviewDecision === 'APPROVED' &&
     checks.every((c) => c.state === 'passing') &&
     pr.mergeable === 'MERGEABLE';
+  // A PR already in the merge queue or with auto-merge on has nothing left for the user to do.
+  const notQueued = pr.mergeQueue === null && !pr.autoMerge;
   return {
     pr,
     owned,
@@ -36,15 +38,19 @@ export function deriveSignals(pr: PullRequest, login: string, checkRules: CheckR
     checksPassing: checks.every((c) => c.state === 'passing'),
     waitingOn,
     conflict: pr.mergeable === 'CONFLICTING',
+    queued: pr.mergeQueue !== null,
+    autoMerge: pr.autoMerge,
     // Strict definition, which the in-app merge relies on.
     ready:
       approved &&
+      notQueued &&
       waitingOn.length === 0 &&
       ['CLEAN', 'HAS_HOOKS', 'UNSTABLE'].includes(pr.mergeStateStatus),
     // GitHub reports a required pending check as BLOCKED and does not say which rule blocks,
     // so BLOCKED is tolerated only while a check the user marked non-blocking is pending.
     readyPendingChecks:
       approved &&
+      notQueued &&
       waitingOn.length > 0 &&
       ['BLOCKED', 'CLEAN', 'HAS_HOOKS', 'UNSTABLE'].includes(pr.mergeStateStatus),
   };

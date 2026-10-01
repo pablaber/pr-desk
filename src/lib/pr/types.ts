@@ -14,6 +14,8 @@ export interface PullRequest {
   reviewDecision: string | null;
   mergeable: string;
   mergeStateStatus: string;
+  mergeQueue: { state: string; position: number } | null;
+  autoMerge: boolean;
   directReviewers: string[];
   activeUnresolvedThreads: number;
   outdatedUnresolvedThreads: number;

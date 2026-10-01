@@ -58,6 +58,7 @@ fn validate_ready(pr: &Value, head_oid: &str, login: &str) -> Result<(), String>
             .eq_ignore_ascii_case(login)
         || pr.get("statusCheckRollup").is_none()
         || !checks_pass
+        || !pr["autoMergeRequest"].is_null()
     {
         return Err("This PR changed or is no longer ready to merge. Cancel and refresh before trying again.".into());
     }
@@ -69,7 +70,7 @@ pub async fn merge_pr(url: String, head_oid: String, method: String) -> Result<(
     validate_input(&url, &head_oid, &method)?;
     tokio::time::timeout(Duration::from_secs(45), async {
         let user = gh(&["api", "--hostname", "github.com", "user"]).await?;
-        let pr = gh(&["pr", "view", &url, "--json", "state,isDraft,headRefOid,author,reviewDecision,mergeable,mergeStateStatus,statusCheckRollup"]).await?;
+        let pr = gh(&["pr", "view", &url, "--json", "state,isDraft,headRefOid,author,reviewDecision,mergeable,mergeStateStatus,statusCheckRollup,autoMergeRequest"]).await?;
         validate_ready(&pr, &head_oid, user["login"].as_str().unwrap_or(""))?;
         let path = url.strip_prefix("https://github.com/").unwrap();
         let (repository, number) = path.rsplit_once("/pull/").unwrap();
@@ -131,6 +132,10 @@ mod tests {
             ("reviewDecision", json!("REVIEW_REQUIRED")),
             ("mergeable", json!("UNKNOWN")),
             ("mergeStateStatus", json!("BLOCKED")),
+            (
+                "autoMergeRequest",
+                json!({"enabledAt":"2026-09-20T10:00:00Z"}),
+            ),
         ] {
             let mut pr = ready();
             pr[key] = value;

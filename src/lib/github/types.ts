@@ -23,6 +23,8 @@ export interface RawPR {
   reviewDecision: string | null;
   mergeable: string;
   mergeStateStatus: string;
+  mergeQueueEntry?: { state: string; position: number } | null;
+  autoMergeRequest?: { enabledAt: string | null } | null;
   reviewRequests: Connection<{ requestedReviewer: { __typename: string; login?: string } | null }>;
   reviewThreads: Connection<{ isResolved: boolean; isOutdated: boolean }>;
   commits: {
