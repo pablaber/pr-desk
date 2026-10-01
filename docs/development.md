@@ -145,8 +145,8 @@ column and primary label:
 5. Merge conflicts on an owned PR.
 6. Owned, non-draft, approved, all checks passing, mergeable, and a compatible
    GitHub merge state → Ready to Merge.
-7. Any other non-draft PR from a tracked repository → Needs Attention, labelled
-   “Open in a tracked repository”.
+7. Any other non-draft PR from a tracked repository that the user does not own → Needs
+   Attention, labelled “Open in a tracked repository”. Owned PRs follow the owned rules.
 8. Waiting fallback.
 
 Unknown, blocked, behind, draft, and otherwise non-ready merge states prevent Ready to

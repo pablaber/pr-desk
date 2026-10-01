@@ -41,9 +41,9 @@ test.beforeEach(async ({ page }) => {
           'Refresh session token handling',
           'Add audit event retention',
           'Simplify deployment configuration',
-        ][number - 1] ?? 'A watched pull request',
+        ][number - 1] ?? (number === 6 ? 'Document the retry policy' : 'A watched pull request'),
       repository: { nameWithOwner: 'acme/platform' },
-      author: { login: number === 4 ? 'sam' : 'alex' },
+      author: { login: number === 4 ? 'sam' : number === 6 ? 'jordan' : 'alex' },
       state: (JSON.parse(localStorage.getItem('mergedPrs') ?? '[]') as number[]).includes(number)
         ? 'MERGED'
         : 'OPEN',
@@ -153,7 +153,7 @@ test.beforeEach(async ({ page }) => {
           return {
             repository: {
               nameWithOwner: 'acme/platform',
-              pullRequests: connection([1, 2, 3, 4].map(raw)),
+              pullRequests: connection([1, 2, 3, 4, 6].map(raw)),
             },
           };
         const number = Number(query.match(/pullRequest\(number: (\d+)/)?.[1]);
@@ -264,14 +264,18 @@ test('snooze, ignore, restore, watch, tracked repositories and persistence', asy
   ).toEqual([]);
   await saveSettings(page);
   await page.reload();
-  await expect(page.locator('.pr-card')).toHaveCount(5);
-  // Tracking the repository moves its open PRs to Needs attention; the watched PR stays waiting.
+  await expect(page.locator('.pr-card')).toHaveCount(6);
+  // Tracking the repository moves others' open PRs to Needs attention; owned and watched PRs
+  // keep their own placement.
   await expect(page.locator('.column').nth(0).locator('.pr-card')).toHaveCount(1);
   await expect(page.locator('.column').nth(1).locator('.pr-card')).toHaveCount(3);
-  await expect(page.locator('.column').nth(2).locator('.pr-card')).toHaveCount(1);
+  await expect(page.locator('.column').nth(2).locator('.pr-card')).toHaveCount(2);
+  await expect(
+    page.locator('.pr-card').filter({ hasText: 'Document the retry policy' }),
+  ).toContainText('Open in a tracked repository');
   await expect(
     page.locator('.pr-card').filter({ hasText: 'Add audit event retention' }),
-  ).toContainText('Open in a tracked repository');
+  ).not.toContainText('Open in a tracked repository');
   await page.screenshot({ path: '.context/tracked-repository.png', fullPage: true });
   const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
   expect(Object.keys(persisted)).not.toContain('prs');
@@ -576,7 +580,7 @@ test('ignored repositories validate, persist, override tracking, and can be remo
   await expect(section.locator('.setting-row')).toHaveCount(0);
   await saveSettings(page);
   await page.getByRole('button', { name: /Dashboard/ }).click();
-  await expect(page.locator('.pr-card')).toHaveCount(5);
+  await expect(page.locator('.pr-card')).toHaveCount(6);
 });
 
 test('settings sections default to accordion states, expand/collapse by mouse and keyboard, and show item counts', async ({
@@ -1333,7 +1337,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
   expect(saved.ignoredPullRequests).toHaveProperty('acme/platform#2');
   expect(saved.settings.snoozeOptions).toEqual([]);
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
-  await expect(page.locator('.pr-card')).toHaveCount(3);
+  await expect(page.locator('.pr-card')).toHaveCount(4);
   await page.evaluate(() => {
     const saved = JSON.parse(localStorage.getItem('prefs')!);
     saved.schemaVersion = 999;

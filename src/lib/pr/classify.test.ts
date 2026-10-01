@@ -53,6 +53,14 @@ describe('dashboard rules', () => {
       'Review requested',
     );
   });
+  it('owned PRs in a tracked repository wait rather than needing attention', () => {
+    expect(
+      run({
+        reasons: ['owned', 'tracked-repository'],
+        checks: [{ name: 'CI', state: 'pending' }],
+      }),
+    ).toMatchObject({ state: 'waiting', primary: 'Checks running' });
+  });
   it('readiness requires owned, approved, passing, mergeable and not draft', () => {
     const ready: Partial<PullRequest> = {
       reviewDecision: 'APPROVED',

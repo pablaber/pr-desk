@@ -64,7 +64,7 @@ export const dashboardRules: DashboardRule[] = [
     id: 'tracked-repository',
     state: 'needs-attention',
     priority: 10,
-    matches: (s) => s.trackedRepository && !s.pr.draft,
+    matches: (s) => s.trackedRepository && !s.owned && !s.pr.draft,
     getLabel: () => 'Open in a tracked repository',
     showAsStatus: false,
   },
