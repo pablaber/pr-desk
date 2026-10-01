@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1](https://github.com/pablaber/pr-desk/compare/v1.6.0...v1.6.1) (2026-10-01)
+
+
+### Bug Fixes
+
+* allow completed view queries in the github bridge ([#90](https://github.com/pablaber/pr-desk/issues/90)) ([1d88612](https://github.com/pablaber/pr-desk/commit/1d88612e2b16658597206afc926e2025f8127ee4))
+
 ## [1.6.0](https://github.com/pablaber/pr-desk/compare/v1.5.0...v1.6.0) (2026-10-01)
 
 
