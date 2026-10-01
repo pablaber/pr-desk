@@ -1,6 +1,7 @@
 export type HotkeyAction =
   | 'open-dashboard'
   | 'open-snoozed'
+  | 'open-completed'
   | 'open-labels'
   | 'open-settings'
   | 'toggle-shortcuts'

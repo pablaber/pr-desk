@@ -31,12 +31,28 @@ export interface RawPR {
     }[];
   };
 }
+export interface RawMergedPR {
+  url: string;
+  number: number;
+  title: string;
+  author: { login: string } | null;
+  repository: { nameWithOwner: string };
+  mergedAt: string | null;
+  mergedBy: { login: string } | null;
+}
+export type MergedSearchQualifier = 'author' | 'reviewed-by' | 'user-review-requested';
 export interface GitHubService {
   authenticate(): Promise<void>;
   getCurrentUser(): Promise<{ login: string; avatarUrl: string }>;
   getOwnedPullRequests(ignoredRepositories?: string[]): Promise<RawPR[]>;
   getDirectReviewRequests(ignoredRepositories?: string[]): Promise<RawPR[]>;
   getRepositoryPullRequests(repo: string): Promise<RawPR[]>;
+  getMergedPullRequests(
+    qualifier: MergedSearchQualifier,
+    since: string,
+    ignoredRepositories?: string[],
+  ): Promise<RawMergedPR[]>;
+  getRepositoryMergedPullRequests(repo: string): Promise<RawMergedPR[]>;
   validateRepository(repo: string): Promise<void>;
   getPullRequest(id: string, seed?: RawPR): Promise<PullRequest>;
 }

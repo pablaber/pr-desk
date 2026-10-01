@@ -31,3 +31,12 @@ export function pullRequestQuery(id: string, cursors?: (string | null | undefine
     ${cursors ? '' : fields} ${connections(cursors)}
   } } }`;
 }
+// The Completed view only needs enough to list a PR, so there are no connections to page through.
+const mergedFields = `url number title author { login } repository { nameWithOwner } mergedAt mergedBy { login }`;
+export function mergedSearchQuery(search: string) {
+  return `query DeskMergedSearch { search(query: ${q(search)}, type: ISSUE, first: 100) { nodes { ... on PullRequest { ${mergedFields} } } } }`;
+}
+export function mergedRepositoryQuery(repo: string) {
+  const [owner, name] = repo.split('/');
+  return `query DeskMergedRepository { repository(owner: ${q(owner)}, name: ${q(name)}) { pullRequests(states: MERGED, orderBy: { field: UPDATED_AT, direction: DESC }, first: 25) { nodes { ${mergedFields} } } } }`;
+}

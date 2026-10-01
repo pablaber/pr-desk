@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { isTauri } from '@tauri-apps/api/core';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { openUrl } from '@tauri-apps/plugin-opener';
@@ -10,6 +10,7 @@
   import Clock from '@lucide/svelte/icons/clock';
   import CircleCheck from '@lucide/svelte/icons/circle-check';
   import Link from '@lucide/svelte/icons/link';
+  import GitMerge from '@lucide/svelte/icons/git-merge';
   import GitPullRequest from '@lucide/svelte/icons/git-pull-request';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
@@ -25,6 +26,7 @@
   import AllClear from './components/AllClear.svelte';
   import Ignored from './components/Ignored.svelte';
   import Snoozed from './components/Snoozed.svelte';
+  import Completed from './components/Completed.svelte';
   import Labels from './components/Labels.svelte';
   import LabelPullRequests from './components/LabelPullRequests.svelte';
   import Settings from './components/Settings.svelte';
@@ -35,6 +37,7 @@
   import type { GhCliInfo } from './lib/github/types';
   import { GhGitHubService } from './lib/github/client';
   import { refreshDashboard, type DashboardSnapshot } from './lib/github/refresh';
+  import { fetchCompleted, type CompletedSnapshot } from './lib/github/completed';
   import {
     defaultState,
     loadState,
@@ -74,7 +77,7 @@
     staleIds: [],
     discoveryComplete: false,
   });
-  type Screen = 'dashboard' | 'snoozed' | 'labels' | 'label' | 'settings' | 'ignored';
+  type Screen = 'dashboard' | 'snoozed' | 'completed' | 'labels' | 'label' | 'settings' | 'ignored';
   let login = $state(''),
     avatarUrl = $state(''),
     screen = $state<Screen>('dashboard');
@@ -96,7 +99,10 @@
     initialized = $state(false);
   let silentRefresh = $state(false);
   let refreshQueued = false;
+  let completed = $state<CompletedSnapshot | null>(null),
+    completedLoading = $state(false);
   let showLoading = $derived(loading && !silentRefresh);
+  let refreshBusy = $derived(showLoading || (screen === 'completed' && completedLoading));
   let error = $state(''),
     setupError = $state(''),
     now = $state(Date.now()),
@@ -104,6 +110,7 @@
   const refreshHotkey = hotkeyFor('refresh');
   const dashboardHotkey = hotkeyFor('open-dashboard');
   const snoozedHotkey = hotkeyFor('open-snoozed');
+  const completedHotkey = hotkeyFor('open-completed');
   const labelsHotkey = hotkeyFor('open-labels');
   const settingsHotkey = hotkeyFor('open-settings');
   const shortcutsHotkey = hotkeyFor('toggle-shortcuts');
@@ -213,6 +220,22 @@
     }
     if (initialized) await refresh();
   }
+  // Merged PRs are asked for each time the view opens, so the dashboard refresh never pays for it.
+  async function loadCompleted() {
+    if (completedLoading) return;
+    completedLoading = true;
+    try {
+      completed = await fetchCompleted(service, $state.snapshot(preferences), Date.now());
+      now = Date.now();
+    } catch (e) {
+      error = String(e);
+    } finally {
+      completedLoading = false;
+    }
+  }
+  $effect(() => {
+    if (initialized && screen === 'completed') untrack(() => void loadCompleted());
+  });
   async function refresh(silent = false) {
     if (loading || saving) {
       // A background refresh asked for while one is already running would otherwise be dropped,
@@ -260,7 +283,8 @@
       silentRefresh = false;
       return;
     }
-    void (initialized ? refresh() : start());
+    if (initialized && screen === 'completed') void loadCompleted();
+    else void (initialized ? refresh() : start());
   }
   async function persist(next: AppState) {
     await saveState(next);
@@ -481,6 +505,7 @@
     if (showHotkeys && hotkey.action !== 'toggle-shortcuts') return;
     if (hotkey.action === 'open-dashboard') navigate('dashboard');
     else if (hotkey.action === 'open-snoozed') navigate('snoozed');
+    else if (hotkey.action === 'open-completed') navigate('completed');
     else if (hotkey.action === 'open-labels') navigate('labels');
     else if (hotkey.action === 'open-settings') navigate('settings');
     else if (hotkey.action === 'refresh') manualRefresh();
@@ -580,6 +605,16 @@
           >{/if}
       </button>
       <button
+        class:active={screen === 'completed'}
+        onclick={() => navigate('completed')}
+        aria-keyshortcuts={completedHotkey ? ariaKeyShortcut(completedHotkey) : null}
+      >
+        <GitMerge size={15} /> Completed
+        {#if completedHotkey}<span class="nav-hotkey" aria-hidden="true"
+            >{compactKeys(completedHotkey)}</span
+          >{/if}
+      </button>
+      <button
         class:active={screen === 'labels' || screen === 'label'}
         onclick={() => navigate('labels')}
         aria-keyshortcuts={labelsHotkey ? ariaKeyShortcut(labelsHotkey) : null}
@@ -626,22 +661,24 @@
           ? 'Dashboard'
           : screen === 'snoozed'
             ? 'Snoozed'
-            : screen === 'labels'
-              ? 'Labels'
-              : screen === 'label'
-                ? `Labels / ${selectedLabel?.name ?? ''}`
-                : screen === 'ignored'
-                  ? 'Settings / Ignored pull requests'
-                  : 'Settings'}</span
+            : screen === 'completed'
+              ? 'Completed'
+              : screen === 'labels'
+                ? 'Labels'
+                : screen === 'label'
+                  ? `Labels / ${selectedLabel?.name ?? ''}`
+                  : screen === 'ignored'
+                    ? 'Settings / Ignored pull requests'
+                    : 'Settings'}</span
       >
       <div>
         {#if refreshed}<span class="refresh-time">Updated {refreshed}</span>{/if}<button
-          disabled={showLoading || saving}
+          disabled={refreshBusy || saving}
           onclick={manualRefresh}
           aria-keyshortcuts={refreshHotkey ? ariaKeyShortcut(refreshHotkey) : null}
-          class:refreshing={showLoading}
+          class:refreshing={refreshBusy}
           ><RefreshCw size={13} />
-          {showLoading ? 'Refreshing…' : 'Refresh'}
+          {refreshBusy ? 'Refreshing…' : 'Refresh'}
           {#if refreshHotkey}<span class="refresh-hotkey" aria-hidden="true"
               >{compactKeys(refreshHotkey)}</span
             >{/if}</button
@@ -673,6 +710,8 @@
         onaction={action}
         onrestore={(id) => restore('snoozed', id)}
       />
+    {:else if screen === 'completed'}
+      <Completed snapshot={completed} loading={completedLoading} {now} onopen={open} />
     {:else if screen === 'labels'}
       <Labels
         {preferences}

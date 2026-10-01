@@ -1559,3 +1559,37 @@ fieldset:disabled .segmented-control input {
     animation: none;
   }
 }
+
+/* Completed lists merged pull requests grouped by day, one plain row each. */
+.completed-list {
+  padding: 26px 30px;
+  display: grid;
+  gap: 12px;
+}
+.completed-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: #798675;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.completed-group {
+  display: grid;
+  gap: 8px;
+}
+.completed-group h2 {
+  margin: 8px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #798675;
+}
+.completed-row {
+  padding: 16px 20px;
+  gap: 6px;
+  border: 1px solid #e1e7dc;
+  border-radius: 8px;
+  background: #fff;
+}
