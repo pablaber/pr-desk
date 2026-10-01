@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.6.0](https://github.com/pablaber/pr-desk/compare/v1.5.0...v1.6.0) (2026-10-01)
+
+
+### Features
+
+* add completed view for recently merged prs ([#87](https://github.com/pablaber/pr-desk/issues/87)) ([86f08c6](https://github.com/pablaber/pr-desk/commit/86f08c6cff6be0539f333bfb61309f9363efa05d))
+* show queued and auto-merge prs as waiting ([#89](https://github.com/pablaber/pr-desk/issues/89)) ([823a5c9](https://github.com/pablaber/pr-desk/commit/823a5c93bba42277129ff24aee8867773c806175))
+* split waiting label into review and merge requirements ([#88](https://github.com/pablaber/pr-desk/issues/88)) ([089f8f8](https://github.com/pablaber/pr-desk/commit/089f8f819b1aa70ef20cbf19d7d6880c57691e37))
+
+
+### Bug Fixes
+
+* keep owned PRs in tracked repositories out of needs attention ([#85](https://github.com/pablaber/pr-desk/issues/85)) ([4010664](https://github.com/pablaber/pr-desk/commit/4010664b54cf4e696629244b668b30d645491be4))
+
 ## [1.5.0](https://github.com/pablaber/pr-desk/compare/v1.4.0...v1.5.0) (2026-09-30)
 
 
