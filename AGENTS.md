@@ -57,7 +57,7 @@ Inspect the generated screenshot and include the updated image in the change.
 
 | Path                                | What lives there                                                                                                      |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `src-tauri/src/main.rs`             | the entire Rust bridge: `gh auth status` and read-only GraphQL                                                        |
+| `src-tauri/src/main.rs`             | the Rust bridge: `gh auth status`, allowlisted read-only GraphQL (`QUERY_NAMES`), close as stale                      |
 | `src/lib/github/`                   | `queries.ts` GraphQL text, `normalize.ts` raw → domain, `refresh.ts` orchestration/concurrency, `client.ts` transport |
 | `src/lib/pr/`                       | `signals.ts` → `dashboard-rules.ts` → `classify.ts` → `card-view-model.ts`                                            |
 | `src/lib/store/app-state.ts`        | versioned preferences and all input validation                                                                        |
@@ -85,6 +85,12 @@ Inspect the generated screenshot and include the updated image in the change.
   and a fixed comment. The merge_pr command only merges ready PRs after confirmation,
   revalidates readiness, and pins the mutation to the confirmed commit. Keep mutations
   limited to these actions.
+- The bridge only runs GraphQL operations named in `QUERY_NAMES` in
+  `src-tauri/src/main.rs`. A new `query Desk…` in `src/lib/github/` must be added there
+  in the same change, or every call fails at runtime with "Only named PR Desk read-only
+  queries are allowed". Playwright mocks the bridge and cannot catch this; the
+  `allows_every_frontend_query_and_nothing_else` cargo test does, so run `cargo test`
+  whenever queries change.
 
 ## Code style
 
@@ -113,7 +119,8 @@ reasons the code cannot state — for example in `src/lib/pr/classify.ts`:
 - New dashboard rules, signals, normalization branches and validation paths need unit
   tests; UI-visible behavior needs an `e2e/` case.
 - Playwright mocks the Tauri boundary rather than calling GitHub. Keep mock fixtures
-  out of the shipped bundle.
+  out of the shipped bundle. Because of that mock, green e2e tests say nothing about
+  the Rust bridge's allowlists; cover those with cargo tests.
 
 ## Static analysis
 
