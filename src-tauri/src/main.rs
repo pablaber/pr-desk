@@ -35,15 +35,7 @@ async fn github(operation: String, query: Option<String>) -> Result<serde_json::
         }
         "graphql" => {
             let query = query.ok_or("Missing query")?;
-            let operation_name = [
-                "DeskViewer",
-                "DeskSearch",
-                "DeskRepository",
-                "DeskPullRequest",
-            ]
-            .into_iter()
-            .find(|name| query.trim_start().starts_with(&format!("query {name} {{")))
-            .ok_or("Only named PR Desk read-only queries are allowed")?;
+            let operation_name = query_operation_name(&query)?;
             // Select the named query explicitly, even if another operation appears in the document.
             command
                 .args(["api", "--hostname", "github.com", "graphql", "-f"])
@@ -82,6 +74,22 @@ async fn github(operation: String, query: Option<String>) -> Result<serde_json::
         return Err("GitHub could not complete this query. Check access and try again.".into());
     }
     Ok(value["data"].clone())
+}
+
+const QUERY_NAMES: [&str; 6] = [
+    "DeskViewer",
+    "DeskSearch",
+    "DeskRepository",
+    "DeskPullRequest",
+    "DeskMergedSearch",
+    "DeskMergedRepository",
+];
+
+fn query_operation_name(query: &str) -> Result<&'static str, String> {
+    QUERY_NAMES
+        .into_iter()
+        .find(|name| query.trim_start().starts_with(&format!("query {name} {{")))
+        .ok_or_else(|| "Only named PR Desk read-only queries are allowed".into())
 }
 
 fn parse_gh_version(output: &[u8]) -> Result<String, String> {
@@ -188,6 +196,33 @@ mod tests {
             b"\xff",
         ] {
             assert!(parse_gh_version(output).is_err());
+        }
+    }
+    #[test]
+    fn allows_every_frontend_query_and_nothing_else() {
+        let sources = [
+            include_str!("../../src/lib/github/client.ts"),
+            include_str!("../../src/lib/github/queries.ts"),
+        ];
+        let names: Vec<_> = sources
+            .iter()
+            .flat_map(|source| source.split("query Desk").skip(1))
+            .map(|rest| format!("Desk{}", rest.split(' ').next().unwrap()))
+            .collect();
+        assert_eq!(names.len(), QUERY_NAMES.len());
+        for name in names {
+            assert_eq!(
+                query_operation_name(&format!("\n query {name} {{ x }}")).unwrap(),
+                name
+            );
+        }
+        for query in [
+            "mutation DeskSearch { x }",
+            "query DeskSearchX { x }",
+            "query Other { x }",
+            "{ x }",
+        ] {
+            assert!(query_operation_name(query).is_err(), "{query}");
         }
     }
     #[test]
