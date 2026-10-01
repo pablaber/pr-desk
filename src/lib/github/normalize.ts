@@ -39,6 +39,10 @@ export function normalize(raw: RawPR): PullRequest {
     reviewDecision: raw.reviewDecision,
     mergeable: raw.mergeable,
     mergeStateStatus: raw.mergeStateStatus,
+    mergeQueue: raw.mergeQueueEntry
+      ? { state: raw.mergeQueueEntry.state, position: raw.mergeQueueEntry.position }
+      : null,
+    autoMerge: raw.autoMergeRequest != null,
     directReviewers: raw.reviewRequests.nodes.flatMap((r) =>
       r.requestedReviewer?.__typename === 'User' && r.requestedReviewer.login
         ? [r.requestedReviewer.login]

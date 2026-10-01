@@ -14,6 +14,8 @@ export function pr(overrides: Partial<PullRequest> = {}): PullRequest {
     reviewDecision: null,
     mergeable: 'MERGEABLE',
     mergeStateStatus: 'CLEAN',
+    mergeQueue: null,
+    autoMerge: false,
     directReviewers: [],
     activeUnresolvedThreads: 0,
     outdatedUnresolvedThreads: 0,

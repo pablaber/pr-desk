@@ -77,6 +77,30 @@ describe('dashboard rules', () => {
     ])
       expect(run({ ...ready, ...changes }).state).toBe('waiting');
   });
+  it('queued and auto-merge PRs wait instead of offering a merge', () => {
+    const approved: Partial<PullRequest> = {
+      reviewDecision: 'APPROVED',
+      checks: [{ name: 'CI', state: 'passing' }],
+    };
+    expect(run({ ...approved, mergeQueue: { state: 'QUEUED', position: 2 } })).toMatchObject({
+      state: 'waiting',
+      primary: 'Queued to merge · #2',
+      canMerge: false,
+    });
+    expect(run({ ...approved, autoMerge: true })).toMatchObject({
+      state: 'waiting',
+      primary: 'Auto-merge enabled',
+      canMerge: false,
+    });
+    expect(run(approved)).toMatchObject({ state: 'ready-to-merge', canMerge: true });
+  });
+  it('attention still outranks a queued PR', () => {
+    const queued = { mergeQueue: { state: 'QUEUED', position: 1 } };
+    expect(run({ ...queued, directReviewers: ['me'] }).primary).toBe('Review requested');
+    expect(run({ ...queued, checks: [{ name: 'CI', state: 'failed' }] }).primary).toBe(
+      'Checks failed',
+    );
+  });
   it('any failure prevents readiness even when GitHub permits merging', () =>
     expect(
       run({

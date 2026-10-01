@@ -49,6 +49,16 @@ describe('GitHub adapter', () => {
       activeUnresolvedThreads: 1,
       outdatedUnresolvedThreads: 1,
     }));
+  it('normalizes merge queue and auto-merge, defaulting when GitHub omits them', () => {
+    expect(normalize(raw())).toMatchObject({ mergeQueue: null, autoMerge: false });
+    expect(
+      normalize({
+        ...raw(),
+        mergeQueueEntry: { state: 'QUEUED', position: 3 },
+        autoMergeRequest: { enabledAt: '2026-09-20T10:00:00Z' },
+      }),
+    ).toMatchObject({ mergeQueue: { state: 'QUEUED', position: 3 }, autoMerge: true });
+  });
   it('normalizes both status contexts and check runs', () => {
     expect(normalizeCheck({ __typename: 'CheckRun', status: 'IN_PROGRESS' }).state).toBe('pending');
     expect(normalizeCheck({ __typename: 'StatusContext', state: 'ERROR' }).state).toBe('failed');
