@@ -40,6 +40,13 @@ export const hotkeys: Hotkey[] = [
     description: 'Open snoozed pull requests',
   },
   {
+    action: 'open-completed',
+    section: 'navigation',
+    key: 'c',
+    shift: true,
+    description: 'Open recently merged pull requests',
+  },
+  {
     action: 'open-labels',
     section: 'navigation',
     key: 'l',

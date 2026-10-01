@@ -20,3 +20,13 @@ export interface PullRequest {
   checks: { name: string; state: 'passing' | 'pending' | 'failed' }[];
   reasons: TrackingReason[];
 }
+export interface CompletedPR {
+  id: string;
+  url: string;
+  repository: string;
+  number: number;
+  title: string;
+  author: string;
+  mergedAt: string;
+  mergedBy: string | null;
+}

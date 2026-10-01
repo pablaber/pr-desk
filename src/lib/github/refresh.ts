@@ -3,6 +3,7 @@ import type { AppState } from '../store/app-state';
 import type { PullRequest, TrackingReason } from '../pr/types';
 import { parsePullRequest } from '../store/app-state';
 import { completeSeed } from './normalize';
+import { pool } from './pool';
 import type { GitHubService, RawPR } from './types';
 export interface DashboardSnapshot {
   prs: PullRequest[];
@@ -40,15 +41,6 @@ export async function refreshDashboard(
       run: () => service.getRepositoryPullRequests(repo),
     })),
   ];
-  // Bounded concurrency avoids spawning one gh process per PR at once.
-  async function pool<T>(items: T[], work: (item: T) => Promise<void>) {
-    let index = 0;
-    await Promise.all(
-      Array.from({ length: Math.min(4, items.length) }, async () => {
-        while (index < items.length) await work(items[index++]);
-      }),
-    );
-  }
   const discoveries = new Map<string, RawPR[]>();
   await pool(jobs, async (job) => {
     try {

@@ -2,8 +2,21 @@ import { invoke } from '@tauri-apps/api/core';
 import { parsePullRequest, parseRepository } from '../store/app-state';
 import { githubErrorMessage } from './errors';
 import { normalize, rawConnections } from './normalize';
-import { pullRequestQuery, repositoryQuery, searchQuery } from './queries';
-import type { Connection, GitHubService, GhCliInfo, RawPR } from './types';
+import {
+  mergedRepositoryQuery,
+  mergedSearchQuery,
+  pullRequestQuery,
+  repositoryQuery,
+  searchQuery,
+} from './queries';
+import type {
+  Connection,
+  GitHubService,
+  GhCliInfo,
+  MergedSearchQualifier,
+  RawMergedPR,
+  RawPR,
+} from './types';
 export type QueryRunner = <T>(query: string) => Promise<T>;
 export class GhGitHubService implements GitHubService {
   constructor(
@@ -66,6 +79,29 @@ export class GhGitHubService implements GitHubService {
   }
   getDirectReviewRequests(ignoredRepositories: string[] = []) {
     return this.search('is:pr is:open user-review-requested:@me', ignoredRepositories);
+  }
+  // `since` is a YYYY-MM-DD day, the finest granularity GitHub search accepts; callers trim by
+  // the exact merge time. One page is enough for a week of merges.
+  async getMergedPullRequests(
+    qualifier: MergedSearchQualifier,
+    since: string,
+    ignoredRepositories: string[] = [],
+  ) {
+    const search = [
+      `is:pr is:merged ${qualifier}:@me merged:>=${since} sort:updated-desc`,
+      ...[...new Set(ignoredRepositories.map(parseRepository))].map((repo) => `-repo:${repo}`),
+    ].join(' ');
+    const { search: result } = await this.query<{ search: { nodes: RawMergedPR[] } }>(
+      mergedSearchQuery(search),
+    );
+    return result.nodes.filter(Boolean);
+  }
+  async getRepositoryMergedPullRequests(repo: string) {
+    const data = await this.query<{
+      repository: { pullRequests: { nodes: RawMergedPR[] } } | null;
+    }>(mergedRepositoryQuery(parseRepository(repo)));
+    if (!data.repository) throw new Error('Repository not found or inaccessible.');
+    return data.repository.pullRequests.nodes.filter(Boolean);
   }
   async validateRepository(repo: string) {
     const data = await this.query<{ repository: unknown }>(

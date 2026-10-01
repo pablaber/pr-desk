@@ -132,6 +132,20 @@ test.beforeEach(async ({ page }) => {
           return {
             viewer: { login: 'alex', avatarUrl: 'https://avatars.githubusercontent.com/u/1' },
           };
+        if (query.includes('DeskMergedSearch'))
+          return {
+            search: {
+              nodes: query.includes('author:@me')
+                ? [
+                    {
+                      ...raw(1),
+                      mergedAt: new Date(Date.now() - 3600000).toISOString(),
+                      mergedBy: { login: 'sam' },
+                    },
+                  ]
+                : [],
+            },
+          };
         if (query.includes('author:@me')) w.refreshCount++;
         if (query.includes('DeskSearch'))
           return {
@@ -189,6 +203,25 @@ test('dashboard classification, source filters, browser action, and screenshot',
   await page.getByRole('button', { name: 'All', exact: true }).click();
   await expect(summaryCounts).toHaveText(['1', '2', '1']);
   await page.screenshot({ path: '.context/dashboard.png', fullPage: true });
+});
+
+test('the Completed view lists recently merged pull requests and opens them', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.getByRole('button', { name: /^Completed/ }).click();
+  await expect(page.getByRole('heading', { name: 'Completed' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible();
+  await expect(page.getByText('1 merged pull request', { exact: true })).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Open Reduce cache lookup latency on GitHub', exact: true })
+    .click();
+  expect(await page.evaluate(() => (window as any).opened)).toEqual([
+    'https://github.com/acme/platform/pull/1',
+  ]);
+  await page.keyboard.press('Shift+D');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.keyboard.press('Shift+C');
+  await expect(page.getByRole('heading', { name: 'Completed' })).toBeVisible();
 });
 
 test('cards show the author and the most severe stale badge', async ({ page }) => {
@@ -697,6 +730,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'Open settings',
     'Open the dashboard',
     'Open snoozed pull requests',
+    'Open recently merged pull requests',
     'Open labels',
     'Open the hovered PR on GitHub',
     'Copy the hovered PR URL',
@@ -712,6 +746,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     '⌘+,',
     '⇧+D',
     '⇧+S',
+    '⇧+C',
     '⇧+L',
     'O',
     'Enter',
@@ -726,6 +761,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'Command plus Comma',
     'Shift plus D',
     'Shift plus S',
+    'Shift plus C',
     'Shift plus L',
     'O or Enter',
     'C',
