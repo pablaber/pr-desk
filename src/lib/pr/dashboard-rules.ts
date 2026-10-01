@@ -80,7 +80,9 @@ export const dashboardRules: DashboardRule[] = [
         : s.checksRunning
           ? 'Checks running'
           : s.owned
-            ? 'Waiting for review or merge requirements'
+            ? s.pr.reviewDecision === 'APPROVED'
+              ? 'Waiting on merge requirements'
+              : 'Waiting for review'
             : 'No action needed',
   },
 ];

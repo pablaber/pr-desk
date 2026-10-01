@@ -219,7 +219,12 @@ describe('non-blocking check rules', () => {
   it('waits for review when the PR is not approved', () =>
     expect(
       classify(blocked({ reviewDecision: 'REVIEW_REQUIRED' }), 'me', withRule()),
-    ).toMatchObject({ state: 'waiting', primary: 'Waiting for review or merge requirements' }));
+    ).toMatchObject({ state: 'waiting', primary: 'Waiting for review' }));
+  it('waits on merge requirements once the PR is approved', () =>
+    expect(classify(blocked({ mergeStateStatus: 'BEHIND' }), 'me', withRule())).toMatchObject({
+      state: 'waiting',
+      primary: 'Waiting on merge requirements',
+    }));
   it('does not tolerate BLOCKED without a pending non-blocking check', () =>
     expect(
       classify(blocked({ checks: [{ name: 'CI', state: 'passing' }] }), 'me', withRule())!.state,
