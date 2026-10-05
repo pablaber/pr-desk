@@ -55,10 +55,13 @@
   const ignoreHotkey = hotkeyFor('ignore-pr');
   let menu = $state(false),
     submenu = $state<'snooze' | 'labels' | null>(null);
+  let at = $state<{ x: number; y: number } | null>(null);
+  let cardEl: HTMLElement;
   let card = $derived(cardViewModel(item, now));
   function close() {
     menu = false;
     submenu = null;
+    at = null;
   }
   export function openSubmenu(which: 'snooze' | 'labels') {
     if (busy) return;
@@ -70,11 +73,19 @@
     close();
     onaction(card.pr.id, action, until);
   }
-  // The submenu opens beside its row, so cards low on the board would push it past the
-  // window; lift it by however much it overflows.
+  // Menus open beside their row or at the cursor, so cards low or far right on the board
+  // would push them past the window; shift them back by however much they overflow. A
+  // submenu that would run off the left edge opens on the right of its row instead.
   function keepInView(node: HTMLElement) {
-    const overflow = node.getBoundingClientRect().bottom - (window.innerHeight - 8);
-    if (overflow > 0) node.style.top = `${-6 - overflow}px`;
+    if (node.classList.contains('card-submenu') && node.getBoundingClientRect().left < 8) {
+      node.style.right = 'auto';
+      node.style.left = 'calc(100% + 8px)';
+    }
+    const rect = node.getBoundingClientRect();
+    const down = rect.bottom - (window.innerHeight - 8);
+    if (down > 0) node.style.top = `${node.offsetTop - down}px`;
+    const across = rect.right - (window.innerWidth - 8);
+    if (across > 0) node.style.left = `${node.offsetLeft - across}px`;
   }
 </script>
 
@@ -92,6 +103,15 @@
 <article
   class="pr-card"
   data-pr-id={card.pr.id}
+  bind:this={cardEl}
+  oncontextmenu={(e) => {
+    e.preventDefault();
+    if (busy) return;
+    const r = cardEl.getBoundingClientRect();
+    at = { x: e.clientX - r.left - cardEl.clientLeft, y: e.clientY - r.top - cardEl.clientTop };
+    submenu = null;
+    menu = true;
+  }}
   onpointerenter={() => onhover(card.pr.id)}
   onpointerleave={() => onhover(null)}
 >
@@ -107,7 +127,13 @@
     class="menu-trigger"
     aria-label={`Actions for ${card.pr.title}`}
     aria-expanded={menu}
-    onclick={() => (menu ? close() : (menu = true))}><Ellipsis size={14} /></button
+    onclick={() => {
+      if (menu) close();
+      else {
+        at = null;
+        menu = true;
+      }
+    }}><Ellipsis size={14} /></button
   >
   {#if card.canMerge}
     <button
@@ -119,8 +145,25 @@
   {/if}
   {#if menu}
     <!-- The backdrop swallows the dismissing click so it cannot also open the PR behind it. -->
-    <div class="menu-backdrop" onclick={close} role="presentation"></div>
-    <div class="card-menu" role="group" aria-label="PR actions">
+    <div
+      class="menu-backdrop"
+      onclick={close}
+      oncontextmenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        close();
+      }}
+      role="presentation"
+    ></div>
+    <div
+      use:keepInView
+      class="card-menu"
+      style:left={at ? `${at.x}px` : null}
+      style:top={at ? `${at.y}px` : null}
+      style:right={at ? 'auto' : null}
+      role="group"
+      aria-label="PR actions"
+    >
       <button
         aria-keyshortcuts={openHotkey ? ariaKeyShortcut(openHotkey) : null}
         onclick={() => {
