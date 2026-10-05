@@ -76,7 +76,9 @@
   // Menus open beside their row or at the cursor, so cards low or far right on the board
   // would push them past the window; shift them back by however much they overflow. A
   // submenu that would run off the left edge opens on the right of its row instead.
-  function keepInView(node: HTMLElement) {
+  // The ⋯ menu keeps its usual anchor, so it opts out.
+  function keepInView(node: HTMLElement, active = true) {
+    if (!active) return;
     if (node.classList.contains('card-submenu') && node.getBoundingClientRect().left < 8) {
       node.style.right = 'auto';
       node.style.left = 'calc(100% + 8px)';
@@ -156,7 +158,7 @@
       role="presentation"
     ></div>
     <div
-      use:keepInView
+      use:keepInView={at !== null}
       class="card-menu"
       style:left={at ? `${at.x}px` : null}
       style:top={at ? `${at.y}px` : null}
