@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/pablaber/pr-desk/compare/v1.6.1...v1.7.0) (2026-10-05)
+
+
+### Features
+
+* open the card menu on right-click ([#92](https://github.com/pablaber/pr-desk/issues/92)) ([f48a429](https://github.com/pablaber/pr-desk/commit/f48a4294c310be260adb27316fd13b81df38450f))
+
 ## [1.6.1](https://github.com/pablaber/pr-desk/compare/v1.6.0...v1.6.1) (2026-10-01)
 
 
