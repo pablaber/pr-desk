@@ -85,6 +85,7 @@ PR Desk has no in-app updater.
   for one PR): each PR's normalized GitHub state, matched dashboard rules, derived signals and
   why it landed in its column or was hidden, alongside preferences and refresh warnings — ready
   to paste into an issue or a coding agent.
+- Opens a card's menu on right-click as well as from its ⋯ button.
 - Stores preferences locally and uses your existing GitHub CLI authentication.
 - Closes PRs with red staleness (over 28 days) after confirmation, leaving an automated
   comment with their inactivity in days. Enter confirms; Escape cancels.

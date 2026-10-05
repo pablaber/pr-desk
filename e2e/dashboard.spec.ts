@@ -364,6 +364,57 @@ test('the card menu dismisses on an outside click and nests snooze choices', asy
   await expect(actions).toBeHidden();
 });
 
+test('right-clicking a card opens its menu at the cursor and keeps it in the window', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await page.goto('/');
+  const actions = page.getByRole('group', { name: 'PR actions' });
+  const snoozeOptions = page.getByRole('group', { name: 'Snooze options' });
+  const inView = async (locator: typeof actions) => {
+    const box = (await locator.boundingBox())!;
+    const { width, height } = page.viewportSize()!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+    expect(box.y + box.height).toBeLessThanOrEqual(height);
+  };
+  const cardBody = page.getByRole('button', {
+    name: 'Open Refresh session token handling on GitHub',
+    exact: true,
+  });
+  await cardBody.click({ button: 'right', position: { x: 40, y: 20 } });
+  await expect(actions).toBeVisible();
+  const card = (await cardBody.boundingBox())!;
+  const menu = (await actions.boundingBox())!;
+  expect(Math.abs(menu.x - (card.x + 40))).toBeLessThan(1);
+  expect(Math.abs(menu.y - (card.y + 20))).toBeLessThan(1);
+  expect(await page.evaluate(() => (window as any).opened)).toEqual([]);
+  // Right-clicking the backdrop dismisses, and Escape does too.
+  await page.mouse.click(card.x - 4, card.y + 20, { button: 'right' });
+  await expect(actions).toBeHidden();
+  await cardBody.click({ button: 'right', position: { x: 40, y: 20 } });
+  await page.keyboard.press('Escape');
+  await expect(actions).toBeHidden();
+  // Near the card's far edge the menu is pulled back inside the window.
+  await cardBody.click({ button: 'right', position: { x: card.width - 4, y: card.height - 4 } });
+  await expect(actions).toBeVisible();
+  await inView(actions);
+  await page.keyboard.press('Escape');
+  // The first card in the leftmost column still shows its submenu on screen.
+  const first = page.locator('.column').first().locator('.pr-card .card-main').first();
+  await first.click({ button: 'right', position: { x: 20, y: 20 } });
+  await page.getByRole('button', { name: 'Snooze', exact: true }).click();
+  await expect(snoozeOptions).toBeVisible();
+  await inView(snoozeOptions);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  // Menu actions still work from the right-click menu.
+  await cardBody.click({ button: 'right', position: { x: 40, y: 20 } });
+  await page.getByRole('button', { name: 'Copy PR URL' }).click();
+  await expect(actions).toBeHidden();
+});
+
 test('configured snooze options drive the card menu, capped at five with Custom date last', async ({
   page,
 }) => {
