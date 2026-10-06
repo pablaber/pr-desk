@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.8.0](https://github.com/pablaber/pr-desk/compare/v1.7.0...v1.8.0) (2026-10-06)
+
+
+### Features
+
+* add an interface size setting ([#96](https://github.com/pablaber/pr-desk/issues/96)) ([57800fb](https://github.com/pablaber/pr-desk/commit/57800fbce862464b6d9fb2a209abe228974ee4a7))
+* open settings as an overlay with a section sidebar ([#97](https://github.com/pablaber/pr-desk/issues/97)) ([2cafafe](https://github.com/pablaber/pr-desk/commit/2cafafe8c3763f2a5c60725bff5da222887c5c71))
+* open the window maximized ([#94](https://github.com/pablaber/pr-desk/issues/94)) ([c2748dd](https://github.com/pablaber/pr-desk/commit/c2748dd055af134ac7e4e2533bfda8e17f4ca025))
+
 ## [1.7.0](https://github.com/pablaber/pr-desk/compare/v1.6.1...v1.7.0) (2026-10-05)
 
 
