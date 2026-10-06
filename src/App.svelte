@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
   import { isTauri } from '@tauri-apps/api/core';
+  import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { version } from '../package.json';
@@ -17,6 +18,8 @@
   import SettingsIcon from '@lucide/svelte/icons/settings';
   import Tag from '@lucide/svelte/icons/tag';
   import X from '@lucide/svelte/icons/x';
+  import ZoomIn from '@lucide/svelte/icons/zoom-in';
+  import ZoomOut from '@lucide/svelte/icons/zoom-out';
   // The app's CSP blocks data URLs, so keep the logo as a bundled file.
   import appIcon from '../src-tauri/icons/source.svg?no-inline';
   import PRConfirmation from './components/PRConfirmation.svelte';
@@ -53,6 +56,9 @@
     isRefreshInterval,
     isDockBadgeMode,
     type DockBadgeMode,
+    isInterfaceScale,
+    stepInterfaceScale,
+    type InterfaceScale,
     parseSnoozeOptions,
     preferenceDraft,
     draftDiffers,
@@ -149,6 +155,13 @@
       .catch(() => {});
   });
   $effect(() => {
+    if (!isTauri() || !initialized) return;
+    // Zoom is cosmetic, so a failure to apply it must never surface as a dashboard error.
+    getCurrentWebview()
+      .setZoom(preferences.settings.interfaceScale / 100)
+      .catch(() => {});
+  });
+  $effect(() => {
     if (screen === 'label' && !selectedLabel) screen = 'labels';
   });
   let cliInfo = $state<GhCliInfo | null>(null);
@@ -193,6 +206,17 @@
     await change((next) => {
       next.settings.dockBadge = mode;
     });
+  }
+  async function setInterfaceScale(scale: InterfaceScale) {
+    if (!isInterfaceScale(scale)) return;
+    await change((next) => {
+      next.settings.interfaceScale = scale;
+    });
+  }
+  // The shortcuts have no control on screen to show the result, so they confirm it in a toast.
+  async function zoomTo(scale: InterfaceScale, icon: typeof ZoomIn) {
+    await setInterfaceScale(scale);
+    showToast(icon, `Interface size ${scale}%`, 'interface-size');
   }
   async function setSnoozeOptions(options: SnoozeOption[]) {
     const validated = parseSnoozeOptions(options);
@@ -509,6 +533,11 @@
     else if (hotkey.action === 'open-labels') navigate('labels');
     else if (hotkey.action === 'open-settings') navigate('settings');
     else if (hotkey.action === 'refresh') manualRefresh();
+    else if (hotkey.action === 'zoom-in')
+      void zoomTo(stepInterfaceScale(preferences.settings.interfaceScale, 1), ZoomIn);
+    else if (hotkey.action === 'zoom-out')
+      void zoomTo(stepInterfaceScale(preferences.settings.interfaceScale, -1), ZoomOut);
+    else if (hotkey.action === 'zoom-reset') void zoomTo(100, ZoomIn);
     else if (hotkey.action === 'toggle-shortcuts') showHotkeys = !showHotkeys;
     else if (target) {
       if (hotkey.action === 'open-pr') open(target.pr.url);
@@ -761,6 +790,8 @@
         ondiscard={discardSettings}
         onrefreshinterval={setRefreshInterval}
         ondockbadge={setDockBadge}
+        interfaceScale={preferences.settings.interfaceScale}
+        oninterfacescale={setInterfaceScale}
         onsnoozeoptions={setSnoozeOptions}
         onopenignored={() => navigate('ignored')}
         oncopydebuginfo={() => void copyDebugInfo()}

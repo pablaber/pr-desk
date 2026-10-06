@@ -23,9 +23,11 @@ test.beforeEach(async ({ page }) => {
       opened: string[];
       refreshCount: number;
       badges: (number | null)[];
+      zooms: number[];
     };
     w.opened = [];
     w.badges = [];
+    w.zooms = [];
     w.refreshCount = 0;
     w.isTauri = true;
     const connection = (nodes: unknown[]) => ({
@@ -92,6 +94,10 @@ test.beforeEach(async ({ page }) => {
       invoke: async (command: string, args: Record<string, any>) => {
         if (command === 'plugin:window|set_badge_count') {
           w.badges.push(args.value ?? null);
+          return;
+        }
+        if (command === 'plugin:webview|set_webview_zoom') {
+          w.zooms.push(args.value);
           return;
         }
         if (command === 'plugin:store|load') return 1;
@@ -741,6 +747,29 @@ test('the dock badge follows the chosen mode and persists', async ({ page }) => 
     .toBe('off');
 });
 
+test('the interface size follows the chosen step and the zoom shortcuts', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const lastZoom = () => page.evaluate(() => (window as any).zooms.at(-1) ?? null);
+  const savedScale = () =>
+    page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!).settings.interfaceScale);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expandSettingsSection(page, 'Interface size');
+  await page.getByRole('radio', { name: 'Large (115%)', exact: true }).check();
+  await expect.poll(lastZoom).toBe(1.15);
+  await expect.poll(savedScale).toBe(115);
+  await page.keyboard.press('Meta+=');
+  await expect(page.getByText('Interface size 130%')).toBeVisible();
+  await expect.poll(lastZoom).toBe(1.3);
+  await expect.poll(savedScale).toBe(130);
+  await page.keyboard.press('Meta+0');
+  // Quick successive changes replace the toast instead of stacking.
+  await expect(page.getByText('Interface size 100%')).toBeVisible();
+  await expect(page.getByText('Interface size 130%')).toHaveCount(0);
+  await expect.poll(lastZoom).toBe(1);
+  await expect.poll(savedScale).toBe(100);
+});
+
 test('hotkeys switch screens and stay out of the way while typing', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.pr-card')).toHaveCount(4);
@@ -789,6 +818,9 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'Ignore the hovered PR',
     'Label the hovered PR',
     'Refresh pull requests',
+    'Increase interface size',
+    'Decrease interface size',
+    'Reset interface size',
     'Show keyboard shortcuts',
   ]);
   // Each key gets its own cap, joined by a plus, and the spelled-out combination is what
@@ -806,6 +838,9 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'I',
     'L',
     '⌘+R',
+    '⌘+=',
+    '⌘+-',
+    '⌘+0',
     '?',
   ]);
   await expect(dialog.locator('.hotkey-row .visually-hidden')).toHaveText([
@@ -820,6 +855,9 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'I',
     'L',
     'Command plus R',
+    'Command plus =',
+    'Command plus -',
+    'Command plus 0',
     'Question mark',
   ]);
   await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveAttribute(
@@ -1419,7 +1457,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
     .click();
   await saveSettings(page);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
-  expect(saved.schemaVersion).toBe(9);
+  expect(saved.schemaVersion).toBe(10);
   expect(saved.ignoreRules).toEqual([]);
   expect(saved.ignoredPullRequests).toHaveProperty('acme/platform#2');
   expect(saved.settings.snoozeOptions).toEqual([]);

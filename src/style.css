@@ -869,16 +869,9 @@ footer {
 .settings-note {
   font-size: 10px;
 }
+/* The sidebar keeps its full width here: the nav rows with their hotkey hints need it, and
+   zooming the interface lands the window in this range. */
 @media (max-width: 1000px) {
-  aside {
-    width: 160px;
-  }
-  main {
-    margin-left: 160px;
-  }
-  .settings-save-bar {
-    left: 160px;
-  }
   .board {
     gap: 10px;
     padding: 20px 15px;

@@ -28,9 +28,13 @@ export function dismissToast(id: number) {
   if (index >= 0) toasts.splice(index, 1);
 }
 
-export function showToast(icon: Toast['icon'], message: string) {
-  const existing = toasts.find((t) => t.message === message);
+// A toast with the same key (or, without one, the same message) is refreshed in place, so a
+// value changed in quick succession replaces the previous toast rather than stacking.
+export function showToast(icon: Toast['icon'], message: string, key?: string) {
+  const existing = toasts.find((t) => (key !== undefined ? t.key === key : t.message === message));
   if (existing) {
+    existing.icon = icon;
+    existing.message = message;
     const timer = timers.get(existing.id)!;
     if (timer.handle) clearTimeout(timer.handle);
     timer.remaining = DURATION_MS;
@@ -39,7 +43,7 @@ export function showToast(icon: Toast['icon'], message: string) {
     return;
   }
   const id = nextId++;
-  toasts.push({ id, icon, message });
+  toasts.push({ id, icon, message, key });
   while (toasts.length > MAX_TOASTS) dismissToast(toasts[0].id);
   const timer: Timer = { handle: null, remaining: DURATION_MS, startedAt: 0 };
   timers.set(id, timer);

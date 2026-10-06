@@ -20,6 +20,17 @@ describe('toasts', () => {
     expect(toasts).toHaveLength(0);
   });
 
+  it('replaces a toast with the same key and restarts its timer', () => {
+    showToast(icon, 'size 115%', 'size');
+    vi.advanceTimersByTime(3000);
+    showToast(icon, 'size 130%', 'size');
+    expect(toasts.map((t) => t.message)).toEqual(['size 130%']);
+    vi.advanceTimersByTime(3999);
+    expect(toasts).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(toasts).toHaveLength(0);
+  });
+
   it('refreshes a duplicate message instead of stacking', () => {
     showToast(icon, 'same');
     vi.advanceTimersByTime(3000);

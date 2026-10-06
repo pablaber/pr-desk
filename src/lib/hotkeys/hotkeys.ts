@@ -18,6 +18,32 @@ export const hotkeys: Hotkey[] = [
     description: 'Refresh pull requests',
   },
   {
+    // Shift is 'any' so ⌘⇧= still zooms in on layouts that keep = as the key value.
+    action: 'zoom-in',
+    section: 'other',
+    key: '=',
+    meta: true,
+    shift: 'any',
+    whileTyping: true,
+    description: 'Increase interface size',
+  },
+  {
+    action: 'zoom-out',
+    section: 'other',
+    key: '-',
+    meta: true,
+    whileTyping: true,
+    description: 'Decrease interface size',
+  },
+  {
+    action: 'zoom-reset',
+    section: 'other',
+    key: '0',
+    meta: true,
+    whileTyping: true,
+    description: 'Reset interface size',
+  },
+  {
     action: 'open-settings',
     section: 'navigation',
     key: ',',
