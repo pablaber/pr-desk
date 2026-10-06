@@ -18,6 +18,17 @@ describe('resolveHotkey', () => {
     expect(resolveHotkey(press('L', { shiftKey: true }), { tagName: 'INPUT' })).toBeNull();
   });
 
+  it('matches the zoom bindings, including while typing', () => {
+    const input = { tagName: 'INPUT' };
+    expect(resolveHotkey(press('=', { metaKey: true }), input)?.action).toBe('zoom-in');
+    expect(resolveHotkey(press('=', { metaKey: true, shiftKey: true }), input)?.action).toBe(
+      'zoom-in',
+    );
+    expect(resolveHotkey(press('-', { metaKey: true }), input)?.action).toBe('zoom-out');
+    expect(resolveHotkey(press('0', { metaKey: true }), input)?.action).toBe('zoom-reset');
+    expect(resolveHotkey(press('-'))).toBeNull();
+  });
+
   it('matches plain card keys and suppresses them while typing', () => {
     expect(resolveHotkey(press('o'))?.action).toBe('open-pr');
     expect(resolveHotkey(press('c'))?.action).toBe('copy-pr');

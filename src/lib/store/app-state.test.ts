@@ -10,6 +10,7 @@ import {
   migrateState,
   isRefreshInterval,
   isDockBadgeMode,
+  stepInterfaceScale,
   defaultSnoozeOptions,
   parseSnoozeOptions,
   snoozeOptionLabel,
@@ -112,7 +113,7 @@ it('defaults to five minutes and migrates reserved v1 settings without losing pr
     settings: { automaticRefreshMinutes: 0 },
   };
   expect(migrateState(legacy)).toMatchObject({
-    schemaVersion: 9,
+    schemaVersion: 10,
     watchedPullRequests: ['acme/api#1'],
     settings: { automaticRefreshMinutes: 5, snoozeOptions: defaultSnoozeOptions() },
   });
@@ -131,7 +132,7 @@ it('preserves Never and all valid intervals, and repairs invalid stored interval
         .automaticRefreshMinutes,
     ).toBe(5);
   }
-  expect(() => migrateState({ ...defaultState(), schemaVersion: 10 })).toThrow('Unsupported');
+  expect(() => migrateState({ ...defaultState(), schemaVersion: 11 })).toThrow('Unsupported');
 });
 
 it('migrates older preferences and validates ignored repositories', () => {
@@ -145,7 +146,7 @@ it('migrates older preferences and validates ignored repositories', () => {
         settings: { automaticRefreshMinutes: 0 },
       }),
     ).toMatchObject({
-      schemaVersion: 9,
+      schemaVersion: 10,
       ignoreRules: [],
       trackedRepositories: ['acme/api'],
       settings: { automaticRefreshMinutes: schemaVersion === 1 ? 5 : 0 },
@@ -209,7 +210,7 @@ it('migrates all supported versions without losing independently saved preferenc
       settings: { automaticRefreshMinutes: 12, snoozeOptions: [] },
     };
     const migrated = migrateState(legacy);
-    expect(migrated.schemaVersion).toBe(9);
+    expect(migrated.schemaVersion).toBe(10);
     expect(migrated.checkRules).toEqual([]);
     expect(migrated.ignoreRules).toEqual(
       schemaVersion >= 3 ? [{ kind: 'repository', value: 'acme/api' }] : [],
@@ -377,7 +378,7 @@ it('loads pre-v8 preferences without labels', () => {
       labels: [label('x', 'Ignored')],
       labeledPullRequests: { 'acme/api#1': ['x'] },
     });
-    expect(migrated).toMatchObject({ schemaVersion: 9, labels: [], labeledPullRequests: {} });
+    expect(migrated).toMatchObject({ schemaVersion: 10, labels: [], labeledPullRequests: {} });
   }
 });
 it('round-trips v8 labels and canonicalizes their assignments', () => {
@@ -442,4 +443,32 @@ it('validates label names, colors and uniqueness', () => {
   expect(labelNameTaken(labels, ' backend ')).toBe(true);
   expect(labelNameTaken(labels, 'backend', 'a')).toBe(false);
   expect(labelNameTaken(labels, 'Frontend')).toBe(false);
+});
+
+it('defaults the interface scale to 100, for new and pre-v10 preferences', () => {
+  expect(defaultState().settings.interfaceScale).toBe(100);
+  const { interfaceScale: _, ...settings } = defaultState().settings;
+  for (const schemaVersion of [9, 10])
+    expect(
+      migrateState({ ...defaultState(), schemaVersion, settings }).settings.interfaceScale,
+    ).toBe(100);
+});
+it('keeps each valid interface scale and rejects an invalid stored one', () => {
+  for (const interfaceScale of [90, 100, 115, 130])
+    expect(
+      migrateState({ ...defaultState(), settings: { ...defaultState().settings, interfaceScale } })
+        .settings.interfaceScale,
+    ).toBe(interfaceScale);
+  expect(() =>
+    migrateState({
+      ...defaultState(),
+      settings: { ...defaultState().settings, interfaceScale: 120 },
+    }),
+  ).toThrow('Invalid preferences file');
+});
+it('steps the interface scale and clamps at both ends', () => {
+  expect(stepInterfaceScale(100, 1)).toBe(115);
+  expect(stepInterfaceScale(100, -1)).toBe(90);
+  expect(stepInterfaceScale(90, -1)).toBe(90);
+  expect(stepInterfaceScale(130, 1)).toBe(130);
 });

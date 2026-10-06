@@ -34,8 +34,9 @@ export interface PRLabel {
   color: LabelColor;
 }
 export type DockBadgeMode = 'off' | 'ready-to-merge' | 'needs-attention' | 'both';
+export type InterfaceScale = 90 | 100 | 115 | 130;
 export interface AppState {
-  schemaVersion: 9;
+  schemaVersion: 10;
   trackedRepositories: string[];
   ignoreRules: IgnoreRule[];
   checkRules: CheckRule[];
@@ -48,6 +49,7 @@ export interface AppState {
     automaticRefreshMinutes: number;
     snoozeOptions: SnoozeOption[];
     dockBadge: DockBadgeMode;
+    interfaceScale: InterfaceScale;
   };
 }
 export const MAX_SNOOZE_OPTIONS = 5;
@@ -58,7 +60,7 @@ export const defaultSnoozeOptions = (): SnoozeOption[] => [
   { kind: 'duration', amount: 1, unit: 'weeks' },
 ];
 export const defaultState = (): AppState => ({
-  schemaVersion: 9,
+  schemaVersion: 10,
   trackedRepositories: [],
   ignoreRules: [],
   checkRules: [],
@@ -71,6 +73,7 @@ export const defaultState = (): AppState => ({
     automaticRefreshMinutes: 5,
     snoozeOptions: defaultSnoozeOptions(),
     dockBadge: 'both',
+    interfaceScale: 100,
   },
 });
 export async function loadState(): Promise<AppState> {
@@ -88,7 +91,7 @@ export function migrateState(value: unknown): AppState {
     labels?: unknown;
     labeledPullRequests?: unknown;
   };
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(stored.schemaVersion))
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10].includes(stored.schemaVersion))
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
@@ -114,7 +117,7 @@ export function migrateState(value: unknown): AppState {
     watchedPullRequests: stored.watchedPullRequests,
     ignoredPullRequests: stored.ignoredPullRequests,
     snoozedPullRequests: stored.snoozedPullRequests,
-    schemaVersion: 9,
+    schemaVersion: 10,
     ignoreRules: readStoredIgnoreRules(stored),
     checkRules: readStoredCheckRules(stored),
     ...readStoredLabels(stored),
@@ -126,6 +129,7 @@ export function migrateState(value: unknown): AppState {
           ? readStoredSnoozeOptions(stored.settings?.snoozeOptions)
           : defaultSnoozeOptions(),
       dockBadge: readStoredDockBadge(stored),
+      interfaceScale: readStoredInterfaceScale(stored),
     },
   };
 }
@@ -141,6 +145,25 @@ function readStoredDockBadge(stored: { schemaVersion: number; settings?: unknown
   if (!isDockBadgeMode(mode))
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
   return mode;
+}
+const INTERFACE_SCALES: InterfaceScale[] = [90, 100, 115, 130];
+export function isInterfaceScale(value: unknown): value is InterfaceScale {
+  return INTERFACE_SCALES.includes(value as InterfaceScale);
+}
+export function stepInterfaceScale(current: InterfaceScale, direction: 1 | -1): InterfaceScale {
+  const index = INTERFACE_SCALES.indexOf(current) + direction;
+  return INTERFACE_SCALES[Math.min(INTERFACE_SCALES.length - 1, Math.max(0, index))];
+}
+function readStoredInterfaceScale(stored: {
+  schemaVersion: number;
+  settings?: unknown;
+}): InterfaceScale {
+  if (stored.schemaVersion < 10) return 100;
+  const scale = (stored.settings as { interfaceScale?: unknown } | undefined)?.interfaceScale;
+  if (scale === undefined) return 100;
+  if (!isInterfaceScale(scale))
+    throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
+  return scale;
 }
 // A saved file that no longer validates must never be silently rewritten with defaults. An
 // absent list is different from an empty one: only the empty list means "the user removed them".

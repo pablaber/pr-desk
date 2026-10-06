@@ -4,12 +4,14 @@
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import { githubErrorMessage } from '../lib/github/errors';
   import DockBadge from './DockBadge.svelte';
+  import InterfaceScaleControl from './InterfaceScale.svelte';
   import RefreshInterval from './RefreshInterval.svelte';
   import SnoozeOptions from './SnoozeOptions.svelte';
   import type {
     AppState,
     CheckRule,
     DockBadgeMode,
+    InterfaceScale,
     SnoozeOption,
     IgnoreRuleKind,
   } from '../lib/store/app-state';
@@ -29,6 +31,8 @@
     ondiscard,
     onrefreshinterval,
     ondockbadge,
+    interfaceScale,
+    oninterfacescale,
     onsnoozeoptions,
     onopenignored,
     oncopydebuginfo,
@@ -47,6 +51,8 @@
     ondiscard: () => void;
     onrefreshinterval: (minutes: number) => Promise<void>;
     ondockbadge: (mode: DockBadgeMode) => Promise<void>;
+    interfaceScale: InterfaceScale;
+    oninterfacescale: (scale: InterfaceScale) => Promise<void>;
     onsnoozeoptions: (options: SnoozeOption[]) => Promise<void>;
     onopenignored: () => void;
     oncopydebuginfo: () => void;
@@ -66,6 +72,7 @@
   let open = $state({
     refresh: false,
     badge: false,
+    scale: false,
     snooze: false,
     tracked: false,
     ignoredRules: false,
@@ -166,6 +173,24 @@
       <div class="settings-section-body" id="settings-section-badge">
         <p>Show a count on the PR Desk Dock icon.</p>
         <DockBadge mode={preferences.settings.dockBadge} {busy} onsave={ondockbadge} />
+      </div>
+    {/if}
+  </section>
+  <section class="settings-section">
+    <h2>
+      <button
+        type="button"
+        class="settings-section-toggle"
+        aria-expanded={open.scale}
+        aria-controls="settings-section-scale"
+        onclick={() => (open.scale = !open.scale)}
+        ><ChevronRight class="chevron" size={13} /> Interface size</button
+      >
+    </h2>
+    {#if open.scale}
+      <div class="settings-section-body" id="settings-section-scale">
+        <p>Scale the whole interface up or down.</p>
+        <InterfaceScaleControl scale={interfaceScale} {busy} onsave={oninterfacescale} />
       </div>
     {/if}
   </section>

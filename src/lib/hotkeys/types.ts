@@ -10,7 +10,10 @@ export type HotkeyAction =
   | 'snooze-pr'
   | 'ignore-pr'
   | 'label-pr'
-  | 'refresh';
+  | 'refresh'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'zoom-reset';
 
 // A modifier must be absent unless the binding asks for it; 'any' means the binding does
 // not care, which is what layout-dependent keys like ? need.

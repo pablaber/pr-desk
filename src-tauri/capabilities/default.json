@@ -4,6 +4,7 @@
   "permissions": [
     "core:default",
     "core:window:allow-set-badge-count",
+    "core:webview:allow-set-webview-zoom",
     "store:default",
     { "identifier": "opener:allow-open-url", "allow": [{ "url": "https://github.com/*" }] }
   ]
