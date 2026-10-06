@@ -27,7 +27,6 @@
   import type { PullRequest } from './lib/pr/types';
   import PRCard from './components/PRCard.svelte';
   import AllClear from './components/AllClear.svelte';
-  import Ignored from './components/Ignored.svelte';
   import Snoozed from './components/Snoozed.svelte';
   import Completed from './components/Completed.svelte';
   import Labels from './components/Labels.svelte';
@@ -83,18 +82,19 @@
     staleIds: [],
     discoveryComplete: false,
   });
-  type Screen = 'dashboard' | 'snoozed' | 'completed' | 'labels' | 'label' | 'settings' | 'ignored';
+  type Screen = 'dashboard' | 'snoozed' | 'completed' | 'labels' | 'label';
   let login = $state(''),
     avatarUrl = $state(''),
     screen = $state<Screen>('dashboard');
-  // Settings edits live here until Save, so leaving and returning through the Ignored sub-screen
-  // keeps them, and a refresh never fires for a half-finished list of repositories.
   let selectedLabelId = $state<string | null>(null);
   let selectedLabel = $derived(preferences.labels.find((l) => l.id === selectedLabelId) ?? null);
+  // Settings is an overlay above the current screen. Its edits live here until Save, so a refresh
+  // never fires for a half-finished list of repositories.
+  let settingsOpen = $state(false);
+  let confirmClose = $state(false);
   let settingsDraft = $state<PreferenceDraft | null>(null);
   let settingsDirty = $derived(settingsDraft !== null && draftDiffers(settingsDraft, preferences));
   let settingsView = $derived(settingsDraft ? { ...preferences, ...settingsDraft } : preferences);
-  let pendingScreen = $state<Screen | null>(null);
   let actionPR = $state<PullRequest | null>(null);
   let actionError = $state('');
   let pendingAction = $state<'close-stale' | 'merge'>('close-stale');
@@ -167,7 +167,7 @@
   let cliInfo = $state<GhCliInfo | null>(null);
   let cliInfoError = $state(false);
   $effect(() => {
-    if (screen !== 'settings' || !initialized) return;
+    if (!settingsOpen || !initialized) return;
     let active = true;
     cliInfo = null;
     cliInfoError = false;
@@ -423,23 +423,18 @@
     settingsDraft = null;
     error = '';
   }
-  // The Ignored screen is part of Settings, so a draft survives a trip through it; anything else
-  // leaves Settings behind and has to ask first.
-  function navigate(to: Screen) {
-    if (settingsDirty && to !== 'settings' && to !== 'ignored') pendingScreen = to;
-    else screen = to;
+  // Closing Settings with unsaved edits has to ask first.
+  function closeSettings() {
+    if (settingsDirty) confirmClose = true;
+    else settingsOpen = false;
   }
-  async function saveAndLeave() {
-    const to = pendingScreen;
+  async function saveAndClose() {
     if (!(await saveSettings())) return;
-    pendingScreen = null;
-    if (to) screen = to;
+    confirmClose = settingsOpen = false;
   }
-  function discardAndLeave() {
-    const to = pendingScreen;
+  function discardAndClose() {
     discardSettings();
-    pendingScreen = null;
-    if (to) screen = to;
+    confirmClose = settingsOpen = false;
   }
   async function action(id: string, action: string, until?: string) {
     if (action === 'close-stale' || action === 'merge') {
@@ -510,7 +505,7 @@
     await refresh();
   }
   function handleHotkey(event: KeyboardEvent) {
-    if (actionPR || pendingScreen) return;
+    if (actionPR || confirmClose) return;
     const hotkey = resolveHotkey(event, event.target as HTMLElement | null);
     if (!hotkey) return;
     // Enter must keep activating a focused button or link rather than open the hovered PR.
@@ -527,11 +522,14 @@
     // While the shortcut list is up, the only shortcut that still acts is the one that
     // dismisses it; navigating behind an open dialog would leave the user lost.
     if (showHotkeys && hotkey.action !== 'toggle-shortcuts') return;
-    if (hotkey.action === 'open-dashboard') navigate('dashboard');
-    else if (hotkey.action === 'open-snoozed') navigate('snoozed');
-    else if (hotkey.action === 'open-completed') navigate('completed');
-    else if (hotkey.action === 'open-labels') navigate('labels');
-    else if (hotkey.action === 'open-settings') navigate('settings');
+    // Settings covers the window, so only shortcuts that make sense above it stay active.
+    if (settingsOpen && !hotkey.action.startsWith('zoom-') && hotkey.action !== 'toggle-shortcuts')
+      return;
+    if (hotkey.action === 'open-dashboard') screen = 'dashboard';
+    else if (hotkey.action === 'open-snoozed') screen = 'snoozed';
+    else if (hotkey.action === 'open-completed') screen = 'completed';
+    else if (hotkey.action === 'open-labels') screen = 'labels';
+    else if (hotkey.action === 'open-settings') settingsOpen = true;
     else if (hotkey.action === 'refresh') manualRefresh();
     else if (hotkey.action === 'zoom-in')
       void zoomTo(stepInterfaceScale(preferences.settings.interfaceScale, 1), ZoomIn);
@@ -616,7 +614,7 @@
     <nav aria-label="Main navigation">
       <button
         class:active={screen === 'dashboard'}
-        onclick={() => navigate('dashboard')}
+        onclick={() => (screen = 'dashboard')}
         aria-keyshortcuts={dashboardHotkey ? ariaKeyShortcut(dashboardHotkey) : null}
         ><LayoutGrid size={15} /> Dashboard
         {#if dashboardHotkey}<span class="nav-hotkey" aria-hidden="true"
@@ -625,7 +623,7 @@
       >
       <button
         class:active={screen === 'snoozed'}
-        onclick={() => navigate('snoozed')}
+        onclick={() => (screen = 'snoozed')}
         aria-keyshortcuts={snoozedHotkey ? ariaKeyShortcut(snoozedHotkey) : null}
       >
         <Clock size={15} /> Snoozed
@@ -635,7 +633,7 @@
       </button>
       <button
         class:active={screen === 'completed'}
-        onclick={() => navigate('completed')}
+        onclick={() => (screen = 'completed')}
         aria-keyshortcuts={completedHotkey ? ariaKeyShortcut(completedHotkey) : null}
       >
         <GitMerge size={15} /> Completed
@@ -645,7 +643,7 @@
       </button>
       <button
         class:active={screen === 'labels' || screen === 'label'}
-        onclick={() => navigate('labels')}
+        onclick={() => (screen = 'labels')}
         aria-keyshortcuts={labelsHotkey ? ariaKeyShortcut(labelsHotkey) : null}
       >
         <Tag size={15} /> Labels
@@ -657,8 +655,7 @@
     <div class="sidebar-utilities">
       <nav aria-label="Preferences">
         <button
-          class:active={screen === 'settings'}
-          onclick={() => navigate('settings')}
+          onclick={() => (settingsOpen = true)}
           aria-keyshortcuts={settingsHotkey ? ariaKeyShortcut(settingsHotkey) : null}
           ><SettingsIcon size={15} /> Settings{#if settingsHotkey}<span
               class="nav-hotkey"
@@ -694,11 +691,7 @@
               ? 'Completed'
               : screen === 'labels'
                 ? 'Labels'
-                : screen === 'label'
-                  ? `Labels / ${selectedLabel?.name ?? ''}`
-                  : screen === 'ignored'
-                    ? 'Settings / Ignored pull requests'
-                    : 'Settings'}</span
+                : `Labels / ${selectedLabel?.name ?? ''}`}</span
       >
       <div>
         {#if refreshed}<span class="refresh-time">Updated {refreshed}</span>{/if}<button
@@ -714,7 +707,7 @@
         >
       </div>
     </div>
-    {#if error}<div class="alert" role="alert">
+    {#if error && !settingsOpen}<div class="alert" role="alert">
         {error}<button onclick={() => (error = '')} aria-label="Dismiss error"
           ><X size={14} /></button
         >
@@ -747,7 +740,7 @@
         busy={saving || loading}
         onselect={(id) => {
           selectedLabelId = id;
-          navigate('label');
+          screen = 'label';
         }}
         onlabel={label}
       />
@@ -761,40 +754,7 @@
         busy={saving || loading}
         onopen={open}
         onlabel={label}
-        onback={() => navigate('labels')}
-      />
-    {:else if screen === 'ignored'}
-      <Ignored
-        {preferences}
-        {snapshot}
-        {login}
-        {now}
-        busy={saving || loading}
-        onopen={open}
-        onunignore={(id) => restore('ignored', id)}
-        onback={() => navigate('settings')}
-      />
-    {:else if screen === 'settings'}
-      <Settings
-        {login}
-        {cliInfo}
-        {cliInfoError}
-        preferences={settingsView}
-        busy={saving}
-        dirty={settingsDirty}
-        onadd={add}
-        onremove={remove}
-        onaddcheckrule={addCheckRule}
-        onremovecheckrule={removeCheckRule}
-        onsave={saveSettings}
-        ondiscard={discardSettings}
-        onrefreshinterval={setRefreshInterval}
-        ondockbadge={setDockBadge}
-        interfaceScale={preferences.settings.interfaceScale}
-        oninterfacescale={setInterfaceScale}
-        onsnoozeoptions={setSnoozeOptions}
-        onopenignored={() => navigate('ignored')}
-        oncopydebuginfo={() => void copyDebugInfo()}
+        onback={() => (screen = 'labels')}
       />
     {:else}
       <div class="dashboard-heading">
@@ -899,13 +859,45 @@
   </main>
 </div>
 <Toaster />
+{#if initialized}
+  <Settings
+    open={settingsOpen}
+    {login}
+    {cliInfo}
+    {cliInfoError}
+    preferences={settingsView}
+    saved={preferences}
+    {snapshot}
+    {now}
+    busy={saving}
+    listBusy={saving || loading}
+    dirty={settingsDirty}
+    {error}
+    ondismisserror={() => (error = '')}
+    onclose={closeSettings}
+    onadd={add}
+    onremove={remove}
+    onaddcheckrule={addCheckRule}
+    onremovecheckrule={removeCheckRule}
+    onsave={saveSettings}
+    ondiscard={discardSettings}
+    onrefreshinterval={setRefreshInterval}
+    ondockbadge={setDockBadge}
+    interfaceScale={preferences.settings.interfaceScale}
+    oninterfacescale={setInterfaceScale}
+    onsnoozeoptions={setSnoozeOptions}
+    onopen={open}
+    onunignore={(id) => restore('ignored', id)}
+    oncopydebuginfo={() => void copyDebugInfo()}
+  />
+{/if}
 <UnsavedChanges
-  open={pendingScreen !== null}
+  open={confirmClose}
   busy={saving}
-  onsave={() => void saveAndLeave()}
-  ondiscard={discardAndLeave}
+  onsave={() => void saveAndClose()}
+  ondiscard={discardAndClose}
   oncancel={() => {
-    if (!saving) pendingScreen = null;
+    if (!saving) confirmClose = false;
   }}
 />
 <HotkeyHelp open={showHotkeys} onclose={() => (showHotkeys = false)} />
