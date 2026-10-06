@@ -1,5 +1,4 @@
 <script lang="ts">
-  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import type { AppState } from '../lib/store/app-state';
   import type { DashboardSnapshot } from '../lib/github/refresh';
@@ -13,7 +12,6 @@
     busy,
     onopen,
     onunignore,
-    onback,
   }: {
     preferences: AppState;
     snapshot: DashboardSnapshot;
@@ -22,23 +20,14 @@
     busy: boolean;
     onopen: (url: string) => void;
     onunignore: (id: string) => void;
-    onback: () => void;
   } = $props();
   let rows = $derived(ignoredPullRequests(preferences, snapshot.prs, login));
 </script>
 
-<div class="dashboard-heading">
-  <div>
-    <div class="eyebrow">HIDDEN ONE AT A TIME</div>
-    <h1>Ignored pull requests</h1>
-    <p>Unignore a pull request to make it eligible for the dashboard again.</p>
-  </div>
-  <button class="quiet" onclick={onback}><ChevronLeft size={13} /> Back to settings</button>
-</div>
 <div class="ignored-list" aria-busy={busy}>
   <div class="ignored-summary">
     <span>{rows.length} ignored pull request{rows.length === 1 ? '' : 's'}</span><span
-      >Broad rules stay in Settings</span
+      >Broad rules live under Ignore rules</span
     >
   </div>
   {#each rows as row (row.id)}

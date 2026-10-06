@@ -58,8 +58,8 @@ PR Desk has no in-app updater.
 - Acts on the hovered card from the keyboard: O opens the PR on GitHub, S snoozes, L labels
   and I ignores it.
 - Filters by source and supports snoozing or individually ignoring PRs. Individually ignored
-  PRs live on their own screen, reached from Settings → Ignored, where each can be unignored.
-  Settings → Ignored also hides PRs by repository, exact author login (including bots), or title. Repository and
+  PRs are listed under Settings → Ignored pull requests, where each can be unignored.
+  Settings → Ignore rules hides PRs by repository, exact author login (including bots), or title. Repository and
   title rules use case-insensitive whole-value globs: `*` matches zero or more characters and
   `?` matches one. For example, `acme/*`, `*/docs`, or title `chore:*`; use `*dependenc*`
   to match text anywhere in a title. Any matching rule hides a PR from every dashboard source.
@@ -75,8 +75,9 @@ PR Desk has no in-app updater.
   Failures still need attention, and these PRs have no in-app Merge.
 - Batches Settings edits: tracked repositories, ignore rules, check rules and watched pull requests are
   collected as a draft — each new repository or PR is checked against GitHub as you add it —
-  and only Save writes them and refreshes the dashboard, in the background. Leaving Settings
+  and only Save writes them and refreshes the dashboard, in the background. Closing Settings
   with unsaved changes asks whether to save, discard, or keep editing.
+- Opens Settings (⌘,) as a full-window overlay with a sidebar of sections; Esc closes it.
 - Offers configurable automatic refresh while keeping failed refresh results visible
   and clearly marked as stale.
 - Shows a Dock icon badge counting Ready to merge, Needs attention, or both (the default);

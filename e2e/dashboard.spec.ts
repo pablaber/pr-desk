@@ -1,9 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Collapsed by default: expand a Settings accordion section by its heading text before
-// interacting with controls inside it.
-async function expandSettingsSection(page: Page, heading: string) {
-  await page.getByRole('button', { name: new RegExp(`^${heading}( · [0-9]+)?$`) }).click();
+// Settings is a modal overlay: pick a section from its sidebar to reach that section's controls.
+async function openSettingsSection(page: Page, name: string) {
+  await page
+    .getByRole('navigation', { name: 'Settings sections' })
+    .getByRole('button', { name, exact: true })
+    .click();
+}
+
+async function closeSettings(page: Page) {
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Settings' })).toBeHidden();
 }
 
 // Tracked repositories, ignore rules and watched PRs are drafts until the Save bar is used; no
@@ -280,18 +287,17 @@ test('snooze, ignore, restore, watch, tracked repositories and persistence', asy
   await page.getByRole('button', { name: 'Snoozed', exact: true }).click();
   await page.getByRole('button', { name: 'Restore now', exact: true }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Ignored');
-  await page.getByRole('button', { name: 'Ignored pull requests · 1' }).click();
+  await openSettingsSection(page, 'Ignored pull requests');
+  await expect(page.getByRole('heading', { name: 'Ignored pull requests · 1' })).toBeVisible();
   await page.getByRole('button', { name: /^Unignore / }).click();
-  await page.getByRole('button', { name: 'Back to settings' }).click();
-  await expandSettingsSection(page, 'Tracked repositories');
+  await openSettingsSection(page, 'Tracked repositories');
   await page.getByRole('textbox', { name: 'Repository', exact: true }).fill('bad-repository');
   await page.getByRole('button', { name: 'Add repository' }).click();
   await expect(page.getByRole('alert')).toContainText('Use owner/repository');
   await page.getByRole('textbox', { name: 'Repository', exact: true }).fill('acme/platform');
   await page.getByRole('button', { name: 'Add repository' }).click();
   await expect(page.locator('.setting-row').filter({ hasText: 'acme/platform' })).toHaveCount(1);
-  await expandSettingsSection(page, 'Watched pull requests');
+  await openSettingsSection(page, 'Watched pull requests');
   await page
     .getByRole('textbox', { name: 'Pull request URL' })
     .fill('https://github.com/acme/platform/pull/5');
@@ -426,7 +432,7 @@ test('configured snooze options drive the card menu, capped at five with Custom 
 }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Snooze options');
+  await openSettingsSection(page, 'Snooze options');
   const limit = page.getByText('Five snooze options is the maximum');
   const add = page.getByRole('button', { name: 'Add snooze option', exact: true });
   await expect(limit).toBeHidden();
@@ -492,7 +498,7 @@ test('configured snooze options drive the card menu, capped at five with Custom 
 test('removing every snooze option leaves Custom date alone in the menu', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Snooze options');
+  await openSettingsSection(page, 'Snooze options');
   for (let remaining = 4; remaining > 0; remaining--)
     await page
       .getByRole('button', { name: /^Remove snooze option/ })
@@ -524,7 +530,7 @@ test('auto refresh defaults to five minutes, reschedules, and persists Never', a
   await expect.poll(count).toBe(2);
   await expect(refresh).toBeEnabled();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Automatic refresh');
+  await openSettingsSection(page, 'Automatic refresh');
   const interval = page.getByRole('spinbutton', { name: 'Refresh interval in minutes' });
   await expect(interval).toHaveValue('5');
   await interval.fill('1');
@@ -534,9 +540,11 @@ test('auto refresh defaults to five minutes, reschedules, and persists Never', a
   await expect.poll(count).toBe(3);
   await expect(refresh).toBeEnabled();
   await page.clock.runFor(30_000);
+  await closeSettings(page);
   await refresh.click();
   await expect.poll(count).toBe(4);
   await expect(refresh).toBeEnabled();
+  await page.keyboard.press('Meta+,');
   await page.clock.runFor(30_000);
   expect(await count()).toBe(4);
   await page.clock.runFor(30_000);
@@ -557,11 +565,12 @@ test('auto refresh defaults to five minutes, reschedules, and persists Never', a
   await page.reload();
   await expect(refresh).toBeEnabled();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Automatic refresh');
+  await openSettingsSection(page, 'Automatic refresh');
   await expect(page.getByLabel('Never', { exact: true })).toBeChecked();
   await expect(interval).toBeDisabled();
   await page.clock.fastForward(2 * 60 * 60_000);
   expect(await count()).toBe(1);
+  await closeSettings(page);
   await refresh.click();
   await expect.poll(count).toBe(2);
 });
@@ -599,7 +608,7 @@ test('refresh slider and numeric input stay synchronized and validate exact valu
 }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Automatic refresh');
+  await openSettingsSection(page, 'Automatic refresh');
   const slider = page.getByRole('slider', { name: 'Refresh interval', exact: true });
   const number = page.getByRole('spinbutton', { name: 'Refresh interval in minutes' });
   await expect(number).toHaveValue('5');
@@ -626,7 +635,7 @@ test('refresh slider and numeric input stay synchronized and validate exact valu
   await expect(number).toHaveValue('37');
   await page.reload();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Automatic refresh');
+  await openSettingsSection(page, 'Automatic refresh');
   await expect(number).toHaveValue('37');
   await page.screenshot({ path: '.context/refresh-settings.png', fullPage: true });
 });
@@ -637,90 +646,103 @@ test('ignored repositories validate, persist, override tracking, and can be remo
   await page.goto('/');
   await expect(page.locator('.pr-card')).toHaveCount(4);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Tracked repositories');
+  await openSettingsSection(page, 'Tracked repositories');
   await page.getByRole('textbox', { name: 'Repository', exact: true }).fill('acme/platform');
   await page.getByRole('button', { name: 'Add repository' }).click();
-  await expandSettingsSection(page, 'Watched pull requests');
+  await openSettingsSection(page, 'Watched pull requests');
   await page.getByRole('textbox', { name: 'Pull request URL' }).fill('acme/platform#5');
   await page.getByRole('button', { name: 'Watch PR', exact: true }).click();
-  await expandSettingsSection(page, 'Ignored');
+  await openSettingsSection(page, 'Ignore rules');
   const input = page.getByRole('textbox', { name: 'Ignore rule', exact: true });
   await input.fill('invalid');
   await page.getByRole('button', { name: 'Add ignore rule', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Use owner/repository');
   await input.fill(' Acme/Platform ');
   await page.getByRole('button', { name: 'Add ignore rule', exact: true }).click();
-  const section = page
-    .locator('.settings-section')
-    .filter({ has: page.getByRole('heading', { name: /^Ignored( · [0-9]+)?$/ }) });
+  const section = page.locator('#settings-section-ignored-rules');
   await expect(section.locator('.setting-row')).toHaveText('Repository: acme/platformRemove');
   await input.fill('acme/platform');
   await page.getByRole('button', { name: 'Add ignore rule', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('already configured');
   await expect(section.locator('.setting-row')).toHaveCount(1);
-  await expect(page.getByRole('heading', { name: 'Ignored · 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ignore rules · 1', exact: true })).toBeVisible();
   await page.screenshot({ path: '.context/ignored-repositories.png', fullPage: true });
   await saveSettings(page);
   await page.reload();
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
   await expect(page.locator('.pr-card')).toHaveCount(0);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Ignored');
+  await openSettingsSection(page, 'Ignore rules');
   await section.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(section.locator('.setting-row')).toHaveCount(0);
   await saveSettings(page);
-  await page.getByRole('button', { name: /Dashboard/ }).click();
+  await closeSettings(page);
   await expect(page.locator('.pr-card')).toHaveCount(6);
 });
 
-test('settings sections default to accordion states, expand/collapse by mouse and keyboard, and show item counts', async ({
+test('settings opens as an overlay with a section sidebar and confirms unsaved edits on close', async ({
   page,
 }) => {
   await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  const section = (name: RegExp | string) =>
-    page.locator('.settings-section').filter({
-      has: page.getByRole('heading', {
-        name: typeof name === 'string' ? new RegExp(`^${name}( · [0-9]+)?$`) : name,
-      }),
-    });
-  // All editable settings start collapsed beneath the connection metadata.
-  await expect(page.getByRole('spinbutton', { name: 'Refresh interval in minutes' })).toBeHidden();
-  for (const heading of [
-    'Automatic refresh',
-    'Dock badge',
-    'Snooze options · 4',
-    'Tracked repositories',
-    'Ignored',
-    'Watched pull requests',
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await expect(dialog).toBeVisible();
+  // The first section is the GitHub connection.
+  await expect(dialog.getByRole('heading', { name: 'GitHub', exact: true })).toBeVisible();
+  await expect(dialog.getByText('Dashboard account')).toBeVisible();
+  // Every former accordion section is a sidebar item with its own icon.
+  const sidebar = page.getByRole('navigation', { name: 'Settings sections' });
+  for (const [name, icon] of [
+    ['GitHub', 'plug'],
+    ['Automatic refresh', 'refresh-cw'],
+    ['Dock badge', 'bell-dot'],
+    ['Interface size', 'zoom-in'],
+    ['Snooze options', 'alarm-clock'],
+    ['Tracked repositories', 'folder-git-2'],
+    ['Watched pull requests', 'eye'],
+    ['Ignore rules', 'funnel-x'],
+    ['Ignored pull requests', 'eye-off'],
+    ['Non-blocking checks', 'list-checks'],
+    ['Troubleshooting', 'bug'],
   ]) {
-    await expect(section(heading).getByRole('button')).toHaveAttribute('aria-expanded', 'false');
+    const item = sidebar.getByRole('button', { name, exact: true });
+    await expect(item.locator(`svg.lucide-${icon}`)).toHaveAttribute('aria-hidden', 'true');
   }
-  // Each heading button is a keyboard-operable, accessible disclosure control.
-  const trackedSummary = page.getByRole('button', { name: 'Tracked repositories' });
-  await trackedSummary.focus();
-  await expect(trackedSummary).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(trackedSummary).toHaveAttribute('aria-expanded', 'true');
+  await expect(sidebar.getByRole('button', { name: 'GitHub', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  // Selecting an item shows only that section, with its count in the heading.
+  await openSettingsSection(page, 'Snooze options');
+  await expect(dialog.getByRole('heading', { name: 'Snooze options · 4' })).toBeVisible();
+  await expect(dialog.getByText('Dashboard account')).toBeHidden();
+  // Escape closes it when nothing is unsaved, and the last section is remembered.
+  await closeSettings(page);
+  await page.keyboard.press('Meta+,');
+  await expect(dialog.getByRole('heading', { name: 'Snooze options · 4' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  // With a draft, closing asks first; keeping editing leaves the overlay and draft in place.
+  await page.keyboard.press('Meta+,');
+  await openSettingsSection(page, 'Tracked repositories');
   await page.getByRole('textbox', { name: 'Repository', exact: true }).fill('acme/platform');
   await page.getByRole('button', { name: 'Add repository' }).click();
+  await expect(dialog.getByRole('heading', { name: 'Tracked repositories · 1' })).toBeVisible();
+  await page.screenshot({ path: '.context/settings-overlay.png' });
+  await page.keyboard.press('Escape');
+  const confirm = page.getByRole('dialog', { name: 'Save your settings?' });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(confirm).toBeHidden();
+  await expect(dialog.getByRole('heading', { name: 'Tracked repositories · 1' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Back', exact: true }).click();
+  await confirm.getByRole('button', { name: 'Discard changes' }).click();
+  await expect(dialog).toBeHidden();
+  await page.keyboard.press('Meta+,');
   await expect(
-    section('Tracked repositories').locator('.setting-row').filter({ hasText: 'acme/platform' }),
-  ).toHaveCount(1);
-  await expect(page.getByRole('heading', { name: 'Tracked repositories · 1' })).toBeVisible();
-  // Collapsing again with the keyboard hides the section body but keeps the heading (and its
-  // count) visible.
-  await trackedSummary.focus();
-  await page.keyboard.press('Space');
-  await expect(trackedSummary).toHaveAttribute('aria-expanded', 'false');
-  await expect(page.getByRole('heading', { name: 'Tracked repositories · 1' })).toBeVisible();
-  // Mouse expand/collapse works the same way on a different section.
-  const ignoredSummary = page.getByRole('button', { name: 'Ignored', exact: true });
-  await ignoredSummary.click();
-  await expect(ignoredSummary).toHaveAttribute('aria-expanded', 'true');
-  await ignoredSummary.click();
-  await expect(ignoredSummary).toHaveAttribute('aria-expanded', 'false');
-  await page.screenshot({ path: '.context/settings-accordion.png', fullPage: true });
+    dialog.getByRole('heading', { name: 'Tracked repositories', exact: true }),
+  ).toBeVisible();
 });
 
 test('the dock badge follows the chosen mode and persists', async ({ page }) => {
@@ -730,7 +752,7 @@ test('the dock badge follows the chosen mode and persists', async ({ page }) => 
   const lastBadge = () => page.evaluate(() => (window as any).badges.at(-1) ?? null);
   await expect.poll(lastBadge).toBe(3);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Dock badge');
+  await openSettingsSection(page, 'Dock badge');
   const expected = {
     'Ready to merge': 1,
     'Needs attention': 2,
@@ -754,7 +776,7 @@ test('the interface size follows the chosen step and the zoom shortcuts', async 
   const savedScale = () =>
     page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!).settings.interfaceScale);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Interface size');
+  await openSettingsSection(page, 'Interface size');
   await page.getByRole('radio', { name: 'Large (115%)', exact: true }).check();
   await expect.poll(lastZoom).toBe(1.15);
   await expect.poll(savedScale).toBe(115);
@@ -774,13 +796,17 @@ test('hotkeys switch screens and stay out of the way while typing', async ({ pag
   await page.goto('/');
   await expect(page.locator('.pr-card')).toHaveCount(4);
   await expect(page.getByRole('button', { name: 'Settings', exact: true })).toBeVisible();
+  await page.keyboard.press('Shift+S');
+  await expect(page.getByRole('heading', { name: 'Snoozed', exact: true })).toBeVisible();
   await page.keyboard.press('Meta+,');
-  await expect(page.getByRole('heading', { name: 'Tracked repositories' })).toBeVisible();
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await expect(dialog).toBeVisible();
+  // Screen hotkeys stay inert while Settings covers the window.
   await page.keyboard.press('Shift+D');
-  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect(dialog).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Snoozed', exact: true })).toBeAttached();
   // A plain-key hotkey must not steal keystrokes from a field.
-  await page.keyboard.press('Meta+,');
-  await expandSettingsSection(page, 'Tracked repositories');
+  await openSettingsSection(page, 'Tracked repositories');
   const input = page.getByRole('textbox', { name: 'Repository', exact: true });
   await input.fill('');
   await input.press('d');
@@ -788,14 +814,15 @@ test('hotkeys switch screens and stay out of the way while typing', async ({ pag
   await input.press('Shift+S');
   await input.press('Shift+D');
   await expect(input).toHaveValue('dSD');
-  await expect(page.getByRole('heading', { name: 'Tracked repositories' })).toBeVisible();
-  // ⌘, still works from inside a field.
-  await page.getByRole('button', { name: /Dashboard/ }).click();
+  await input.fill('');
+  await closeSettings(page);
+  await page.keyboard.press('Shift+D');
   await expect(page.locator('.pr-card')).toHaveCount(4);
+  // ⌘, works from inside a field too.
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Tracked repositories');
+  await openSettingsSection(page, 'Tracked repositories');
   await page.getByRole('textbox', { name: 'Repository', exact: true }).press('Meta+,');
-  await expect(page.getByRole('heading', { name: 'Tracked repositories' })).toBeVisible();
+  await expect(dialog).toBeVisible();
 });
 
 test('the shortcut list opens with ?, lists every hotkey, and closes again', async ({ page }) => {
@@ -971,7 +998,7 @@ test('copies debug info for the whole board from Settings', async ({ page }) => 
   await expect(page.locator('.pr-card')).toHaveCount(4);
   const copied = await captureClipboard(page);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Troubleshooting');
+  await openSettingsSection(page, 'Troubleshooting');
   await page.getByRole('button', { name: 'Copy debug info' }).click();
   await page.screenshot({ path: '.context/debug-settings.png' });
   await expect(page.getByRole('status').filter({ hasText: 'Debug info copied' })).toBeVisible();
@@ -1253,7 +1280,7 @@ for (const [kind, value, remaining] of [
     await page.goto('/');
     await expect(page.locator('.pr-card')).toHaveCount(4);
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await expandSettingsSection(page, 'Ignored');
+    await openSettingsSection(page, 'Ignore rules');
     await page.getByLabel('Ignore rule type').selectOption(kind);
     await page.getByRole('textbox', { name: 'Ignore rule', exact: true }).fill(value);
     await page.getByRole('button', { name: 'Add ignore rule', exact: true }).click();
@@ -1266,10 +1293,10 @@ for (const [kind, value, remaining] of [
     await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
     await expect(page.locator('.pr-card')).toHaveCount(remaining);
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await expandSettingsSection(page, 'Ignored');
+    await openSettingsSection(page, 'Ignore rules');
     await section.getByRole('button', { name: 'Remove', exact: true }).click();
     await saveSettings(page);
-    await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+    await closeSettings(page);
     await expect(page.locator('.pr-card')).toHaveCount(4);
   });
 }
@@ -1290,61 +1317,56 @@ test('broad rules stay effective on failed refreshes and do not erase individual
     };
   });
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Ignored');
+  await openSettingsSection(page, 'Ignore rules');
   await page.getByLabel('Ignore rule type').selectOption('author');
   await page.getByRole('textbox', { name: 'Ignore rule', exact: true }).fill('ALEX');
   await page.getByRole('button', { name: 'Add ignore rule', exact: true }).click();
   await expect(page.locator('#settings-section-ignored-rules .setting-row')).toHaveCount(1);
   await saveSettings(page);
-  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await closeSettings(page);
   await expect(page.locator('.pr-card')).toHaveCount(1);
   await expect(page.locator('.pr-card')).toContainText('Simplify deployment');
   await expect(page.getByText(/refresh issues/)).toBeVisible();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Ignored');
+  await openSettingsSection(page, 'Ignore rules');
   await page
     .locator('#settings-section-ignored-rules')
     .getByRole('button', { name: 'Remove' })
     .click();
   await saveSettings(page);
-  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await closeSettings(page);
   await expect(page.locator('.pr-card')).toHaveCount(3);
   await expect(page.getByText('Add audit event retention', { exact: true })).toBeHidden();
 });
 
-test('the ignored pull requests screen opens from Settings, lists, and unignores', async ({
-  page,
-}) => {
+test('the ignored pull requests section in Settings lists and unignores', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.pr-card')).toHaveCount(4);
-  // The screen is reachable only from the Settings Ignored section, and starts empty.
+  // The list is a Settings section of its own, and starts empty.
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Ignored');
-  const link = page.getByRole('button', { name: /^Ignored pull requests/ });
-  await expect(link).toHaveText('Ignored pull requests');
-  await link.click();
-  await expect(page.getByRole('heading', { name: 'Ignored pull requests' })).toBeVisible();
-  await expect(page.locator('.toolbar')).toContainText('Settings / Ignored pull requests');
+  await openSettingsSection(page, 'Ignored pull requests');
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await expect(
+    dialog.getByRole('heading', { name: 'Ignored pull requests', exact: true }),
+  ).toBeVisible();
+  await expect(dialog.locator('.toolbar')).toContainText('Settings / Ignored pull requests');
   await expect(page.getByText('Nothing individually ignored', { exact: true })).toBeVisible();
   await page.screenshot({ path: '.context/ignored-empty.png', fullPage: true });
+  await closeSettings(page);
   // Ignore two PRs, one of which also matches a broad author rule.
-  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
   for (const title of ['Add audit event retention', 'Simplify deployment configuration']) {
     await page.getByRole('button', { name: `Actions for ${title}`, exact: true }).click();
     await page.getByRole('button', { name: 'Ignore PR', exact: true }).click();
   }
   await expect(page.locator('.pr-card')).toHaveCount(2);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Ignored');
+  await openSettingsSection(page, 'Ignore rules');
   await page.getByLabel('Ignore rule type').selectOption('author');
   await page.getByRole('textbox', { name: 'Ignore rule', exact: true }).fill('sam');
   await page.getByRole('button', { name: 'Add ignore rule', exact: true }).click();
   await saveSettings(page);
-  // The count rides along with the button, and Enter opens the screen from the keyboard.
-  const counted = page.getByRole('button', { name: 'Ignored pull requests · 2' });
-  await counted.focus();
-  await expect(counted).toBeFocused();
-  await page.keyboard.press('Enter');
+  await openSettingsSection(page, 'Ignored pull requests');
+  await expect(dialog.getByRole('heading', { name: 'Ignored pull requests · 2' })).toBeVisible();
   const rows = page.locator('.ignored-row');
   await expect(rows).toHaveCount(2);
   // Most recently ignored first, identified by repository, number, title and author.
@@ -1369,32 +1391,27 @@ test('the ignored pull requests screen opens from Settings, lists, and unignores
     .click();
   await expect(rows).toHaveCount(1);
   // The broad author rule still hides the PR that was just unignored.
-  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await closeSettings(page);
   await expect(page.locator('.pr-card')).toHaveCount(2);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Ignored');
+  await openSettingsSection(page, 'Ignore rules');
   await page
     .locator('#settings-section-ignored-rules')
     .getByRole('button', { name: 'Remove', exact: true })
     .click();
   await saveSettings(page);
-  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await closeSettings(page);
   await expect(page.locator('.pr-card')).toHaveCount(3);
   await expect(page.getByText('Add audit event retention', { exact: true })).toBeHidden();
-  // The remaining individual ignore survives a reload and Back returns to Settings.
+  // The remaining individual ignore survives a reload.
   await page.reload();
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Ignored');
-  await page.getByRole('button', { name: 'Ignored pull requests · 1' }).click();
+  await openSettingsSection(page, 'Ignored pull requests');
   await expect(rows).toHaveCount(1);
-  await page.getByRole('button', { name: 'Back to settings' }).click();
-  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
-  await expandSettingsSection(page, 'Ignored');
-  await page.getByRole('button', { name: 'Ignored pull requests · 1' }).click();
   await page.getByRole('button', { name: 'Unignore Add audit event retention' }).click();
   await expect(page.getByText('Nothing individually ignored', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await closeSettings(page);
   await expect(page.locator('.pr-card')).toHaveCount(4);
 });
 
@@ -1411,8 +1428,7 @@ test('ignored PRs without fetched details stay identifiable and unignorable', as
   await page.reload();
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Ignored');
-  await page.getByRole('button', { name: 'Ignored pull requests · 2' }).click();
+  await openSettingsSection(page, 'Ignored pull requests');
   // The saved identifier alone still names the repository and number on the row.
   const row = page.locator('.ignored-row').filter({ hasText: '#99' });
   await expect(row).toContainText('acme/platform');
@@ -1450,7 +1466,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
   await expect(page.locator('.pr-card')).toHaveCount(0);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Ignored');
+  await openSettingsSection(page, 'Ignore rules');
   await page
     .locator('#settings-section-ignored-rules')
     .getByRole('button', { name: 'Remove' })
@@ -1461,7 +1477,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
   expect(saved.ignoreRules).toEqual([]);
   expect(saved.ignoredPullRequests).toHaveProperty('acme/platform#2');
   expect(saved.settings.snoozeOptions).toEqual([]);
-  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await closeSettings(page);
   await expect(page.locator('.pr-card')).toHaveCount(4);
   await page.evaluate(() => {
     const saved = JSON.parse(localStorage.getItem('prefs')!);
@@ -1474,7 +1490,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
   expect(await page.evaluate(() => localStorage.getItem('prefs'))).toBe(before);
 });
 
-test('settings edits stay a draft until saved, and leaving with unsaved changes asks first', async ({
+test('settings edits stay a draft until saved, and closing with unsaved changes asks first', async ({
   page,
 }) => {
   await page.goto('/');
@@ -1482,7 +1498,7 @@ test('settings edits stay a draft until saved, and leaving with unsaved changes 
   const refreshes = () => page.evaluate(() => (window as any).refreshCount);
   const before = await refreshes();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Tracked repositories');
+  await openSettingsSection(page, 'Tracked repositories');
   const save = page.getByRole('button', { name: 'Save changes', exact: true });
   await expect(save).toBeHidden();
   // Adding a repository checks it on GitHub, keeps the field usable, and only drafts the value.
@@ -1513,23 +1529,24 @@ test('settings edits stay a draft until saved, and leaving with unsaved changes 
     ),
   ).toEqual([]);
   await page.screenshot({ path: '.context/settings-unsaved.png', fullPage: true });
-  // Leaving is blocked by a dialog. Keep editing returns to Settings with the draft intact.
+  // Closing is blocked by a dialog. Keep editing returns to Settings with the draft intact.
   const dialog = page.getByRole('dialog', { name: 'Save your settings?' });
-  await page.getByRole('button', { name: /Dashboard/ }).click();
+  const settings = page.getByRole('dialog', { name: 'Settings' });
+  await page.keyboard.press('Escape');
   await expect(dialog).toBeVisible();
   await page.screenshot({ path: '.context/settings-unsaved-dialog.png', fullPage: true });
   await page.getByRole('button', { name: 'Keep editing' }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(settings).toBeVisible();
   await expect(save).toBeVisible();
-  // Discarding restores the last saved settings and leaves.
-  await page.keyboard.press('Shift+D');
+  // Discarding restores the last saved settings and closes.
+  await settings.getByRole('button', { name: 'Back', exact: true }).click();
   await expect(dialog).toBeVisible();
   await page.getByRole('button', { name: 'Discard changes' }).click();
   await expect(page.locator('.pr-card')).toHaveCount(4);
   expect(await refreshes()).toBe(before);
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Tracked repositories');
+  await openSettingsSection(page, 'Tracked repositories');
   await expect(page.getByText('No repositories tracked yet.')).toBeVisible();
   // Removing a drafted value again leaves nothing to save.
   await repository.fill('acme/platform');
@@ -1537,19 +1554,18 @@ test('settings edits stay a draft until saved, and leaving with unsaved changes 
   await expect(save).toBeVisible();
   await page.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(save).toBeHidden();
-  // The Ignored sub-screen is part of Settings, so it does not ask and keeps the draft.
+  // Moving between sections does not ask and keeps the draft.
   await repository.fill('acme/platform');
   await page.getByRole('button', { name: 'Add repository' }).click();
-  await expandSettingsSection(page, 'Ignored');
-  await page.getByRole('button', { name: /^Ignored pull requests/ }).click();
+  await openSettingsSection(page, 'Ignored pull requests');
   await expect(dialog).toBeHidden();
-  await page.getByRole('button', { name: 'Back to settings' }).click();
   await expect(save).toBeVisible();
-  // Saving from the dialog writes the draft, refreshes in the background, and completes the move.
-  await page.getByRole('button', { name: /Dashboard/ }).click();
+  // Saving from the dialog writes the draft, refreshes in the background, and closes Settings.
+  await page.keyboard.press('Escape');
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
   await expect(dialog).toBeHidden();
+  await expect(settings).toBeHidden();
   await expect(page.locator('.pr-card')).toHaveCount(4);
   await expect
     .poll(async () =>
@@ -1616,13 +1632,13 @@ test('non-blocking check rules move an approved PR to Ready without a Merge butt
   await expect(page.locator('.column').nth(0).locator('.pr-card')).toHaveCount(0);
   await expect(card).toContainText('Checks running');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Non-blocking checks');
+  await openSettingsSection(page, 'Non-blocking checks');
   await page.getByRole('textbox', { name: 'Check rule repository' }).fill('acme/*');
   await page.getByRole('textbox', { name: 'Check rule check name' }).fill('policy-bot');
   await page.getByRole('button', { name: 'Add check rule', exact: true }).click();
   await expect(page.locator('#settings-section-check-rules .setting-row')).toContainText('acme/*');
   await saveSettings(page);
-  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await closeSettings(page);
   await expect(page.locator('.column').nth(0).locator('.pr-card')).toHaveCount(1);
   await expect(card).toContainText('Ready · policy-bot pending');
   await expect(card.getByRole('button', { name: /^Merge / })).toHaveCount(0);
@@ -1739,7 +1755,7 @@ test('repository validation errors stay beside the input and allow correction', 
     };
   });
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expandSettingsSection(page, 'Tracked repositories');
+  await openSettingsSection(page, 'Tracked repositories');
   const repository = page.getByRole('textbox', { name: 'Repository', exact: true });
   const add = page.getByRole('button', { name: 'Add repository' });
   const alert = page.locator('#settings-section-tracked').getByRole('alert');
@@ -1776,7 +1792,7 @@ test('settings shows read-only GitHub connection details and handles CLI lookup 
   await expect(page.locator('.pr-card')).toHaveCount(4);
   const settings = page.getByRole('button', { name: 'Settings', exact: true });
   await settings.click();
-  const info = page.getByRole('region', { name: 'GitHub connection' });
+  const info = page.getByRole('region', { name: 'GitHub', exact: true });
   await expect(info).toContainText('@alex');
   await expect(info).toContainText('github.com');
   await expect(info).toContainText('2.80.0');
@@ -1792,7 +1808,7 @@ test('settings shows read-only GitHub connection details and handles CLI lookup 
       return invoke(command, args);
     };
   });
-  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
+  await closeSettings(page);
   await settings.click();
   await expect(info).toContainText('Unavailable');
   await expect(info).toContainText('@alex');
