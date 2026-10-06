@@ -15,6 +15,7 @@
         "title": "PR Desk",
         "width": 1180,
         "height": 780,
+        "maximized": true,
         "minWidth": 820,
         "minHeight": 560
       }
