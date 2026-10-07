@@ -9,14 +9,15 @@
     oncancel,
   }: {
     pr: PullRequest | null;
-    action: 'close-stale' | 'merge';
+    action: 'close-stale' | 'merge' | 'approve-merge';
     busy: boolean;
     error: string;
     onconfirm: (method: string) => void;
     oncancel: () => void;
   } = $props();
   let method = $state('squash');
-  let merging = $derived(action === 'merge');
+  let merging = $derived(action !== 'close-stale');
+  let approving = $derived(action === 'approve-merge');
   let dialog = $state<HTMLDialogElement>();
   let confirm = $state<HTMLButtonElement>();
   $effect(() => {
@@ -38,9 +39,16 @@
     if (!busy) oncancel();
   }}
 >
-  <h2 id="pr-confirmation-title">{merging ? 'Merge pull request?' : 'Close as stale?'}</h2>
+  <h2 id="pr-confirmation-title">
+    {approving
+      ? 'Approve and merge pull request?'
+      : merging
+        ? 'Merge pull request?'
+        : 'Close as stale?'}
+  </h2>
   <p id="pr-confirmation-description">
-    Are you sure you want to {merging ? 'merge' : 'close'} <strong>{pr?.title}</strong> on GitHub?
+    Are you sure you want to {approving ? 'approve and merge' : merging ? 'merge' : 'close'}
+    <strong>{pr?.title}</strong> on GitHub?
   </p>
   {#if merging}
     <p>{pr?.repository} #{pr?.number}</p>
@@ -52,7 +60,10 @@
         <option value="rebase">Rebase and merge</option>
       </select>
     </label>
-    <p>This will merge using your GitHub account. The repository must allow the selected method.</p>
+    <p>
+      This will {approving ? 'approve, then merge,' : 'merge'} using your GitHub account. The repository
+      must allow the selected method.
+    </p>
   {:else}
     <p>PR Desk will leave this comment using your GitHub account:</p>
     <blockquote>
@@ -70,8 +81,12 @@
       onclick={() => onconfirm(method)}
       >{merging
         ? busy
-          ? 'Merging…'
-          : 'Confirm merge'
+          ? approving
+            ? 'Approving and merging…'
+            : 'Merging…'
+          : approving
+            ? 'Approve and merge'
+            : 'Confirm merge'
         : busy
           ? 'Closing…'
           : 'Close as stale'}</button

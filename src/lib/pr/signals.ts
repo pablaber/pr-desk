@@ -65,6 +65,18 @@ export function deriveSignals(
       notQueued &&
       waitingOn.length > 0 &&
       ['BLOCKED', 'CLEAN', 'HAS_HOOKS', 'UNSTABLE'].includes(pr.mergeStateStatus),
+    // The missing review is what makes GitHub report BLOCKED, so it is expected here; the
+    // in-app approve and merge revalidates readiness after approving. Every raw check must
+    // pass, so a pending check the user marked non-blocking still disqualifies the PR.
+    approvable:
+      bot &&
+      !pr.draft &&
+      pr.reviewDecision !== 'APPROVED' &&
+      pr.reviewDecision !== 'CHANGES_REQUESTED' &&
+      pr.checks.every((c) => c.state === 'passing') &&
+      pr.mergeable === 'MERGEABLE' &&
+      notQueued &&
+      ['BLOCKED', 'CLEAN', 'HAS_HOOKS', 'UNSTABLE'].includes(pr.mergeStateStatus),
   };
 }
 export type PullRequestSignals = ReturnType<typeof deriveSignals>;

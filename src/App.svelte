@@ -103,7 +103,7 @@
   let settingsView = $derived(settingsDraft ? { ...preferences, ...settingsDraft } : preferences);
   let actionPR = $state<PullRequest | null>(null);
   let actionError = $state('');
-  let pendingAction = $state<'close-stale' | 'merge'>('close-stale');
+  let pendingAction = $state<'close-stale' | 'merge' | 'approve-merge'>('close-stale');
   let showHotkeys = $state(false);
   let filter = $state<TrackingReason | 'all'>('all'),
     loading = $state(false),
@@ -453,15 +453,17 @@
     confirmClose = settingsOpen = false;
   }
   async function action(id: string, action: string, until?: string) {
-    if (action === 'close-stale' || action === 'merge') {
+    if (action === 'close-stale' || action === 'merge' || action === 'approve-merge') {
       if (saving || loading) return;
       const pr = snapshot.prs.find((pr) => pr.id === id);
       if (
         pr &&
-        (action === 'merge'
-          ? !snapshot.staleIds.includes(id) &&
-            classify(pr, login, preferences, Date.now())?.canMerge
-          : stalenessLevel(pr.updatedAt, Date.now()) === 'high')
+        (action === 'close-stale'
+          ? stalenessLevel(pr.updatedAt, Date.now()) === 'high'
+          : !snapshot.staleIds.includes(id) &&
+            classify(pr, login, preferences, Date.now())?.[
+              action === 'merge' ? 'canMerge' : 'canApproveAndMerge'
+            ])
       ) {
         pendingAction = action;
         actionError = '';
@@ -492,7 +494,8 @@
     saving = true;
     actionError = '';
     try {
-      if (pendingAction === 'merge') {
+      if (pendingAction !== 'close-stale') {
+        const merge = pendingAction === 'merge';
         const fresh = await service.getPullRequest(pr.id);
         // A single-PR lookup carries no tracking reasons; the card's own reasons decide bot status.
         const freshResult = classify(
@@ -501,16 +504,21 @@
           preferences,
           Date.now(),
         );
-        if (fresh.headOid !== pr.headOid || !freshResult?.canMerge)
+        if (
+          fresh.headOid !== pr.headOid ||
+          !freshResult?.[merge ? 'canMerge' : 'canApproveAndMerge']
+        )
           throw new Error(
             'This PR changed or is no longer ready to merge. Cancel and refresh before trying again.',
           );
-        await service.mergePullRequest(
-          pr.id,
-          pr.headOid,
-          method,
-          freshResult.bot ? fresh.author : undefined,
-        );
+        if (merge)
+          await service.mergePullRequest(
+            pr.id,
+            pr.headOid,
+            method,
+            freshResult.bot ? fresh.author : undefined,
+          );
+        else await service.approveAndMergePullRequest(pr.id, pr.headOid, method, fresh.author);
       } else {
         await service.closeStalePullRequest(pr.id);
       }

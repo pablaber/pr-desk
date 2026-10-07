@@ -41,6 +41,15 @@ export class GhGitHubService implements GitHubService {
       bot,
     });
   }
+  async approveAndMergePullRequest(input: string, headOid: string, method: string, bot: string) {
+    const [repository, number] = parsePullRequest(input).split('#');
+    await invoke('approve_and_merge_pr', {
+      url: `https://github.com/${repository}/pull/${number}`,
+      headOid,
+      method,
+      bot,
+    });
+  }
   getCliInfo() {
     return invoke<GhCliInfo>('github', { operation: 'info' });
   }
