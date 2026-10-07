@@ -266,9 +266,20 @@ describe('non-blocking check rules', () => {
 describe('known bots', () => {
   const bot = (overrides: Partial<PullRequest> = {}) =>
     run({ author: 'dependabot', reasons: ['tracked-repository'], ...overrides });
-  it('waits for review until approved', () => {
-    const item = bot();
-    expect(item).toMatchObject({ state: 'waiting', primary: 'Waiting for review', bot: true });
+  it('needs attention until approved', () => {
+    expect(bot()).toMatchObject({
+      state: 'needs-attention',
+      primary: 'Bot PR needs review',
+      bot: true,
+    });
+    expect(bot({ reviewDecision: 'CHANGES_REQUESTED' }).state).toBe('needs-attention');
+  });
+  it('waits once approved but blocked, or while auto-merge is on', () => {
+    expect(bot({ reviewDecision: 'APPROVED', mergeStateStatus: 'BLOCKED' })).toMatchObject({
+      state: 'waiting',
+      primary: 'Waiting on merge requirements',
+    });
+    expect(bot({ autoMerge: true }).state).toBe('waiting');
   });
   it('is ready to merge once approved and clean', () => {
     expect(bot({ reviewDecision: 'APPROVED' })).toMatchObject({
@@ -292,6 +303,6 @@ describe('known bots', () => {
     });
   });
   it('treats a watched bot PR as a bot PR', () => {
-    expect(bot({ reasons: ['watched'] })).toMatchObject({ bot: true, state: 'waiting' });
+    expect(bot({ reasons: ['watched'] })).toMatchObject({ bot: true, state: 'needs-attention' });
   });
 });

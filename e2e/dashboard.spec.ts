@@ -2120,7 +2120,9 @@ test('a refresh unwatches and unlabels merged PRs and unlabels ones no longer di
   await expect.poll(stored).toEqual([[], []]);
 });
 
-test('known bot PRs wait for review, then merge with the bot declared', async ({ page }) => {
+test('known bot PRs need attention until approved, then merge with the bot declared', async ({
+  page,
+}) => {
   await page.goto('/');
   await page.evaluate(() => localStorage.setItem('botPr', '1'));
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -2131,10 +2133,10 @@ test('known bot PRs wait for review, then merge with the bot declared', async ({
   await closeSettings(page);
   const card = page.locator('.pr-card', { hasText: 'Bump lodash' });
   await expect(card).toContainText('Bot');
-  await expect(card).toContainText('Waiting for review');
+  await expect(card).toContainText('Bot PR needs review');
   await expect(
     page.locator('.column').nth(1).locator('.pr-card', { hasText: 'Bump lodash' }),
-  ).toHaveCount(0);
+  ).toHaveCount(1);
 
   await page.evaluate(() => localStorage.setItem('botApproved', '1'));
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();

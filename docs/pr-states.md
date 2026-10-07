@@ -95,6 +95,7 @@ label; other matching rules (except the two catch-alls) show as secondary status
 |       54 | `auto-merge`           | **Waiting**         | auto-merge enabled and not queued (anyone's PR)            | Auto-merge enabled            |
 |       50 | `ready`                | **Ready to merge**  | ready                                                      | Ready to merge                |
 |       50 | `ready-pending-checks` | **Ready to merge**  | ready, pending checks                                      | Ready · _check names_ pending |
+|       20 | `bot-review`           | **Needs attention** | bot, not draft, not approved on GitHub                     | Bot PR needs review           |
 |       10 | `tracked-repository`\* | **Needs attention** | from a tracked repository, not owned, not a bot, not draft | Open in a tracked repository  |
 |        0 | `waiting`\*            | **Waiting**         | always (fallback)                                          | see below                     |
 
@@ -107,7 +108,7 @@ The Waiting fallback picks its label from the first that applies:
 | draft (only your own reach here)  | Draft                         |
 | checks pending (not non-blocking) | Checks running                |
 | managed and approved on GitHub    | Waiting on merge requirements |
-| managed                           | Waiting for review            |
+| owned                             | Waiting for review            |
 | otherwise                         | No action needed              |
 
 ### Consequences worth knowing
@@ -118,8 +119,9 @@ The Waiting fallback picks its label from the first that applies:
   the desk — unless it is watched (Waiting, "No action needed") or in a tracked repository
   (Needs attention, "Open in a tracked repository").
 - A known bot's PR is only treated as managed when it comes from a tracked repository or is
-  watched. A known bot's PR in a tracked repository waits for your review rather than showing
-  "Open in a tracked repository".
+  watched. Until you approve it, it needs attention as "Bot PR needs review" rather than
+  "Open in a tracked repository"; once approved it is Ready to merge or, if GitHub still blocks
+  it, Waiting.
 - Thread and changes-requested rules apply only to owned PRs, not bot PRs.
 - An owned draft can still need attention (for example, a review thread or a failed check), but
   it never becomes Ready to merge.
@@ -135,7 +137,7 @@ The common situations, from your point of view:
 | ---------------------------------------------------------------------------------- | --------------- |
 | Someone asked you to review                                                        | Needs attention |
 | Your PR has unresolved comments, requested changes, a failing check, or a conflict | Needs attention |
-| A known bot's PR you track has a failing check or a conflict                       | Needs attention |
+| A known bot's PR you track is unapproved, or has a failing check or a conflict     | Needs attention |
 | Someone else's open PR in a repository you track                                   | Needs attention |
 | Your PR or tracked bot PR is approved, green, and mergeable                        | Ready to merge  |
 | Same, but a non-blocking check is still pending                                    | Ready to merge  |

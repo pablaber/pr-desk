@@ -75,6 +75,13 @@ export const dashboardRules: DashboardRule[] = [
     getLabel: (s) => `Ready · ${s.waitingOn.join(', ')} pending`,
   },
   {
+    id: 'bot-review',
+    state: 'needs-attention',
+    priority: 20,
+    matches: (s) => s.bot && !s.pr.draft && s.pr.reviewDecision !== 'APPROVED',
+    getLabel: () => 'Bot PR needs review',
+  },
+  {
     id: 'tracked-repository',
     state: 'needs-attention',
     priority: 10,

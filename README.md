@@ -72,8 +72,9 @@ PR Desk has no in-app updater.
   automatically drops the label from PRs that were merged, closed, or are no longer tracked,
   and stops watching PRs that were merged or closed.
 - Manages known bots (Settings → Known bots, prefilled with Dependabot and Renovate): their PRs in
-  tracked repositories or watched PRs wait for your review, move to Ready to merge once approved
-  (with in-app Merge…), go to Needs attention on failed checks or conflicts, and carry a Bot badge.
+  tracked repositories or watched PRs sit in Needs attention until you approve them, then move to
+  Ready to merge (with in-app Merge…); failed checks or conflicts bring them back to Needs
+  attention, and they carry a Bot badge.
 - Supports per-repository non-blocking check rules (Settings → Non-blocking checks): a matching
   _pending_ check, such as `policy-bot`, no longer keeps an approved PR out of Ready to merge.
   Failures still need attention, and these PRs have no in-app Merge.

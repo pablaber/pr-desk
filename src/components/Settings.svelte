@@ -429,8 +429,8 @@
             {heading('Known bots', preferences.knownBots.length)}
           </h2>
           <p>
-            PRs by these GitHub App bots in tracked repositories or watched PRs wait for your
-            review, then move to Ready to merge once approved.
+            PRs by these GitHub App bots in tracked repositories or watched PRs need your attention
+            until you approve them, then move to Ready to merge.
           </p>
           <form
             onsubmit={(e) => {
