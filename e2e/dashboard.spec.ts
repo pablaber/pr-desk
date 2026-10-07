@@ -97,12 +97,18 @@ test.beforeEach(async ({ page }) => {
                   {
                     __typename: 'CheckRun',
                     name: 'CI',
-                    status: 'COMPLETED',
-                    conclusion: (
-                      JSON.parse(localStorage.getItem('failedChecks') ?? '[]') as number[]
+                    ...((
+                      JSON.parse(localStorage.getItem('pendingChecks') ?? '[]') as number[]
                     ).includes(number)
-                      ? 'FAILURE'
-                      : 'SUCCESS',
+                      ? { status: 'IN_PROGRESS', conclusion: null }
+                      : {
+                          status: 'COMPLETED',
+                          conclusion: (
+                            JSON.parse(localStorage.getItem('failedChecks') ?? '[]') as number[]
+                          ).includes(number)
+                            ? 'FAILURE'
+                            : 'SUCCESS',
+                        }),
                   },
                 ]),
               },
@@ -2165,14 +2171,25 @@ test('known bot PRs need attention until approved, then merge with the bot decla
   );
 });
 
-test('cards whose checks all pass show a Checks badge', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('failedChecks', '[2]'));
+test('cards show one Checks badge coloured by check status', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('failedChecks', '[2]');
+    localStorage.setItem('pendingChecks', '[3]');
+  });
   await page.goto('/');
   await expect(page.locator('.pr-card')).toHaveCount(4);
   const badge = (title: string) =>
     page.locator('.pr-card', { hasText: title }).locator('.badge.checks');
   await expect(badge('Reduce cache lookup latency')).toHaveText('Checks');
-  await expect(badge('Refresh session token handling')).toHaveCount(0);
+  await expect(badge('Reduce cache lookup latency')).toHaveClass(/passing/);
+  await expect(badge('Reduce cache lookup latency')).toHaveAttribute('title', 'Checks passing');
+  await expect(badge('Refresh session token handling')).toHaveText('Checks');
+  await expect(badge('Refresh session token handling')).toHaveClass(/failed/);
+  await expect(badge('Refresh session token handling')).toHaveAttribute('title', 'Checks failed');
+  await expect(badge('Add audit event retention')).toHaveText('Checks');
+  await expect(badge('Add audit event retention')).toHaveClass(/pending/);
+  await expect(badge('Add audit event retention')).toHaveAttribute('title', 'Checks running');
+  await page.screenshot({ path: '.context/checks-badges.png', fullPage: true });
 });
 
 async function trackBotPr(page: Page) {
@@ -2255,7 +2272,7 @@ test('approve and merge is not offered on bot PRs with failing checks', async ({
   const card = page.locator('.pr-card', { hasText: 'Bump lodash' });
   await expect(card).toContainText('Checks failed');
   await expect(card.locator('.merge-button')).toHaveCount(0);
-  await expect(card.locator('.badge.checks')).toHaveCount(0);
+  await expect(card.locator('.badge.checks.failed')).toHaveCount(1);
 });
 
 test('known bots can be added and removed in Settings', async ({ page }) => {

@@ -178,7 +178,7 @@ These do not affect the column:
 | Extra             | Shown when                                                                                          |
 | ----------------- | --------------------------------------------------------------------------------------------------- |
 | Secondary status  | other matching non-catch-all rules; "Checks failed" on any PR with a failed check; outdated threads |
-| Checks badge      | at least one check, and every check passes                                                          |
+| Checks badge      | at least one check; red if any failed, otherwise amber if any are pending, otherwise green          |
 | Approved badge    | `reviewDecision` is `APPROVED`                                                                      |
 | Changes badge     | `reviewDecision` is `CHANGES_REQUESTED`                                                             |
 | Staleness         | not updated for more than 7 days (low), 14 days (medium), or 28 days (high, red)                    |

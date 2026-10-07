@@ -469,12 +469,18 @@ i.waiting {
   gap: 2px;
 }
 .badge.review.approved,
-.badge.checks {
+.badge.checks.passing {
   color: #326443;
   border-color: #b8d8bf;
   background: #eaf5ed;
 }
-.badge.review.changes-requested {
+.badge.checks.pending {
+  color: #8a6d1f;
+  border-color: #ecd9a1;
+  background: #fdf6e3;
+}
+.badge.review.changes-requested,
+.badge.checks.failed {
   color: #a33a2f;
   border-color: #eeb2ab;
   background: #fdeae7;
