@@ -85,6 +85,9 @@ PR Desk has no in-app updater.
   and clearly marked as stale.
 - Shows a Dock icon badge counting Ready to merge, Needs attention, or both (the default);
   choose Off in Settings to hide it.
+- Exports your configuration to the clipboard as JSON and imports it from pasted text or a
+  `.json` file (Settings → Import & export); importing replaces the configuration after a
+  confirmation, and leaves snoozes, ignored PRs and label assignments alone.
 - Copies debug info as JSON (Settings → Troubleshooting for the whole board, or a card's menu
   for one PR): each PR's normalized GitHub state, matched dashboard rules, derived signals and
   why it landed in its column or was hidden, alongside preferences and refresh warnings — ready

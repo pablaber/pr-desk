@@ -21,6 +21,9 @@ import {
   parseLabelColor,
   randomLabelColor,
   labelNameTaken,
+  exportSettings,
+  parseSettingsImport,
+  applySettingsImport,
   type SnoozeOption,
 } from './app-state';
 it('validates and canonicalizes input', () => {
@@ -500,4 +503,85 @@ it('seeds known bots when migrating from 10 and validates stored lists', () => {
 it('detects known bot changes in the draft', () => {
   const state = defaultState();
   expect(draftDiffers({ ...preferenceDraft(state), knownBots: [] }, state)).toBe(true);
+});
+
+const configured = () => ({
+  ...defaultState(),
+  trackedRepositories: ['acme/api', 'acme/web'],
+  watchedPullRequests: ['acme/api#7'],
+  ignoreRules: [{ kind: 'author' as const, value: 'octocat' }],
+  checkRules: [{ repository: 'acme/*', check: 'policy-bot' }],
+  labels: [label('a', 'Backend')],
+  ignoredPullRequests: { 'acme/api#1': { ignoredAt: '2026-01-01T00:00:00.000Z' } },
+  snoozedPullRequests: { 'acme/api#2': { until: '2099-01-01T00:00:00.000Z' } },
+  labeledPullRequests: { 'acme/api#3': ['a'] },
+});
+const exported = (change: Record<string, unknown> = {}) =>
+  JSON.stringify({ ...exportSettings(configured(), new Date(0)), ...change });
+it('exports configuration without per-PR state and imports it back', () => {
+  const state = configured();
+  const data = exportSettings(state, new Date(0));
+  expect(data).toMatchObject({
+    app: 'pr-desk',
+    kind: 'settings',
+    exportedAt: '1970-01-01T00:00:00.000Z',
+  });
+  for (const key of ['ignoredPullRequests', 'snoozedPullRequests', 'labeledPullRequests'])
+    expect(data).not.toHaveProperty(key);
+  const { ignoredPullRequests, snoozedPullRequests, labeledPullRequests, ...config } = state;
+  void [ignoredPullRequests, snoozedPullRequests, labeledPullRequests];
+  expect(parseSettingsImport(JSON.stringify(data))).toEqual({
+    trackedRepositories: config.trackedRepositories,
+    watchedPullRequests: config.watchedPullRequests,
+    knownBots: config.knownBots,
+    ignoreRules: config.ignoreRules,
+    checkRules: config.checkRules,
+    labels: config.labels,
+    settings: config.settings,
+  });
+});
+it('rejects settings imports that are not valid exports', () => {
+  expect(() => parseSettingsImport('nope')).toThrow("That isn't valid JSON.");
+  for (const text of ['null', '5', '{}', exported({ app: 'other' }), exported({ kind: 'debug' })])
+    expect(() => parseSettingsImport(text)).toThrow("This isn't a PR Desk settings export.");
+  expect(() => parseSettingsImport(exported({ schemaVersion: 12 }))).toThrow('newer PR Desk');
+  const invalid: Record<string, unknown>[] = [
+    { trackedRepositories: ['no-owner'] },
+    { trackedRepositories: [5] },
+    { watchedPullRequests: ['acme/api'] },
+    { ignoreRules: [{ kind: 'author', value: '@bad name' }] },
+    { settings: { ...defaultState().settings, snoozeOptions: [{ kind: 'duration' }] } },
+    { labels: [label('a', 'Same'), label('b', 'same')] },
+    { schemaVersion: 'x' },
+  ];
+  for (const change of invalid)
+    expect(() => parseSettingsImport(exported(change))).toThrow(
+      /^This settings export is invalid: /,
+    );
+  expect(() =>
+    parseSettingsImport(exported({ labels: [label('a', 'Same'), label('b', 'same')] })),
+  ).not.toThrow('left intact');
+});
+it('dedupes imported repositories and watched PRs', () => {
+  const config = parseSettingsImport(
+    exported({
+      trackedRepositories: ['Acme/API', 'acme/api'],
+      watchedPullRequests: ['https://github.com/acme/api/pull/7', 'acme/api#7'],
+    }),
+  );
+  expect(config.trackedRepositories).toEqual(['acme/api']);
+  expect(config.watchedPullRequests).toEqual(['acme/api#7']);
+});
+it('keeps per-PR state when applying an import and drops stale label assignments', () => {
+  const current = {
+    ...configured(),
+    labels: [label('a', 'Backend'), label('b', 'Old')],
+    labeledPullRequests: { 'acme/api#3': ['a', 'b'], 'acme/api#4': ['b'] },
+  };
+  const config = parseSettingsImport(exported({ trackedRepositories: ['acme/new'] }));
+  const next = applySettingsImport(current, config);
+  expect(next.trackedRepositories).toEqual(['acme/new']);
+  expect(next.ignoredPullRequests).toEqual(current.ignoredPullRequests);
+  expect(next.snoozedPullRequests).toEqual(current.snoozedPullRequests);
+  expect(next.labeledPullRequests).toEqual({ 'acme/api#3': ['a'] });
 });

@@ -1,5 +1,6 @@
 <script lang="ts">
   import AlarmClock from '@lucide/svelte/icons/alarm-clock';
+  import ArrowDownUp from '@lucide/svelte/icons/arrow-down-up';
   import BellDot from '@lucide/svelte/icons/bell-dot';
   import Bot from '@lucide/svelte/icons/bot';
   import Bug from '@lucide/svelte/icons/bug';
@@ -19,12 +20,14 @@
   import Ignored from './Ignored.svelte';
   import InterfaceScaleControl from './InterfaceScale.svelte';
   import RefreshInterval from './RefreshInterval.svelte';
+  import SettingsTransfer from './SettingsTransfer.svelte';
   import SnoozeOptions from './SnoozeOptions.svelte';
   import type {
     AppState,
     CheckRule,
     DockBadgeMode,
     InterfaceScale,
+    SettingsConfig,
     SnoozeOption,
     IgnoreRuleKind,
   } from '../lib/store/app-state';
@@ -59,6 +62,8 @@
     onopen,
     onunignore,
     oncopydebuginfo,
+    oncopysettings,
+    onimportsettings,
   }: {
     open: boolean;
     login: string;
@@ -90,6 +95,8 @@
     onopen: (url: string) => void;
     onunignore: (id: string) => void;
     oncopydebuginfo: () => void;
+    oncopysettings: () => void;
+    onimportsettings: (config: SettingsConfig) => Promise<boolean>;
   } = $props();
   type Section =
     | 'github'
@@ -103,6 +110,7 @@
     | 'ignore-rules'
     | 'ignored'
     | 'check-rules'
+    | 'transfer'
     | 'troubleshooting';
   const groups: { label: string; items: { id: Section; title: string; icon: typeof Plug }[] }[] = [
     {
@@ -127,9 +135,10 @@
       ],
     },
   ];
+  const transfer = { id: 'transfer', title: 'Import & export', icon: ArrowDownUp } as const;
   const troubleshooting = { id: 'troubleshooting', title: 'Troubleshooting', icon: Bug } as const;
   const titles = Object.fromEntries(
-    [...groups.flatMap((g) => g.items), troubleshooting].map((i) => [i.id, i.title]),
+    [...groups.flatMap((g) => g.items), transfer, troubleshooting].map((i) => [i.id, i.title]),
   ) as Record<Section, string>;
   // Kept while the app runs, so reopening Settings returns to the section last used.
   let section = $state<Section>('github');
@@ -210,7 +219,9 @@
         <div class="nav-label">{group.label}</div>
         {#each group.items as item (item.id)}{@render navItem(item)}{/each}
       {/each}
-      <div class="settings-nav-bottom">{@render navItem(troubleshooting)}</div>
+      <div class="settings-nav-bottom">
+        {@render navItem(transfer)}{@render navItem(troubleshooting)}
+      </div>
     </nav>
   </div>
   <div class="settings-content">
@@ -593,6 +604,15 @@
                 onclick={() => onremovecheckrule(rule)}>Remove</button
               >
             </div>{:else}<p class="empty-setting">No check rules.</p>{/each}
+        </section>
+      {:else if section === 'transfer'}
+        <section
+          id="settings-section-transfer"
+          class="settings-section"
+          aria-labelledby="settings-section-heading"
+        >
+          <h2 id="settings-section-heading">Import &amp; export</h2>
+          <SettingsTransfer {busy} {dirty} oncopy={oncopysettings} onimport={onimportsettings} />
         </section>
       {:else}
         <section
