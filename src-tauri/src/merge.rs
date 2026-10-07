@@ -30,7 +30,29 @@ fn validate_input(url: &str, head_oid: &str, method: &str) -> Result<(), String>
     Ok(())
 }
 
-fn validate_ready(pr: &Value, head_oid: &str, login: &str) -> Result<(), String> {
+// gh reports a bot author as `app/name`; the app stores `name[bot]`. Compare the bare names.
+fn bot_key(login: &str) -> String {
+    let lower = login.to_ascii_lowercase();
+    let name = lower.strip_prefix("app/").unwrap_or(&lower);
+    name.strip_suffix("[bot]").unwrap_or(name).to_string()
+}
+
+fn author_allowed(pr: &Value, login: &str, bot: Option<&str>) -> bool {
+    let author = pr["author"]["login"].as_str().unwrap_or("");
+    if !login.is_empty() && author.eq_ignore_ascii_case(login) {
+        return true;
+    }
+    bot.is_some_and(|bot| {
+        pr["author"]["is_bot"] == true && !author.is_empty() && bot_key(author) == bot_key(bot)
+    })
+}
+
+fn validate_ready(
+    pr: &Value,
+    head_oid: &str,
+    login: &str,
+    bot: Option<&str>,
+) -> Result<(), String> {
     let checks_pass = match &pr["statusCheckRollup"] {
         Value::Null => true,
         Value::Array(checks) => checks.iter().all(|check| {
@@ -51,11 +73,7 @@ fn validate_ready(pr: &Value, head_oid: &str, login: &str) -> Result<(), String>
         || pr["mergeable"] != "MERGEABLE"
         || !["CLEAN", "HAS_HOOKS", "UNSTABLE"]
             .contains(&pr["mergeStateStatus"].as_str().unwrap_or(""))
-        || login.is_empty()
-        || !pr["author"]["login"]
-            .as_str()
-            .unwrap_or("")
-            .eq_ignore_ascii_case(login)
+        || !author_allowed(pr, login, bot)
         || pr.get("statusCheckRollup").is_none()
         || !checks_pass
         || !pr["autoMergeRequest"].is_null()
@@ -66,12 +84,17 @@ fn validate_ready(pr: &Value, head_oid: &str, login: &str) -> Result<(), String>
 }
 
 #[tauri::command]
-pub async fn merge_pr(url: String, head_oid: String, method: String) -> Result<(), String> {
+pub async fn merge_pr(
+    url: String,
+    head_oid: String,
+    method: String,
+    bot: Option<String>,
+) -> Result<(), String> {
     validate_input(&url, &head_oid, &method)?;
     tokio::time::timeout(Duration::from_secs(45), async {
         let user = gh(&["api", "--hostname", "github.com", "user"]).await?;
         let pr = gh(&["pr", "view", &url, "--json", "state,isDraft,headRefOid,author,reviewDecision,mergeable,mergeStateStatus,statusCheckRollup,autoMergeRequest"]).await?;
-        validate_ready(&pr, &head_oid, user["login"].as_str().unwrap_or(""))?;
+        validate_ready(&pr, &head_oid, user["login"].as_str().unwrap_or(""), bot.as_deref())?;
         let path = url.strip_prefix("https://github.com/").unwrap();
         let (repository, number) = path.rsplit_once("/pull/").unwrap();
         let endpoint = format!("repos/{repository}/pulls/{number}/merge");
@@ -123,8 +146,8 @@ mod tests {
     #[test]
     fn rejects_changed_head_and_every_non_ready_state() {
         let oid = "a".repeat(40);
-        assert!(validate_ready(&ready(), &oid, "ME").is_ok());
-        assert!(validate_ready(&ready(), &oid, "other").is_err());
+        assert!(validate_ready(&ready(), &oid, "ME", None).is_ok());
+        assert!(validate_ready(&ready(), &oid, "other", None).is_err());
         for (key, value) in [
             ("state", json!("MERGED")),
             ("isDraft", json!(true)),
@@ -139,8 +162,23 @@ mod tests {
         ] {
             let mut pr = ready();
             pr[key] = value;
-            assert!(validate_ready(&pr, &oid, "me").is_err(), "{key}");
+            assert!(validate_ready(&pr, &oid, "me", None).is_err(), "{key}");
         }
+    }
+
+    #[test]
+    fn known_bot_authors_are_accepted_only_when_declared_and_matching() {
+        let oid = "a".repeat(40);
+        let bot_pr = |is_bot: bool| {
+            let mut pr = ready();
+            pr["author"] = json!({"login":"app/dependabot","is_bot":is_bot});
+            pr
+        };
+        assert!(validate_ready(&bot_pr(true), &oid, "me", Some("dependabot[bot]")).is_ok());
+        assert!(validate_ready(&bot_pr(false), &oid, "me", Some("dependabot[bot]")).is_err());
+        assert!(validate_ready(&bot_pr(true), &oid, "me", Some("renovate[bot]")).is_err());
+        assert!(validate_ready(&bot_pr(true), &oid, "me", None).is_err());
+        assert!(validate_ready(&ready(), &oid, "me", Some("dependabot[bot]")).is_ok());
     }
 
     #[test]
@@ -179,7 +217,10 @@ mod tests {
         ] {
             let mut pr = ready();
             pr["statusCheckRollup"] = json!([check]);
-            assert_eq!(validate_ready(&pr, &"a".repeat(40), "me").is_ok(), passing);
+            assert_eq!(
+                validate_ready(&pr, &"a".repeat(40), "me", None).is_ok(),
+                passing
+            );
         }
     }
 }

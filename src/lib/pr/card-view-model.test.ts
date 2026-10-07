@@ -65,3 +65,15 @@ it.each([
   )!;
   expect(cardViewModel(item, now)).toMatchObject({ primary, secondary });
 });
+
+describe('bot badge', () => {
+  it('marks known bot PRs', () => {
+    const item = classify(
+      pr({ author: 'dependabot', reasons: ['tracked-repository'] }),
+      'me',
+      defaultState(),
+      now,
+    )!;
+    expect(cardViewModel(item, now).badges).toEqual(['Tracked repo', 'Bot']);
+  });
+});

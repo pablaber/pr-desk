@@ -2,7 +2,7 @@ import { ignoresPullRequest } from './ignore';
 import { dashboardRules, type DashboardRule } from './dashboard-rules';
 import { deriveSignals } from './signals';
 import type { PullRequest } from './types';
-import type { AppState, CheckRule } from '../store/app-state';
+import type { AppState } from '../store/app-state';
 export function classify(
   pr: PullRequest,
   login: string,
@@ -11,7 +11,7 @@ export function classify(
   rules: DashboardRule[] = dashboardRules,
 ) {
   if (hiddenReason(pr, login, local, now)) return null;
-  return describePullRequest(pr, login, local.checkRules, rules);
+  return describePullRequest(pr, login, local, rules);
 }
 export type HiddenReason = 'not-open' | 'ignore-rule' | 'ignored' | 'snoozed' | 'others-draft';
 export function hiddenReason(
@@ -30,14 +30,15 @@ export function hiddenReason(
 export function describePullRequest(
   pr: PullRequest,
   login: string,
-  checkRules: CheckRule[] = [],
+  prefs: Pick<AppState, 'checkRules' | 'knownBots'>,
   rules: DashboardRule[] = dashboardRules,
 ) {
-  const signals = deriveSignals(pr, login, checkRules);
+  const signals = deriveSignals(pr, login, prefs);
   const matches = rules.filter((r) => r.matches(signals)).sort((a, b) => b.priority - a.priority);
   const primary = matches[0];
   return {
     pr,
+    bot: signals.bot,
     state: primary.state,
     priority: primary.priority,
     canMerge: signals.ready && primary.state === 'ready-to-merge',

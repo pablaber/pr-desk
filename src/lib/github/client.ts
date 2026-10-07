@@ -32,12 +32,13 @@ export class GhGitHubService implements GitHubService {
     const [repository, number] = parsePullRequest(input).split('#');
     await invoke('close_stale_pr', { url: `https://github.com/${repository}/pull/${number}` });
   }
-  async mergePullRequest(input: string, headOid: string, method: string) {
+  async mergePullRequest(input: string, headOid: string, method: string, bot?: string) {
     const [repository, number] = parsePullRequest(input).split('#');
     await invoke('merge_pr', {
       url: `https://github.com/${repository}/pull/${number}`,
       headOid,
       method,
+      bot,
     });
   }
   getCliInfo() {

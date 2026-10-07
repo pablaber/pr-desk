@@ -36,11 +36,12 @@ export interface PRLabel {
 export type DockBadgeMode = 'off' | 'ready-to-merge' | 'needs-attention' | 'both';
 export type InterfaceScale = 90 | 100 | 115 | 130;
 export interface AppState {
-  schemaVersion: 10;
+  schemaVersion: 11;
   trackedRepositories: string[];
   ignoreRules: IgnoreRule[];
   checkRules: CheckRule[];
   watchedPullRequests: string[];
+  knownBots: string[];
   ignoredPullRequests: Record<string, { ignoredAt: string }>;
   snoozedPullRequests: Record<string, { until: string }>;
   labels: PRLabel[];
@@ -59,12 +60,14 @@ export const defaultSnoozeOptions = (): SnoozeOption[] => [
   { kind: 'duration', amount: 1, unit: 'days' },
   { kind: 'duration', amount: 1, unit: 'weeks' },
 ];
+const defaultKnownBots = (): string[] => ['dependabot[bot]', 'renovate[bot]'];
 export const defaultState = (): AppState => ({
-  schemaVersion: 10,
+  schemaVersion: 11,
   trackedRepositories: [],
   ignoreRules: [],
   checkRules: [],
   watchedPullRequests: [],
+  knownBots: defaultKnownBots(),
   ignoredPullRequests: {},
   snoozedPullRequests: {},
   labels: [],
@@ -90,8 +93,9 @@ export function migrateState(value: unknown): AppState {
     checkRules?: unknown;
     labels?: unknown;
     labeledPullRequests?: unknown;
+    knownBots?: unknown;
   };
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10].includes(stored.schemaVersion))
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].includes(stored.schemaVersion))
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
@@ -117,7 +121,8 @@ export function migrateState(value: unknown): AppState {
     watchedPullRequests: stored.watchedPullRequests,
     ignoredPullRequests: stored.ignoredPullRequests,
     snoozedPullRequests: stored.snoozedPullRequests,
-    schemaVersion: 10,
+    schemaVersion: 11,
+    knownBots: readStoredKnownBots(stored),
     ignoreRules: readStoredIgnoreRules(stored),
     checkRules: readStoredCheckRules(stored),
     ...readStoredLabels(stored),
@@ -322,6 +327,26 @@ function readStoredIgnoreRules(stored: {
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
   }
 }
+export function parseKnownBot(input: string): string {
+  if (typeof input !== 'string') throw new Error('Enter a bot name.');
+  const name = input
+    .trim()
+    .toLowerCase()
+    .replace(/^app\//, '')
+    .replace(/\[bot\]$/, '');
+  if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(name))
+    throw new Error('Enter a GitHub App bot name, such as dependabot or renovate[bot].');
+  return `${name}[bot]`;
+}
+function readStoredKnownBots(stored: { schemaVersion: number; knownBots?: unknown }): string[] {
+  if (stored.schemaVersion < 11) return defaultKnownBots();
+  try {
+    if (!Array.isArray(stored.knownBots)) throw new Error('Invalid bots');
+    return [...new Set(stored.knownBots.map(parseKnownBot))];
+  } catch {
+    throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
+  }
+}
 export function parseCheckRule(repository: string, check: string): CheckRule {
   if (typeof check !== 'string') throw new Error('Enter a check name.');
   const name = check.trim().toLowerCase();
@@ -438,7 +463,7 @@ function readStoredLabels(stored: {
 // stays free to change underneath an unsaved draft.
 export type PreferenceDraft = Pick<
   AppState,
-  'trackedRepositories' | 'ignoreRules' | 'checkRules' | 'watchedPullRequests'
+  'trackedRepositories' | 'ignoreRules' | 'checkRules' | 'watchedPullRequests' | 'knownBots'
 >;
 export function preferenceDraft(state: AppState): PreferenceDraft {
   return {
@@ -446,6 +471,7 @@ export function preferenceDraft(state: AppState): PreferenceDraft {
     ignoreRules: state.ignoreRules.map((rule) => ({ ...rule })),
     checkRules: state.checkRules.map((rule) => ({ ...rule })),
     watchedPullRequests: [...state.watchedPullRequests],
+    knownBots: [...state.knownBots],
   };
 }
 export function draftDiffers(draft: PreferenceDraft, state: AppState): boolean {
@@ -454,6 +480,7 @@ export function draftDiffers(draft: PreferenceDraft, state: AppState): boolean {
   return !(
     same(draft.trackedRepositories, state.trackedRepositories) &&
     same(draft.watchedPullRequests, state.watchedPullRequests) &&
+    same(draft.knownBots, state.knownBots) &&
     same(draft.ignoreRules.map(ignoreRuleKey), state.ignoreRules.map(ignoreRuleKey)) &&
     same(draft.checkRules.map(checkRuleKey), state.checkRules.map(checkRuleKey))
   );

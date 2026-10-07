@@ -5,7 +5,7 @@
 </p>
 
 A compact macOS pull request dashboard. PR Desk shows what needs your attention, what
-is ready to merge, and what can wait. Select a card to review or comment on GitHub. Ready to merge cards have a green
+is ready to merge, and what can wait. Select a card to review or comment on GitHub. Ready to merge cards for your own PRs and known-bot PRs have a green
 **Merge…** button with a confirmation and a choice of squash, merge commit, or rebase.
 PR Desk rechecks readiness and the commit before merging through your authenticated
 GitHub CLI. Repository permissions and merge rules still apply; repositories requiring
@@ -70,6 +70,9 @@ PR Desk has no in-app updater.
   open one to see its pull requests, and rename, recolor, or delete labels there. A refresh
   automatically drops the label from PRs that were merged, closed, or are no longer tracked,
   and stops watching PRs that were merged or closed.
+- Manages known bots (Settings → Known bots, prefilled with Dependabot and Renovate): their PRs in
+  tracked repositories or watched PRs wait for your review, move to Ready to merge once approved
+  (with in-app Merge…), go to Needs attention on failed checks or conflicts, and carry a Bot badge.
 - Supports per-repository non-blocking check rules (Settings → Non-blocking checks): a matching
   _pending_ check, such as `policy-bot`, no longer keeps an approved PR out of Ready to merge.
   Failures still need attention, and these PRs have no in-app Merge.

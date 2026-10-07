@@ -21,7 +21,7 @@ export function snoozedPullRequests(
       return {
         id,
         until,
-        item: pr ? describePullRequest(pr, login, local.checkRules) : null,
+        item: pr ? describePullRequest(pr, login, local) : null,
         labels: labelsFor(local, id),
       };
     });
