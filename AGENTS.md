@@ -10,7 +10,8 @@ PR Desk is a macOS pull request dashboard: a Tauri 2 (Rust) shell around a Svelt
 TypeScript + Vite frontend. All GitHub access goes through the user's authenticated
 `gh` CLI — the app never handles tokens itself. Reviewing happens on GitHub; the app opens PRs in the browser.
 Ready PRs you authored, or by a known GitHub App bot, can be merged after confirmation through
-the dedicated merge_pr command.
+the dedicated merge_pr command. Known-bot PRs waiting for review with passing checks can be
+approved and merged after confirmation through approve_and_merge_pr.
 The confirmed Close as stale action closes stale PRs with a fixed automatic comment.
 
 Pinned and expected versions: Rust 1.94.0 (`rust-toolchain.toml`, installed by rustup
@@ -59,6 +60,7 @@ Inspect the generated screenshot and include the updated image in the change.
 | Path                                | What lives there                                                                                                      |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `src-tauri/src/main.rs`             | the Rust bridge: `gh auth status`, allowlisted read-only GraphQL (`QUERY_NAMES`), close as stale                      |
+| `src-tauri/src/merge.rs`            | merge_pr and approve_and_merge_pr: revalidate, then mutate pinned to the confirmed commit                             |
 | `src/lib/github/`                   | `queries.ts` GraphQL text, `normalize.ts` raw → domain, `refresh.ts` orchestration/concurrency, `client.ts` transport |
 | `src/lib/pr/`                       | `signals.ts` → `dashboard-rules.ts` → `classify.ts` → `card-view-model.ts`                                            |
 | `src/lib/store/app-state.ts`        | versioned preferences and all input validation                                                                        |
@@ -86,8 +88,10 @@ Inspect the generated screenshot and include the updated image in the change.
   45-second timeout, read-only GraphQL, and it never returns authentication output or
   tokens. The separate close_stale_pr command only closes open PRs with red staleness
   and a fixed comment. The merge_pr command only merges ready PRs you authored, or by a known GitHub App bot, after confirmation,
-  revalidates readiness, and pins the mutation to the confirmed commit. Keep mutations
-  limited to these actions.
+  revalidates readiness, and pins the mutation to the confirmed commit. The
+  approve_and_merge_pr command only approves known-bot PRs waiting for review with passing
+  checks, pins the approval to the confirmed commit, and merges only once merge_pr's readiness
+  checks pass. Keep mutations limited to these actions.
 - The bridge only runs GraphQL operations named in `QUERY_NAMES` in
   `src-tauri/src/main.rs`. A new `query Desk…` in `src/lib/github/` must be added there
   in the same change, or every call fails at runtime with "Only named PR Desk read-only

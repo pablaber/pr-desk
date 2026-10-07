@@ -145,6 +145,15 @@
       aria-label={`Merge ${card.pr.title}`}><GitMerge size={14} /> Merge…</button
     >
   {/if}
+  {#if card.canApproveAndMerge}
+    <button
+      class="merge-button"
+      disabled={busy || stale}
+      onclick={() => act('approve-merge')}
+      aria-label={`Approve and merge ${card.pr.title}`}
+      ><GitMerge size={14} /> Approve and merge…</button
+    >
+  {/if}
   {#if menu}
     <!-- The backdrop swallows the dismissing click so it cannot also open the PR behind it. -->
     <div

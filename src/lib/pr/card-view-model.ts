@@ -48,6 +48,7 @@ export function cardViewModel(item: ClassifiedPR, now: number) {
         : item.pr.reviewDecision === 'CHANGES_REQUESTED'
           ? { label: 'Changes requested', tone: 'changes-requested' }
           : null,
+    checksPassing: checks.length > 0 && checks.every((c) => c.state === 'passing'),
     staleness: stalenessLevel(item.pr.updatedAt, now),
     age,
     secondary: secondary.join(' · '),

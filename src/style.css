@@ -459,10 +459,17 @@ i.waiting {
   background: #f8faf5;
 }
 .badge.staleness,
-.badge.review {
+.badge.review,
+.badge.checks {
   font-weight: 600;
 }
-.badge.review.approved {
+.badge.checks {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.badge.review.approved,
+.badge.checks {
   color: #326443;
   border-color: #b8d8bf;
   background: #eaf5ed;

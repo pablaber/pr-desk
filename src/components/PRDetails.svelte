@@ -22,6 +22,7 @@
 <span class="badges"
   >{#each card.badges as badge}<span class="badge">{badge}</span>{/each}{#if card.reviewBadge}<span
       class="badge review {card.reviewBadge.tone}">{card.reviewBadge.label}</span
+    >{/if}{#if card.checksPassing}<span class="badge checks"><Check size={10} /> Checks</span
     >{/if}{#if card.staleness}<span class="badge staleness {card.staleness}">Stale</span
     >{/if}{#each labels as label (label.id)}<span class="badge label"
       ><i class="label-dot" style:--label-color={label.color}></i>{label.name}</span

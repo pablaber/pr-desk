@@ -320,3 +320,55 @@ describe('known bots', () => {
     expect(bot({ reasons: ['watched'] })).toMatchObject({ bot: true, state: 'waiting' });
   });
 });
+describe('approve and merge', () => {
+  const waiting = (overrides: Partial<PullRequest> = {}) =>
+    pr({
+      author: 'dependabot',
+      reasons: ['tracked-repository'],
+      reviewDecision: 'REVIEW_REQUIRED',
+      mergeStateStatus: 'BLOCKED',
+      checks: [{ name: 'CI', state: 'passing' }],
+      ...overrides,
+    });
+  it('is offered on a waiting bot PR with passing checks that GitHub can merge', () => {
+    expect(classify(waiting(), 'me', local)).toMatchObject({
+      state: 'needs-attention',
+      primary: 'Waiting for your review',
+      canApproveAndMerge: true,
+      canMerge: false,
+    });
+    expect(
+      classify(
+        waiting({ reviewDecision: null, mergeStateStatus: 'CLEAN', checks: [] }),
+        'me',
+        local,
+      )?.canApproveAndMerge,
+    ).toBe(true);
+  });
+  it.each([
+    ['a non-bot author', { author: 'someone' }],
+    ['an owned PR', { author: 'me', reasons: ['owned', 'tracked-repository'] }],
+    ['an untracked bot PR', { reasons: ['direct-review-request'] }],
+    ['an approved PR', { reviewDecision: 'APPROVED', mergeStateStatus: 'CLEAN' }],
+    ['requested changes', { reviewDecision: 'CHANGES_REQUESTED' }],
+    ['a pending check', { checks: [{ name: 'CI', state: 'pending' }] }],
+    ['a failed check', { checks: [{ name: 'CI', state: 'failed' }] }],
+    ['a conflict', { mergeable: 'CONFLICTING' }],
+    ['an unknown mergeability', { mergeable: 'UNKNOWN' }],
+    ['a branch behind its base', { mergeStateStatus: 'BEHIND' }],
+    ['a merge queue entry', { mergeQueue: { state: 'QUEUED', position: 1 } }],
+    ['auto-merge', { autoMerge: true }],
+    ['a draft', { draft: true }],
+  ] as [string, Partial<PullRequest>][])('is not offered for %s', (_, overrides) => {
+    expect(classify(waiting(overrides), 'me', local)?.canApproveAndMerge ?? false).toBe(false);
+  });
+  it('is not offered while a non-blocking check is pending', () => {
+    const prefs = { ...local, checkRules: [{ repository: '*', check: 'policy-bot' }] };
+    const item = classify(
+      waiting({ checks: [{ name: 'policy-bot', state: 'pending' }] }),
+      'me',
+      prefs,
+    );
+    expect(item?.canApproveAndMerge).toBe(false);
+  });
+});

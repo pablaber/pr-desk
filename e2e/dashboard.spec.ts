@@ -96,7 +96,11 @@ test.beforeEach(async ({ page }) => {
                     __typename: 'CheckRun',
                     name: 'CI',
                     status: 'COMPLETED',
-                    conclusion: 'SUCCESS',
+                    conclusion: (
+                      JSON.parse(localStorage.getItem('failedChecks') ?? '[]') as number[]
+                    ).includes(number)
+                      ? 'FAILURE'
+                      : 'SUCCESS',
                   },
                 ]),
               },
@@ -140,6 +144,15 @@ test.beforeEach(async ({ page }) => {
           localStorage.setItem('mergeCalls', JSON.stringify(calls));
           if (localStorage.getItem('mergeFailure'))
             throw new Error('Merge rejected by repository rules');
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          return;
+        }
+        if (command === 'approve_and_merge_pr') {
+          const calls = JSON.parse(localStorage.getItem('approveMergeCalls') ?? '[]');
+          calls.push(args);
+          localStorage.setItem('approveMergeCalls', JSON.stringify(calls));
+          if (localStorage.getItem('approveMergeFailure'))
+            throw new Error('Approved on GitHub, but the merge failed.');
           await new Promise((resolve) => setTimeout(resolve, 200));
           return;
         }
@@ -2123,14 +2136,7 @@ test('a refresh unwatches and unlabels merged PRs and unlabels ones no longer di
 test('known bot PRs need attention until approved, then merge with the bot declared', async ({
   page,
 }) => {
-  await page.goto('/');
-  await page.evaluate(() => localStorage.setItem('botPr', '1'));
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await openSettingsSection(page, 'Tracked repositories');
-  await page.getByRole('textbox', { name: 'Repository', exact: true }).fill('acme/platform');
-  await page.getByRole('button', { name: 'Add repository' }).click();
-  await saveSettings(page);
-  await closeSettings(page);
+  await trackBotPr(page);
   const card = page.locator('.pr-card', { hasText: 'Bump lodash' });
   await expect(card).toContainText('Bot');
   await expect(card).toContainText('Waiting for your review');
@@ -2154,6 +2160,77 @@ test('known bot PRs need attention until approved, then merge with the bot decla
       },
     ],
   );
+});
+
+test('cards whose checks all pass show a Checks badge', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('failedChecks', '[2]'));
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const badge = (title: string) =>
+    page.locator('.pr-card', { hasText: title }).locator('.badge.checks');
+  await expect(badge('Reduce cache lookup latency')).toHaveText('Checks');
+  await expect(badge('Refresh session token handling')).toHaveCount(0);
+});
+
+async function trackBotPr(page: Page) {
+  await page.goto('/');
+  await page.evaluate(() => localStorage.setItem('botPr', '1'));
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSettingsSection(page, 'Tracked repositories');
+  await page.getByRole('textbox', { name: 'Repository', exact: true }).fill('acme/platform');
+  await page.getByRole('button', { name: 'Add repository' }).click();
+  await saveSettings(page);
+  await closeSettings(page);
+}
+
+test('bot PRs waiting for review approve and merge after confirmation', async ({ page }) => {
+  await trackBotPr(page);
+  const card = page.locator('.pr-card', { hasText: 'Bump lodash' });
+  await expect(card).toContainText('Waiting for your review');
+  await expect(
+    page.getByRole('button', { name: 'Merge Reduce cache lookup latency', exact: true }),
+  ).toHaveCount(1);
+  await page.screenshot({ path: '.context/approve-merge-card.png', fullPage: true });
+  await card.getByRole('button', { name: 'Approve and merge Bump lodash', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Approve and merge pull request?' });
+  await expect(dialog).toContainText('approve, then merge');
+  await page.screenshot({ path: '.context/approve-merge-confirmation.png', fullPage: true });
+  await dialog.getByLabel('Merge method').selectOption('merge');
+  await dialog.getByRole('button', { name: 'Approve and merge', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Approving and merging…' })).toBeDisabled();
+  await expect(dialog).toBeHidden();
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('approveMergeCalls') ?? '[]')),
+  ).toEqual([
+    {
+      url: 'https://github.com/acme/platform/pull/7',
+      headOid: 'a'.repeat(40),
+      method: 'merge',
+      bot: 'dependabot',
+    },
+  ]);
+  expect(await page.evaluate(() => localStorage.getItem('mergeCalls'))).toBeNull();
+  await expect(card).toHaveCount(0);
+});
+
+test('approve and merge failures keep the dialog and card available', async ({ page }) => {
+  await trackBotPr(page);
+  await page.evaluate(() => localStorage.setItem('approveMergeFailure', '1'));
+  await page.getByRole('button', { name: 'Approve and merge Bump lodash', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Approve and merge pull request?' });
+  await dialog.getByRole('button', { name: 'Approve and merge', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('the merge failed');
+  await expect(page.locator('.pr-card', { hasText: 'Bump lodash' })).toHaveCount(1);
+  await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeEnabled();
+});
+
+test('approve and merge is not offered on bot PRs with failing checks', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('failedChecks', '[7]'));
+  await trackBotPr(page);
+  const card = page.locator('.pr-card', { hasText: 'Bump lodash' });
+  await expect(card).toContainText('Checks failed');
+  await expect(card.locator('.merge-button')).toHaveCount(0);
+  await expect(card.locator('.badge.checks')).toHaveCount(0);
 });
 
 test('known bots can be added and removed in Settings', async ({ page }) => {

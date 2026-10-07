@@ -9,7 +9,9 @@ is ready to merge, and what can wait. Select a card to review or comment on GitH
 **Merge…** button with a confirmation and a choice of squash, merge commit, or rebase.
 PR Desk rechecks readiness and the commit before merging through your authenticated
 GitHub CLI. Repository permissions and merge rules still apply; repositories requiring
-a merge queue may need to be merged on GitHub.
+a merge queue may need to be merged on GitHub. Known-bot PRs waiting for your review whose
+checks all pass and that GitHub can merge have an **Approve and merge…** button that approves
+the confirmed commit, then merges it. Cards whose checks all pass carry a green Checks badge.
 
 ## Installation
 
@@ -73,8 +75,8 @@ PR Desk has no in-app updater.
   and stops watching PRs that were merged or closed.
 - Manages known bots (Settings → Known bots, prefilled with Dependabot and Renovate): their PRs in
   tracked repositories sit in Needs attention as "Waiting for your review" like any other PR that
-  is not yours; once approved, they and watched bot PRs move to Ready to merge (with in-app
-  Merge…); failed checks or conflicts bring them back to Needs attention, and they carry a Bot
+  is not yours, with in-app Approve and merge… once their checks pass; once approved, they and
+  watched bot PRs move to Ready to merge (with in-app Merge…); failed checks or conflicts bring them back to Needs attention, and they carry a Bot
   badge.
 - Supports per-repository non-blocking check rules (Settings → Non-blocking checks): a matching
   _pending_ check, such as `policy-bot`, no longer keeps an approved PR out of Ready to merge.

@@ -47,14 +47,12 @@ fn author_allowed(pr: &Value, login: &str, bot: Option<&str>) -> bool {
     })
 }
 
-fn validate_ready(
-    pr: &Value,
-    head_oid: &str,
-    login: &str,
-    bot: Option<&str>,
-) -> Result<(), String> {
-    let checks_pass = match &pr["statusCheckRollup"] {
-        Value::Null => true,
+const PR_FIELDS: &str = "state,isDraft,headRefOid,author,reviewDecision,mergeable,mergeStateStatus,statusCheckRollup,autoMergeRequest";
+
+// Pending or unknown checks never pass; an empty or missing rollup means no checks.
+fn checks_pass(pr: &Value) -> bool {
+    match &pr["statusCheckRollup"] {
+        Value::Null => pr.get("statusCheckRollup").is_some(),
         Value::Array(checks) => checks.iter().all(|check| {
             if check["__typename"] == "CheckRun" {
                 check["status"] == "COMPLETED"
@@ -65,7 +63,15 @@ fn validate_ready(
             }
         }),
         _ => false,
-    };
+    }
+}
+
+fn validate_ready(
+    pr: &Value,
+    head_oid: &str,
+    login: &str,
+    bot: Option<&str>,
+) -> Result<(), String> {
     if pr["state"] != "OPEN"
         || pr["isDraft"] != false
         || pr["headRefOid"] != head_oid
@@ -74,11 +80,58 @@ fn validate_ready(
         || !["CLEAN", "HAS_HOOKS", "UNSTABLE"]
             .contains(&pr["mergeStateStatus"].as_str().unwrap_or(""))
         || !author_allowed(pr, login, bot)
-        || pr.get("statusCheckRollup").is_none()
-        || !checks_pass
+        || !checks_pass(pr)
         || !pr["autoMergeRequest"].is_null()
     {
         return Err("This PR changed or is no longer ready to merge. Cancel and refresh before trying again.".into());
+    }
+    Ok(())
+}
+
+// The missing review is what makes GitHub report BLOCKED, so it is accepted before approving.
+fn validate_approvable(pr: &Value, head_oid: &str, bot: &str) -> Result<(), String> {
+    if pr["state"] != "OPEN"
+        || pr["isDraft"] != false
+        || pr["headRefOid"] != head_oid
+        || pr["reviewDecision"] == "APPROVED"
+        || pr["reviewDecision"] == "CHANGES_REQUESTED"
+        || pr["mergeable"] != "MERGEABLE"
+        || !["BLOCKED", "CLEAN", "HAS_HOOKS", "UNSTABLE"]
+            .contains(&pr["mergeStateStatus"].as_str().unwrap_or(""))
+        || !author_allowed(pr, "", Some(bot))
+        || !checks_pass(pr)
+        || !pr["autoMergeRequest"].is_null()
+    {
+        return Err("This PR changed or can no longer be approved and merged. Cancel and refresh before trying again.".into());
+    }
+    Ok(())
+}
+
+fn pull_endpoint(url: &str) -> String {
+    let path = url.strip_prefix("https://github.com/").unwrap();
+    let (repository, number) = path.rsplit_once("/pull/").unwrap();
+    format!("repos/{repository}/pulls/{number}")
+}
+
+// Pin the mutation to the commit shown in the confirmation; never enable auto-merge
+// or bypass repository rules. GitHub atomically rejects a changed head.
+async fn merge(url: &str, head_oid: &str, method: &str) -> Result<(), String> {
+    let endpoint = format!("{}/merge", pull_endpoint(url));
+    let result = gh(&[
+        "api",
+        "--hostname",
+        "github.com",
+        "--method",
+        "PUT",
+        &endpoint,
+        "-f",
+        &format!("sha={head_oid}"),
+        "-f",
+        &format!("merge_method={method}"),
+    ])
+    .await?;
+    if result["merged"] != true {
+        return Err(FAILURE.into());
     }
     Ok(())
 }
@@ -93,20 +146,58 @@ pub async fn merge_pr(
     validate_input(&url, &head_oid, &method)?;
     tokio::time::timeout(Duration::from_secs(45), async {
         let user = gh(&["api", "--hostname", "github.com", "user"]).await?;
-        let pr = gh(&["pr", "view", &url, "--json", "state,isDraft,headRefOid,author,reviewDecision,mergeable,mergeStateStatus,statusCheckRollup,autoMergeRequest"]).await?;
-        validate_ready(&pr, &head_oid, user["login"].as_str().unwrap_or(""), bot.as_deref())?;
-        let path = url.strip_prefix("https://github.com/").unwrap();
-        let (repository, number) = path.rsplit_once("/pull/").unwrap();
-        let endpoint = format!("repos/{repository}/pulls/{number}/merge");
-        // Pin the mutation to the commit shown in the confirmation; never enable auto-merge
-        // or bypass repository rules. GitHub atomically rejects a changed head.
-        let result = gh(&["api", "--hostname", "github.com", "--method", "PUT", &endpoint,
-            "-f", &format!("sha={head_oid}"), "-f", &format!("merge_method={method}")]).await?;
-        if result["merged"] != true {
-            return Err(FAILURE.into());
+        let pr = gh(&["pr", "view", &url, "--json", PR_FIELDS]).await?;
+        validate_ready(
+            &pr,
+            &head_oid,
+            user["login"].as_str().unwrap_or(""),
+            bot.as_deref(),
+        )?;
+        merge(&url, &head_oid, &method).await
+    })
+    .await
+    .map_err(|_| {
+        "Merge timed out. Refresh the PR on GitHub before retrying; it may already have merged."
+            .to_string()
+    })?
+}
+
+#[tauri::command]
+pub async fn approve_and_merge_pr(
+    url: String,
+    head_oid: String,
+    method: String,
+    bot: String,
+) -> Result<(), String> {
+    validate_input(&url, &head_oid, &method)?;
+    tokio::time::timeout(Duration::from_secs(45), async {
+        let user = gh(&["api", "--hostname", "github.com", "user"]).await?;
+        let login = user["login"].as_str().unwrap_or("");
+        let pr = gh(&["pr", "view", &url, "--json", PR_FIELDS]).await?;
+        validate_approvable(&pr, &head_oid, &bot)?;
+        // The approval is pinned to the confirmed commit, like the merge that follows it.
+        let reviews = format!("{}/reviews", pull_endpoint(&url));
+        gh(&["api", "--hostname", "github.com", "--method", "POST", &reviews,
+            "-f", &format!("commit_id={head_oid}"), "-f", "event=APPROVE"])
+            .await
+            .map_err(|_| "Could not approve this PR. Check your repository permissions on GitHub, then refresh before retrying.".to_string())?;
+        // GitHub recomputes the review decision and merge state asynchronously after a review.
+        let mut ready = false;
+        for _ in 0..10 {
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            let pr = gh(&["pr", "view", &url, "--json", PR_FIELDS]).await?;
+            if validate_ready(&pr, &head_oid, login, Some(&bot)).is_ok() {
+                ready = true;
+                break;
+            }
         }
-        Ok(())
-    }).await.map_err(|_| "Merge timed out. Refresh the PR on GitHub before retrying; it may already have merged.".to_string())?
+        if !ready {
+            return Err("Approved on GitHub, but it isn't mergeable yet — GitHub may require more reviews. Refresh to see what's blocking it.".into());
+        }
+        merge(&url, &head_oid, &method)
+            .await
+            .map_err(|e| format!("Approved on GitHub, but the merge failed. {e}"))
+    }).await.map_err(|_| "Approve and merge timed out. Refresh the PR on GitHub before retrying; it may already be approved or merged.".to_string())?
 }
 
 #[cfg(test)]
@@ -220,6 +311,65 @@ mod tests {
             assert_eq!(
                 validate_ready(&pr, &"a".repeat(40), "me", None).is_ok(),
                 passing
+            );
+        }
+    }
+
+    fn approvable() -> Value {
+        let mut pr = ready();
+        pr["author"] = json!({"login":"app/dependabot","is_bot":true});
+        pr["reviewDecision"] = json!("REVIEW_REQUIRED");
+        pr["mergeStateStatus"] = json!("BLOCKED");
+        pr
+    }
+
+    #[test]
+    fn approvable_accepts_waiting_bot_prs() {
+        let oid = "a".repeat(40);
+        assert!(validate_approvable(&approvable(), &oid, "dependabot[bot]").is_ok());
+        let mut pr = approvable();
+        pr["reviewDecision"] = Value::Null;
+        pr["mergeStateStatus"] = json!("CLEAN");
+        assert!(validate_approvable(&pr, &oid, "dependabot[bot]").is_ok());
+    }
+
+    #[test]
+    fn approvable_rejects_other_authors_and_non_approvable_states() {
+        let oid = "a".repeat(40);
+        let mut owned = approvable();
+        owned["author"] = json!({"login":"me"});
+        assert!(validate_approvable(&owned, &oid, "me").is_err());
+        let mut human = approvable();
+        human["author"] = json!({"login":"app/dependabot","is_bot":false});
+        assert!(validate_approvable(&human, &oid, "dependabot[bot]").is_err());
+        assert!(validate_approvable(&approvable(), &oid, "renovate[bot]").is_err());
+        for (key, value) in [
+            ("state", json!("CLOSED")),
+            ("isDraft", json!(true)),
+            ("headRefOid", json!("b".repeat(40))),
+            ("reviewDecision", json!("APPROVED")),
+            ("reviewDecision", json!("CHANGES_REQUESTED")),
+            ("mergeable", json!("CONFLICTING")),
+            ("mergeStateStatus", json!("BEHIND")),
+            ("mergeStateStatus", json!("DIRTY")),
+            (
+                "statusCheckRollup",
+                json!([{"__typename":"CheckRun","status":"COMPLETED","conclusion":"FAILURE"}]),
+            ),
+            (
+                "statusCheckRollup",
+                json!([{"__typename":"StatusContext","state":"PENDING"}]),
+            ),
+            (
+                "autoMergeRequest",
+                json!({"enabledAt":"2026-09-20T10:00:00Z"}),
+            ),
+        ] {
+            let mut pr = approvable();
+            pr[key] = value;
+            assert!(
+                validate_approvable(&pr, &oid, "dependabot[bot]").is_err(),
+                "{key}"
             );
         }
     }

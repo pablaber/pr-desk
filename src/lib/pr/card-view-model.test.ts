@@ -3,6 +3,7 @@ import { cardViewModel, stalenessLevel } from './card-view-model';
 import { classify } from './classify';
 import { defaultState } from '../store/app-state';
 import { pr } from '../../test/fixtures';
+import type { PullRequest } from './types';
 const now = Date.parse('2026-09-20T10:00:00Z');
 const daysAgo = (days: number) => new Date(now - days * 86400000).toISOString();
 describe('review badges', () => {
@@ -75,5 +76,29 @@ describe('bot badge', () => {
       now,
     )!;
     expect(cardViewModel(item, now).badges).toEqual(['Tracked repo', 'Bot']);
+  });
+});
+describe('checks badge', () => {
+  it.each([
+    [[], false],
+    [[{ name: 'CI', state: 'passing' }], true],
+    [
+      [
+        { name: 'CI', state: 'passing' },
+        { name: 'lint', state: 'passing' },
+      ],
+      true,
+    ],
+    [
+      [
+        { name: 'CI', state: 'passing' },
+        { name: 'lint', state: 'pending' },
+      ],
+      false,
+    ],
+    [[{ name: 'CI', state: 'failed' }], false],
+  ] as [PullRequest['checks'], boolean][])('shows for %j: %s', (checks, expected) => {
+    const item = classify(pr({ checks }), 'me', defaultState(), now)!;
+    expect(cardViewModel(item, now).checksPassing).toBe(expected);
   });
 });
