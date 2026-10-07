@@ -49,6 +49,15 @@ describe('GitHub adapter', () => {
       activeUnresolvedThreads: 1,
       outdatedUnresolvedThreads: 1,
     }));
+  it('marks GitHub App authors apart from user accounts', () => {
+    expect(normalize({ ...raw(), author: { __typename: 'User', login: 'ci-user' } })).toMatchObject(
+      { author: 'ci-user', authorIsBot: false },
+    );
+    expect(
+      normalize({ ...raw(), author: { __typename: 'Bot', login: 'dependabot' } }),
+    ).toMatchObject({ author: 'dependabot', authorIsBot: true });
+    expect(normalize({ ...raw(), author: null })).toMatchObject({ author: '', authorIsBot: false });
+  });
   it('normalizes merge queue and auto-merge, defaulting when GitHub omits them', () => {
     expect(normalize(raw())).toMatchObject({ mergeQueue: null, autoMerge: false });
     expect(

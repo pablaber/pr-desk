@@ -77,7 +77,8 @@ PR Desk has no in-app updater.
   tracked repositories sit in Needs attention as "Waiting for your review" like any other PR that
   is not yours, with in-app Approve and merge… once their checks pass; once approved, they and
   watched bot PRs move to Ready to merge (with in-app Merge…); failed checks or conflicts bring them back to Needs attention, and they carry a Bot
-  badge.
+  badge. Add a GitHub App as `name[bot]`, such as `renovate[bot]`, or a machine user account by
+  its exact login; the author's account type must match.
 - Supports per-repository non-blocking check rules (Settings → Non-blocking checks): a matching
   _pending_ check, such as `policy-bot`, no longer keeps an approved PR out of Ready to merge.
   Failures still need attention, and these PRs have no in-app Merge.

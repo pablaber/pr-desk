@@ -36,7 +36,7 @@ export interface PRLabel {
 export type DockBadgeMode = 'off' | 'ready-to-merge' | 'needs-attention' | 'both';
 export type InterfaceScale = 90 | 100 | 115 | 130;
 export interface AppState {
-  schemaVersion: 11;
+  schemaVersion: 12;
   trackedRepositories: string[];
   ignoreRules: IgnoreRule[];
   checkRules: CheckRule[];
@@ -62,7 +62,7 @@ export const defaultSnoozeOptions = (): SnoozeOption[] => [
 ];
 const defaultKnownBots = (): string[] => ['dependabot[bot]', 'renovate[bot]'];
 export const defaultState = (): AppState => ({
-  schemaVersion: 11,
+  schemaVersion: 12,
   trackedRepositories: [],
   ignoreRules: [],
   checkRules: [],
@@ -95,7 +95,7 @@ export function migrateState(value: unknown): AppState {
     labeledPullRequests?: unknown;
     knownBots?: unknown;
   };
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].includes(stored.schemaVersion))
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(stored.schemaVersion))
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
@@ -121,7 +121,7 @@ export function migrateState(value: unknown): AppState {
     watchedPullRequests: stored.watchedPullRequests,
     ignoredPullRequests: stored.ignoredPullRequests,
     snoozedPullRequests: stored.snoozedPullRequests,
-    schemaVersion: 11,
+    schemaVersion: 12,
     knownBots: readStoredKnownBots(stored),
     ignoreRules: readStoredIgnoreRules(stored),
     checkRules: readStoredCheckRules(stored),
@@ -327,22 +327,31 @@ function readStoredIgnoreRules(stored: {
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
   }
 }
+// A GitHub App is stored as `name[bot]` (gh shows it as `app/name`); a bare login is a machine user.
 export function parseKnownBot(input: string): string {
   if (typeof input !== 'string') throw new Error('Enter a bot name.');
-  const name = input
-    .trim()
-    .toLowerCase()
-    .replace(/^app\//, '')
-    .replace(/\[bot\]$/, '');
+  const value = input.trim().toLowerCase();
+  const app = /^app\//.test(value) || /\[bot\]$/.test(value);
+  const name = value.replace(/^app\//, '').replace(/\[bot\]$/, '');
   if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(name))
-    throw new Error('Enter a GitHub App bot name, such as dependabot or renovate[bot].');
-  return `${name}[bot]`;
+    throw new Error(
+      'Enter a GitHub App as name[bot], such as renovate[bot], or a machine user by its login.',
+    );
+  return app ? `${name}[bot]` : name;
 }
 function readStoredKnownBots(stored: { schemaVersion: number; knownBots?: unknown }): string[] {
   if (stored.schemaVersion < 11) return defaultKnownBots();
   try {
     if (!Array.isArray(stored.knownBots)) throw new Error('Invalid bots');
-    return [...new Set(stored.knownBots.map(parseKnownBot))];
+    // Version 11 only held GitHub Apps and accepted their bare names.
+    return [
+      ...new Set(
+        stored.knownBots.map((input) => {
+          const bot = parseKnownBot(input);
+          return stored.schemaVersion > 11 || bot.endsWith('[bot]') ? bot : `${bot}[bot]`;
+        }),
+      ),
+    ];
   } catch {
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
   }

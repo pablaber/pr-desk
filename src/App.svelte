@@ -72,6 +72,7 @@
     type SnoozeOption,
   } from './lib/store/app-state';
   import { classify, sortPullRequests } from './lib/pr/classify';
+  import { knownBotKey } from './lib/pr/bots';
   import { badgeCount } from './lib/pr/badge';
   import { buildDebugInfo } from './lib/debug/debug-info';
   import { applyLabelOp, labelsFor, type LabelOp } from './lib/pr/labels';
@@ -516,9 +517,10 @@
             pr.id,
             pr.headOid,
             method,
-            freshResult.bot ? fresh.author : undefined,
+            freshResult.bot ? knownBotKey(fresh) : undefined,
           );
-        else await service.approveAndMergePullRequest(pr.id, pr.headOid, method, fresh.author);
+        else
+          await service.approveAndMergePullRequest(pr.id, pr.headOid, method, knownBotKey(fresh));
       } else {
         await service.closeStalePullRequest(pr.id);
       }

@@ -33,6 +33,7 @@ export function normalize(raw: RawPR): PullRequest {
     title: raw.title,
     headOid: raw.commits.nodes[0]?.commit.oid ?? '',
     author: raw.author?.login ?? '',
+    authorIsBot: raw.author?.__typename === 'Bot',
     state: raw.state,
     draft: raw.isDraft,
     updatedAt: raw.updatedAt,

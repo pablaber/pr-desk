@@ -8,6 +8,7 @@ export function pr(overrides: Partial<PullRequest> = {}): PullRequest {
     title: 'Improve caching',
     headOid: 'a'.repeat(40),
     author: 'me',
+    authorIsBot: false,
     state: 'OPEN',
     draft: false,
     updatedAt: '2026-09-20T10:00:00Z',

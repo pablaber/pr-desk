@@ -15,7 +15,7 @@ export interface RawPR {
   url: string;
   number: number;
   title: string;
-  author: { login: string } | null;
+  author: { __typename?: string; login: string } | null;
   repository: { nameWithOwner: string };
   state: PullRequest['state'];
   isDraft: boolean;

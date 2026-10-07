@@ -30,11 +30,14 @@ fn validate_input(url: &str, head_oid: &str, method: &str) -> Result<(), String>
     Ok(())
 }
 
-// gh reports a bot author as `app/name`; the app stores `name[bot]`. Compare the bare names.
-fn bot_key(login: &str) -> String {
-    let lower = login.to_ascii_lowercase();
-    let name = lower.strip_prefix("app/").unwrap_or(&lower);
-    name.strip_suffix("[bot]").unwrap_or(name).to_string()
+// A known bot is a GitHub App, `name[bot]`, which gh reports as `app/name`, or a machine
+// user's bare login. The account type must match too, so a user never passes for an App.
+fn bot_key(author: &Value) -> Option<String> {
+    let login = author["login"].as_str()?.to_ascii_lowercase();
+    match author["is_bot"].as_bool()? {
+        true => Some(format!("{}[bot]", login.strip_prefix("app/")?)),
+        false => Some(login),
+    }
 }
 
 fn author_allowed(pr: &Value, login: &str, bot: Option<&str>) -> bool {
@@ -42,9 +45,8 @@ fn author_allowed(pr: &Value, login: &str, bot: Option<&str>) -> bool {
     if !login.is_empty() && author.eq_ignore_ascii_case(login) {
         return true;
     }
-    bot.is_some_and(|bot| {
-        pr["author"]["is_bot"] == true && !author.is_empty() && bot_key(author) == bot_key(bot)
-    })
+    !author.is_empty()
+        && bot.is_some_and(|bot| bot_key(&pr["author"]) == Some(bot.to_ascii_lowercase()))
 }
 
 const PR_FIELDS: &str = "state,isDraft,headRefOid,author,reviewDecision,mergeable,mergeStateStatus,statusCheckRollup,autoMergeRequest";
@@ -89,7 +91,8 @@ fn validate_ready(
 }
 
 // The missing review is what makes GitHub report BLOCKED, so it is accepted before approving.
-fn validate_approvable(pr: &Value, head_oid: &str, bot: &str) -> Result<(), String> {
+fn validate_approvable(pr: &Value, head_oid: &str, login: &str, bot: &str) -> Result<(), String> {
+    let author = pr["author"]["login"].as_str().unwrap_or("");
     if pr["state"] != "OPEN"
         || pr["isDraft"] != false
         || pr["headRefOid"] != head_oid
@@ -98,6 +101,8 @@ fn validate_approvable(pr: &Value, head_oid: &str, bot: &str) -> Result<(), Stri
         || pr["mergeable"] != "MERGEABLE"
         || !["BLOCKED", "CLEAN", "HAS_HOOKS", "UNSTABLE"]
             .contains(&pr["mergeStateStatus"].as_str().unwrap_or(""))
+        || login.is_empty()
+        || author.eq_ignore_ascii_case(login)
         || !author_allowed(pr, "", Some(bot))
         || !checks_pass(pr)
         || !pr["autoMergeRequest"].is_null()
@@ -174,7 +179,7 @@ pub async fn approve_and_merge_pr(
         let user = gh(&["api", "--hostname", "github.com", "user"]).await?;
         let login = user["login"].as_str().unwrap_or("");
         let pr = gh(&["pr", "view", &url, "--json", PR_FIELDS]).await?;
-        validate_approvable(&pr, &head_oid, &bot)?;
+        validate_approvable(&pr, &head_oid, login, &bot)?;
         // The approval is pinned to the confirmed commit, like the merge that follows it.
         let reviews = format!("{}/reviews", pull_endpoint(&url));
         gh(&["api", "--hostname", "github.com", "--method", "POST", &reviews,
@@ -260,15 +265,24 @@ mod tests {
     #[test]
     fn known_bot_authors_are_accepted_only_when_declared_and_matching() {
         let oid = "a".repeat(40);
-        let bot_pr = |is_bot: bool| {
+        let bot_pr = |login: &str, is_bot: bool| {
             let mut pr = ready();
-            pr["author"] = json!({"login":"app/dependabot","is_bot":is_bot});
+            pr["author"] = json!({"login":login,"is_bot":is_bot});
             pr
         };
-        assert!(validate_ready(&bot_pr(true), &oid, "me", Some("dependabot[bot]")).is_ok());
-        assert!(validate_ready(&bot_pr(false), &oid, "me", Some("dependabot[bot]")).is_err());
-        assert!(validate_ready(&bot_pr(true), &oid, "me", Some("renovate[bot]")).is_err());
-        assert!(validate_ready(&bot_pr(true), &oid, "me", None).is_err());
+        let app = bot_pr("app/dependabot", true);
+        assert!(validate_ready(&app, &oid, "me", Some("dependabot[bot]")).is_ok());
+        assert!(validate_ready(&app, &oid, "me", Some("dependabot")).is_err());
+        assert!(validate_ready(&app, &oid, "me", Some("renovate[bot]")).is_err());
+        assert!(validate_ready(&app, &oid, "me", None).is_err());
+        let user = bot_pr("CI-User", false);
+        assert!(validate_ready(&user, &oid, "me", Some("ci-user")).is_ok());
+        assert!(validate_ready(&user, &oid, "me", Some("ci-user[bot]")).is_err());
+        let impostor = bot_pr("dependabot", false);
+        assert!(validate_ready(&impostor, &oid, "me", Some("dependabot[bot]")).is_err());
+        let mut unknown = bot_pr("app/dependabot", true);
+        unknown["author"]["is_bot"] = Value::Null;
+        assert!(validate_ready(&unknown, &oid, "me", Some("dependabot[bot]")).is_err());
         assert!(validate_ready(&ready(), &oid, "me", Some("dependabot[bot]")).is_ok());
     }
 
@@ -326,23 +340,27 @@ mod tests {
     #[test]
     fn approvable_accepts_waiting_bot_prs() {
         let oid = "a".repeat(40);
-        assert!(validate_approvable(&approvable(), &oid, "dependabot[bot]").is_ok());
+        assert!(validate_approvable(&approvable(), &oid, "me", "dependabot[bot]").is_ok());
+        let mut machine_user = approvable();
+        machine_user["author"] = json!({"login":"ci-user","is_bot":false});
+        assert!(validate_approvable(&machine_user, &oid, "me", "ci-user").is_ok());
         let mut pr = approvable();
         pr["reviewDecision"] = Value::Null;
         pr["mergeStateStatus"] = json!("CLEAN");
-        assert!(validate_approvable(&pr, &oid, "dependabot[bot]").is_ok());
+        assert!(validate_approvable(&pr, &oid, "me", "dependabot[bot]").is_ok());
     }
 
     #[test]
     fn approvable_rejects_other_authors_and_non_approvable_states() {
         let oid = "a".repeat(40);
         let mut owned = approvable();
-        owned["author"] = json!({"login":"me"});
-        assert!(validate_approvable(&owned, &oid, "me").is_err());
+        owned["author"] = json!({"login":"Me","is_bot":false});
+        assert!(validate_approvable(&owned, &oid, "me", "me").is_err());
+        assert!(validate_approvable(&approvable(), &oid, "", "dependabot[bot]").is_err());
         let mut human = approvable();
         human["author"] = json!({"login":"app/dependabot","is_bot":false});
-        assert!(validate_approvable(&human, &oid, "dependabot[bot]").is_err());
-        assert!(validate_approvable(&approvable(), &oid, "renovate[bot]").is_err());
+        assert!(validate_approvable(&human, &oid, "me", "dependabot[bot]").is_err());
+        assert!(validate_approvable(&approvable(), &oid, "me", "renovate[bot]").is_err());
         for (key, value) in [
             ("state", json!("CLOSED")),
             ("isDraft", json!(true)),
@@ -368,7 +386,7 @@ mod tests {
             let mut pr = approvable();
             pr[key] = value;
             assert!(
-                validate_approvable(&pr, &oid, "dependabot[bot]").is_err(),
+                validate_approvable(&pr, &oid, "me", "dependabot[bot]").is_err(),
                 "{key}"
             );
         }
