@@ -36,14 +36,14 @@ export const dashboardRules: DashboardRule[] = [
     id: 'checks',
     state: 'needs-attention',
     priority: 70,
-    matches: (s) => s.owned && s.failedChecks > 0,
+    matches: (s) => s.managed && s.failedChecks > 0,
     getLabel: () => 'Checks failed',
   },
   {
     id: 'conflict',
     state: 'needs-attention',
     priority: 60,
-    matches: (s) => s.owned && s.conflict,
+    matches: (s) => s.managed && s.conflict,
     getLabel: () => 'Merge conflict',
   },
   {
@@ -78,7 +78,7 @@ export const dashboardRules: DashboardRule[] = [
     id: 'tracked-repository',
     state: 'needs-attention',
     priority: 10,
-    matches: (s) => s.trackedRepository && !s.owned && !s.pr.draft,
+    matches: (s) => s.trackedRepository && !s.owned && !s.bot && !s.pr.draft,
     getLabel: () => 'Open in a tracked repository',
     showAsStatus: false,
   },
@@ -93,7 +93,7 @@ export const dashboardRules: DashboardRule[] = [
         ? 'Draft'
         : s.checksRunning
           ? 'Checks running'
-          : s.owned
+          : s.managed
             ? s.pr.reviewDecision === 'APPROVED'
               ? 'Waiting on merge requirements'
               : 'Waiting for review'

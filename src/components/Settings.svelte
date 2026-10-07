@@ -1,6 +1,7 @@
 <script lang="ts">
   import AlarmClock from '@lucide/svelte/icons/alarm-clock';
   import BellDot from '@lucide/svelte/icons/bell-dot';
+  import Bot from '@lucide/svelte/icons/bot';
   import Bug from '@lucide/svelte/icons/bug';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import Eye from '@lucide/svelte/icons/eye';
@@ -75,8 +76,8 @@
     error: string;
     ondismisserror: () => void;
     onclose: () => void;
-    onadd: (kind: 'repo' | 'pr' | IgnoreRuleKind, value: string) => Promise<boolean>;
-    onremove: (kind: 'repo' | 'pr' | IgnoreRuleKind, value: string) => void;
+    onadd: (kind: 'repo' | 'pr' | 'bot' | IgnoreRuleKind, value: string) => Promise<boolean>;
+    onremove: (kind: 'repo' | 'pr' | 'bot' | IgnoreRuleKind, value: string) => void;
     onaddcheckrule: (repository: string, check: string) => boolean;
     onremovecheckrule: (rule: CheckRule) => void;
     onsave: () => Promise<boolean>;
@@ -98,6 +99,7 @@
     | 'snooze'
     | 'tracked'
     | 'watched'
+    | 'bots'
     | 'ignore-rules'
     | 'ignored'
     | 'check-rules'
@@ -118,6 +120,7 @@
       items: [
         { id: 'tracked', title: 'Tracked repositories', icon: FolderGit2 },
         { id: 'watched', title: 'Watched pull requests', icon: Eye },
+        { id: 'bots', title: 'Known bots', icon: Bot },
         { id: 'ignore-rules', title: 'Ignore rules', icon: FunnelX },
         { id: 'ignored', title: 'Ignored pull requests', icon: EyeOff },
         { id: 'check-rules', title: 'Non-blocking checks', icon: ListChecks },
@@ -149,21 +152,23 @@
     pr = $state('');
   let checkRepository = $state(''),
     checkName = $state('');
+  let bot = $state('');
   let repositoryError = $state('');
   // Adding a repository or a watched PR asks GitHub whether it exists before the value joins the
   // draft, so each of those two fields shows its own in-field progress while that check runs.
-  let checking = $state({ repo: false, pr: false });
+  let checking = $state({ repo: false, pr: false, bot: false });
 
   function heading(label: string, count: number): string {
     return count > 0 ? `${label} · ${count}` : label;
   }
-  async function submit(field: 'repo' | 'pr', value: string) {
+  async function submit(field: 'repo' | 'pr' | 'bot', value: string) {
     if (checking[field]) return;
     checking[field] = true;
     if (field === 'repo') repositoryError = '';
     try {
       if (await onadd(field, value)) {
         if (field === 'repo') repository = '';
+        else if (field === 'bot') bot = '';
         else pr = '';
       }
     } catch (error) {
@@ -402,6 +407,45 @@
                 >Remove</button
               >
             </div>{:else}<p class="empty-setting">No individually watched PRs.</p>{/each}
+        </section>
+      {:else if section === 'bots'}
+        <section
+          id="settings-section-bots"
+          class="settings-section"
+          aria-labelledby="settings-section-heading"
+        >
+          <h2 id="settings-section-heading">
+            {heading('Known bots', preferences.knownBots.length)}
+          </h2>
+          <p>
+            PRs by these GitHub App bots in tracked repositories or watched PRs wait for your
+            review, then move to Ready to merge once approved.
+          </p>
+          <form
+            onsubmit={(e) => {
+              e.preventDefault();
+              void submit('bot', bot);
+            }}
+          >
+            <span class="settings-field">
+              <input
+                aria-label="Bot name"
+                autocapitalize="off"
+                autocomplete="off"
+                autocorrect="off"
+                spellcheck="false"
+                placeholder="dependabot[bot]"
+                bind:value={bot}
+                required
+                disabled={busy}
+              />
+            </span><button class="primary-button" disabled={busy}>Add bot</button>
+          </form>
+          {#each preferences.knownBots as name}<div class="setting-row">
+              <code>{name}</code><button disabled={busy} onclick={() => onremove('bot', name)}
+                >Remove</button
+              >
+            </div>{:else}<p class="empty-setting">No known bots.</p>{/each}
         </section>
       {:else if section === 'ignore-rules'}
         <section

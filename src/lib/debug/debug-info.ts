@@ -49,8 +49,8 @@ export function buildDebugInfo(input: DebugInfoInput, prId?: string) {
 function describePlacement(pr: PullRequest, input: DebugInfoInput) {
   const { login, now, preferences, snapshot } = input;
   const hidden = hiddenReason(pr, login, preferences, now);
-  const described = describePullRequest(pr, login, preferences.checkRules);
-  const signals = deriveSignals(pr, login, preferences.checkRules);
+  const described = describePullRequest(pr, login, preferences);
+  const signals = deriveSignals(pr, login, preferences);
   return {
     pr,
     column: hidden ? null : described.state,

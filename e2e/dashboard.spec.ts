@@ -50,9 +50,17 @@ test.beforeEach(async ({ page }) => {
           'Refresh session token handling',
           'Add audit event retention',
           'Simplify deployment configuration',
-        ][number - 1] ?? (number === 6 ? 'Document the retry policy' : 'A watched pull request'),
+        ][number - 1] ??
+        (number === 6
+          ? 'Document the retry policy'
+          : number === 7
+            ? 'Bump lodash'
+            : 'A watched pull request'),
       repository: { nameWithOwner: 'acme/platform' },
-      author: { login: number === 4 ? 'sam' : number === 6 ? 'jordan' : 'alex' },
+      author: {
+        login:
+          number === 4 ? 'sam' : number === 6 ? 'jordan' : number === 7 ? 'dependabot' : 'alex',
+      },
       state: (JSON.parse(localStorage.getItem('mergedPrs') ?? '[]') as number[]).includes(number)
         ? 'MERGED'
         : 'OPEN',
@@ -61,7 +69,12 @@ test.beforeEach(async ({ page }) => {
       updatedAt: new Date(
         Date.now() - ([1 / 24, 10, 20, 30][number - 1] ?? 1 / 24) * 86400000,
       ).toISOString(),
-      reviewDecision: number === 1 ? 'APPROVED' : number === 2 ? 'CHANGES_REQUESTED' : null,
+      reviewDecision:
+        number === 1 || (number === 7 && localStorage.getItem('botApproved'))
+          ? 'APPROVED'
+          : number === 2
+            ? 'CHANGES_REQUESTED'
+            : null,
       mergeable: 'MERGEABLE',
       mergeStateStatus: 'CLEAN',
       reviewRequests: connection(
@@ -180,7 +193,9 @@ test.beforeEach(async ({ page }) => {
           return {
             repository: {
               nameWithOwner: 'acme/platform',
-              pullRequests: connection([1, 2, 3, 4, 6].map(raw)),
+              pullRequests: connection(
+                [1, 2, 3, 4, 6, ...(localStorage.getItem('botPr') ? [7] : [])].map(raw),
+              ),
             },
           };
         const number = Number(query.match(/pullRequest\(number: (\d+)/)?.[1]);
@@ -701,6 +716,7 @@ test('settings opens as an overlay with a section sidebar and confirms unsaved e
     ['Snooze options', 'alarm-clock'],
     ['Tracked repositories', 'folder-git-2'],
     ['Watched pull requests', 'eye'],
+    ['Known bots', 'bot'],
     ['Ignore rules', 'funnel-x'],
     ['Ignored pull requests', 'eye-off'],
     ['Non-blocking checks', 'list-checks'],
@@ -1473,7 +1489,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
     .click();
   await saveSettings(page);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
-  expect(saved.schemaVersion).toBe(10);
+  expect(saved.schemaVersion).toBe(11);
   expect(saved.ignoreRules).toEqual([]);
   expect(saved.ignoredPullRequests).toHaveProperty('acme/platform#2');
   expect(saved.settings.snoozeOptions).toEqual([]);
@@ -2057,4 +2073,56 @@ test('a refresh unwatches and unlabels merged PRs and unlabels ones no longer di
   });
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await expect.poll(stored).toEqual([[], []]);
+});
+
+test('known bot PRs wait for review, then merge with the bot declared', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => localStorage.setItem('botPr', '1'));
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSettingsSection(page, 'Tracked repositories');
+  await page.getByRole('textbox', { name: 'Repository', exact: true }).fill('acme/platform');
+  await page.getByRole('button', { name: 'Add repository' }).click();
+  await saveSettings(page);
+  await closeSettings(page);
+  const card = page.locator('.pr-card', { hasText: 'Bump lodash' });
+  await expect(card).toContainText('Bot');
+  await expect(card).toContainText('Waiting for review');
+  await expect(
+    page.locator('.column').nth(1).locator('.pr-card', { hasText: 'Bump lodash' }),
+  ).toHaveCount(0);
+
+  await page.evaluate(() => localStorage.setItem('botApproved', '1'));
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('button', { name: 'Merge Bump lodash', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Merge pull request?' });
+  await dialog.getByRole('button', { name: 'Confirm merge', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mergeCalls') ?? '[]'))).toEqual(
+    [
+      {
+        url: 'https://github.com/acme/platform/pull/7',
+        headOid: 'a'.repeat(40),
+        method: 'squash',
+        bot: 'dependabot',
+      },
+    ],
+  );
+});
+
+test('known bots can be added and removed in Settings', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await openSettingsSection(page, 'Known bots');
+  await expect(dialog.getByRole('heading', { name: 'Known bots · 2' })).toBeVisible();
+  await dialog.getByRole('textbox', { name: 'Bot name' }).fill('app/Mend');
+  await dialog.getByRole('button', { name: 'Add bot' }).click();
+  await expect(dialog.getByText('mend[bot]', { exact: true })).toBeVisible();
+  await dialog
+    .locator('.setting-row', { hasText: 'renovate[bot]' })
+    .getByRole('button', { name: 'Remove' })
+    .click();
+  await saveSettings(page);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
+  expect(saved.knownBots).toEqual(['dependabot[bot]', 'mend[bot]']);
 });

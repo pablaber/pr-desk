@@ -41,7 +41,7 @@ export function cardViewModel(item: ClassifiedPR, now: number) {
   ];
   return {
     ...item,
-    badges: item.pr.reasons.map((r) => sourceLabels[r]),
+    badges: [...item.pr.reasons.map((r) => sourceLabels[r]), ...(item.bot ? ['Bot'] : [])],
     reviewBadge:
       item.pr.reviewDecision === 'APPROVED'
         ? { label: 'Approved', tone: 'approved' }

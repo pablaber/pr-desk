@@ -44,6 +44,7 @@
     defaultState,
     loadState,
     saveState,
+    parseKnownBot,
     parseRepository,
     parseIgnoreRule,
     parseCheckRule,
@@ -337,7 +338,10 @@
   }
   // Validating a value costs a GitHub round trip for repositories and PRs, so it happens here,
   // before the value joins the draft. Nothing is written or refreshed until Save.
-  async function add(kind: 'repo' | 'pr' | IgnoreRuleKind, value: string): Promise<boolean> {
+  async function add(
+    kind: 'repo' | 'pr' | 'bot' | IgnoreRuleKind,
+    value: string,
+  ): Promise<boolean> {
     if (saving) return false;
     error = '';
     try {
@@ -347,6 +351,11 @@
           throw new Error('That ignore rule is already configured.');
         editDraft((next) => {
           next.ignoreRules = [...next.ignoreRules, rule];
+        });
+      } else if (kind === 'bot') {
+        const bot = parseKnownBot(value);
+        editDraft((next) => {
+          next.knownBots = [...new Set([...next.knownBots, bot])];
         });
       } else if (kind === 'repo') {
         const repo = parseRepository(value);
@@ -392,13 +401,14 @@
       next.checkRules = next.checkRules.filter((e) => checkRuleKey(e) !== checkRuleKey(rule));
     });
   }
-  function remove(kind: 'repo' | 'pr' | IgnoreRuleKind, value: string) {
+  function remove(kind: 'repo' | 'pr' | 'bot' | IgnoreRuleKind, value: string) {
     error = '';
     editDraft((next) => {
       if (kind === 'repository' || kind === 'author' || kind === 'title')
         next.ignoreRules = next.ignoreRules.filter(
           (rule) => rule.kind !== kind || rule.value !== value,
         );
+      else if (kind === 'bot') next.knownBots = next.knownBots.filter((b) => b !== value);
       else if (kind === 'repo')
         next.trackedRepositories = next.trackedRepositories.filter((r) => r !== value);
       else next.watchedPullRequests = next.watchedPullRequests.filter((p) => p !== value);
@@ -412,6 +422,7 @@
       next.ignoreRules = draft.ignoreRules;
       next.checkRules = draft.checkRules;
       next.watchedPullRequests = draft.watchedPullRequests;
+      next.knownBots = draft.knownBots;
     });
     // change() reports failures through error; keep the draft so the user can try again.
     if (error) return false;
@@ -478,14 +489,23 @@
     try {
       if (pendingAction === 'merge') {
         const fresh = await service.getPullRequest(pr.id);
-        if (
-          fresh.headOid !== pr.headOid ||
-          !classify(fresh, login, preferences, Date.now())?.canMerge
-        )
+        // A single-PR lookup carries no tracking reasons; the card's own reasons decide bot status.
+        const freshResult = classify(
+          { ...fresh, reasons: pr.reasons },
+          login,
+          preferences,
+          Date.now(),
+        );
+        if (fresh.headOid !== pr.headOid || !freshResult?.canMerge)
           throw new Error(
             'This PR changed or is no longer ready to merge. Cancel and refresh before trying again.',
           );
-        await service.mergePullRequest(pr.id, pr.headOid, method);
+        await service.mergePullRequest(
+          pr.id,
+          pr.headOid,
+          method,
+          freshResult.bot ? fresh.author : undefined,
+        );
       } else {
         await service.closeStalePullRequest(pr.id);
       }

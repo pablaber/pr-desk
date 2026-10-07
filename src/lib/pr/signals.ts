@@ -1,15 +1,25 @@
-import type { CheckRule } from '../store/app-state';
+import type { AppState } from '../store/app-state';
+import { isKnownBot } from './bots';
 import { matchesGlob } from './ignore';
 import type { PullRequest } from './types';
-export function deriveSignals(pr: PullRequest, login: string, checkRules: CheckRule[] = []) {
+export function deriveSignals(
+  pr: PullRequest,
+  login: string,
+  prefs: Pick<AppState, 'checkRules' | 'knownBots'>,
+) {
   const owned = pr.author.toLowerCase() === login.toLowerCase();
+  const bot =
+    !owned &&
+    isKnownBot(pr.author, prefs.knownBots) &&
+    (pr.reasons.includes('tracked-repository') || pr.reasons.includes('watched'));
+  const managed = owned || bot;
   const waitingOn = [
     ...new Set(
       pr.checks
         .filter(
           (c) =>
             c.state === 'pending' &&
-            checkRules.some(
+            prefs.checkRules.some(
               (rule) =>
                 matchesGlob(pr.repository, rule.repository) && matchesGlob(c.name, rule.check),
             ),
@@ -19,7 +29,7 @@ export function deriveSignals(pr: PullRequest, login: string, checkRules: CheckR
   ];
   const checks = pr.checks.filter((c) => !(c.state === 'pending' && waitingOn.includes(c.name)));
   const approved =
-    owned &&
+    managed &&
     !pr.draft &&
     pr.reviewDecision === 'APPROVED' &&
     checks.every((c) => c.state === 'passing') &&
@@ -29,6 +39,8 @@ export function deriveSignals(pr: PullRequest, login: string, checkRules: CheckR
   return {
     pr,
     owned,
+    bot,
+    managed,
     directReviewRequested: pr.directReviewers.some((r) => r.toLowerCase() === login.toLowerCase()),
     trackedRepository: pr.reasons.includes('tracked-repository'),
     activeThreads: pr.activeUnresolvedThreads,

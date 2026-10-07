@@ -52,7 +52,7 @@ export function labeledPullRequests(
       return {
         id,
         url: pr?.url ?? `https://github.com/${repository}/pull/${number}`,
-        item: pr ? describePullRequest(pr, login, local.checkRules) : null,
+        item: pr ? describePullRequest(pr, login, local) : null,
       };
     })
     .sort((a, b) => updated(b) - updated(a) || a.id.localeCompare(b.id));
