@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cardViewModel, stalenessLevel } from './card-view-model';
+import { cardViewModel, stalenessLevel, type ChecksStatus } from './card-view-model';
 import { classify } from './classify';
 import { defaultState } from '../store/app-state';
 import { pr } from '../../test/fixtures';
@@ -80,25 +80,32 @@ describe('bot badge', () => {
 });
 describe('checks badge', () => {
   it.each([
-    [[], false],
-    [[{ name: 'CI', state: 'passing' }], true],
+    [[], null],
+    [[{ name: 'CI', state: 'passing' }], 'passing'],
     [
       [
         { name: 'CI', state: 'passing' },
         { name: 'lint', state: 'passing' },
       ],
-      true,
+      'passing',
     ],
     [
       [
         { name: 'CI', state: 'passing' },
         { name: 'lint', state: 'pending' },
       ],
-      false,
+      'pending',
     ],
-    [[{ name: 'CI', state: 'failed' }], false],
-  ] as [PullRequest['checks'], boolean][])('shows for %j: %s', (checks, expected) => {
+    [[{ name: 'CI', state: 'failed' }], 'failed'],
+    [
+      [
+        { name: 'CI', state: 'pending' },
+        { name: 'lint', state: 'failed' },
+      ],
+      'failed',
+    ],
+  ] as [PullRequest['checks'], ChecksStatus | null][])('shows for %j: %s', (checks, expected) => {
     const item = classify(pr({ checks }), 'me', defaultState(), now)!;
-    expect(cardViewModel(item, now).checksPassing).toBe(expected);
+    expect(cardViewModel(item, now).checksBadge).toBe(expected);
   });
 });

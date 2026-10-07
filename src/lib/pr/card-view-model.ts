@@ -6,6 +6,7 @@ const sourceLabels: Record<TrackingReason, string> = {
   'tracked-repository': 'Tracked repo',
   watched: 'Watching',
 };
+export type ChecksStatus = 'passing' | 'pending' | 'failed';
 export type StalenessLevel = 'low' | 'medium' | 'high';
 const stalenessThresholds: [days: number, level: StalenessLevel][] = [
   [28, 'high'],
@@ -16,6 +17,13 @@ const stalenessThresholds: [days: number, level: StalenessLevel][] = [
 export function stalenessLevel(updatedAt: string, now: number): StalenessLevel | null {
   const days = (now - Date.parse(updatedAt)) / 86400000;
   return stalenessThresholds.find(([threshold]) => days > threshold)?.[1] ?? null;
+}
+// Failed outranks pending, so the badge shows the worst state and only ever one badge.
+function checksStatus(checks: ClassifiedPR['pr']['checks']): ChecksStatus | null {
+  if (checks.length === 0) return null;
+  if (checks.some((c) => c.state === 'failed')) return 'failed';
+  if (checks.some((c) => c.state === 'pending')) return 'pending';
+  return 'passing';
 }
 export function cardViewModel(item: ClassifiedPR, now: number) {
   const minutes = Math.max(0, Math.floor((now - Date.parse(item.pr.updatedAt)) / 60000));
@@ -48,7 +56,7 @@ export function cardViewModel(item: ClassifiedPR, now: number) {
         : item.pr.reviewDecision === 'CHANGES_REQUESTED'
           ? { label: 'Changes requested', tone: 'changes-requested' }
           : null,
-    checksPassing: checks.length > 0 && checks.every((c) => c.state === 'passing'),
+    checksBadge: checksStatus(checks),
     staleness: stalenessLevel(item.pr.updatedAt, now),
     age,
     secondary: secondary.join(' · '),

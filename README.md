@@ -11,7 +11,7 @@ PR Desk rechecks readiness and the commit before merging through your authentica
 GitHub CLI. Repository permissions and merge rules still apply; repositories requiring
 a merge queue may need to be merged on GitHub. Known-bot PRs waiting for your review whose
 checks all pass and that GitHub can merge have an **Approve and merge…** button that approves
-the confirmed commit, then merges it. Cards whose checks all pass carry a green Checks badge.
+the confirmed commit, then merges it. Cards with checks carry a Checks badge: green when all pass, amber while any are running, red when any fail.
 
 ## Installation
 
