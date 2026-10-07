@@ -67,13 +67,15 @@ Inspect the generated screenshot and include the updated image in the change.
 | `.fallowrc.jsonc`                   | Fallow config; the only place for analyzer exceptions, each with its reason                                           |
 | `e2e/dashboard.spec.ts`             | Playwright against the real UI with the Tauri boundary mocked                                                         |
 | `scripts/`                          | `install.sh`, `notarize-macos.sh`, `update-homebrew.mjs` (+ its `node --test` suite)                                  |
+| `docs/pr-states.md`                 | reference tables for which conditions put a PR in which column                                                        |
 | `docs/macos-signing.md`             | signing and notarization reference                                                                                    |
 
 ## Where changes belong
 
 - **Classification and dashboard rules live in `src/lib/pr/`, never in Svelte
   components.** Priorities, predicates, destination columns and labels are declarative
-  in `dashboard-rules.ts`; sorting is centralized in `classify.ts`.
+  in `dashboard-rules.ts`; sorting is centralized in `classify.ts`. Update
+  `docs/pr-states.md` in the same change whenever rules, signals or sorting change.
 - Fetching and normalization belong in `src/lib/github/`. Components consume the
   normalized model, not raw GraphQL shapes.
 - Persisted preference shape and canonical input validation belong in

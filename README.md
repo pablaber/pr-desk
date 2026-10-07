@@ -52,7 +52,8 @@ PR Desk has no in-app updater.
 ## Key features
 
 - Sorts pull requests into Ready to merge, Needs attention, and Waiting based on
-  reviews, all checks, unresolved threads, conflicts, and draft state.
+  reviews, all checks, unresolved threads, conflicts, and draft state. See
+  [PR states](docs/pr-states.md) for the full rules.
 - Combines your own PRs, direct review requests, tracked repositories, and individually
   watched PRs in one dashboard.
 - Acts on the hovered card from the keyboard: O opens the PR on GitHub, S snoozes, L labels

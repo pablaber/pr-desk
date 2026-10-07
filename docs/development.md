@@ -134,32 +134,12 @@ and title rules live in Settings → Ignore rules.
 ## Rules and sorting
 
 Edit `src/lib/pr/dashboard-rules.ts` to change priorities, predicates, destination
-states, or labels. Ignore, active snooze, and closed state hide a PR before rules run.
-All matching actionable labels are retained; the highest-priority rule determines the
-column and primary label:
+states, or labels. Ignore, active snooze, closed state, and other people's drafts hide a PR
+before rules run. All matching actionable labels are retained; the highest-priority rule
+determines the column and primary label. Sorting is centralized in `classify.ts`.
 
-1. Direct individual review request.
-2. Active unresolved threads on an owned PR.
-3. GitHub's aggregate changes-requested decision on an owned PR.
-4. Any failed checks on an owned PR.
-5. Merge conflicts on an owned PR.
-6. Owned, non-draft, approved, all checks passing, mergeable, and a compatible
-   GitHub merge state → Ready to Merge.
-7. Any other non-draft PR from a tracked repository that the user does not own → Needs
-   Attention, labelled “Open in a tracked repository”. Owned PRs follow the owned rules.
-8. Waiting fallback.
-
-Unknown, blocked, behind, draft, and otherwise non-ready merge states prevent Ready to
-Merge. Tracked-repository and waiting are catch-alls and do not appear in a card's
-secondary status list. Failures on other people’s PRs appear as secondary information
-without independently creating attention. Every check counts, including optional checks
-that GitHub does not require for merging. Pending and unknown checks block readiness;
-success, neutral, skipped, and empty check sets pass.
-Source badges are independent of classification.
-
-Sorting is centralized in `classify.ts`: attention priority then oldest update; ready
-oldest update; waiting newest update. GitHub does not expose when a PR entered these
-derived states, so `updatedAt` approximates time in state.
+[PR states](pr-states.md) tables every hidden reason, signal, rule, column, label and sort
+order. Keep it in step with any change to the rules, signals or sorting.
 
 ## Refresh behavior
 
