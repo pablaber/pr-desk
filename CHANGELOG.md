@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/pablaber/pr-desk/compare/v1.10.0...v1.11.0) (2026-10-07)
+
+
+### Features
+
+* accept machine-user accounts as known bots ([#106](https://github.com/pablaber/pr-desk/issues/106)) ([09ca234](https://github.com/pablaber/pr-desk/commit/09ca2347cf0bbeb8fdb1bbc41e74e5aafb5aeb67))
+
 ## [1.10.0](https://github.com/pablaber/pr-desk/compare/v1.9.1...v1.10.0) (2026-10-07)
 
 
