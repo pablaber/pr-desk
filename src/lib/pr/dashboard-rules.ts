@@ -75,19 +75,16 @@ export const dashboardRules: DashboardRule[] = [
     getLabel: (s) => `Ready · ${s.waitingOn.join(', ')} pending`,
   },
   {
-    id: 'bot-review',
-    state: 'needs-attention',
-    priority: 20,
-    matches: (s) => s.bot && !s.pr.draft && s.pr.reviewDecision !== 'APPROVED',
-    getLabel: () => 'Bot PR needs review',
-  },
-  {
     id: 'tracked-repository',
     state: 'needs-attention',
     priority: 10,
-    matches: (s) => s.trackedRepository && !s.owned && !s.bot && !s.pr.draft,
-    getLabel: () => 'Open in a tracked repository',
-    showAsStatus: false,
+    // An approved bot PR has had its review; it now waits on merge requirements instead.
+    matches: (s) =>
+      s.trackedRepository &&
+      !s.owned &&
+      !s.pr.draft &&
+      !(s.bot && s.pr.reviewDecision === 'APPROVED'),
+    getLabel: () => 'Waiting for your review',
   },
   {
     id: 'waiting',

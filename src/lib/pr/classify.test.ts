@@ -25,11 +25,21 @@ describe('dashboard rules', () => {
     const tracked: Partial<PullRequest> = { author: 'other', reasons: ['tracked-repository'] };
     expect(run(tracked)).toMatchObject({
       state: 'needs-attention',
-      primary: 'Open in a tracked repository',
-      statuses: [],
+      primary: 'Waiting for your review',
     });
     expect(classify(pr({ ...tracked, draft: true }), 'me', local)).toBeNull();
   });
+  it('shows waiting for your review as a status beneath a higher-priority rule', () =>
+    expect(
+      run({
+        author: 'other',
+        reasons: ['tracked-repository'],
+        directReviewers: ['me'],
+      }),
+    ).toMatchObject({
+      primary: 'Review requested',
+      statuses: ['Review requested', 'Waiting for your review'],
+    }));
   it('hides draft PRs authored by someone else from every column, tracked or not', () => {
     expect(classify(pr({ author: 'other', draft: true }), 'me', local)).toBeNull();
     expect(
@@ -269,7 +279,7 @@ describe('known bots', () => {
   it('needs attention until approved', () => {
     expect(bot()).toMatchObject({
       state: 'needs-attention',
-      primary: 'Bot PR needs review',
+      primary: 'Waiting for your review',
       bot: true,
     });
     expect(bot({ reviewDecision: 'CHANGES_REQUESTED' }).state).toBe('needs-attention');
@@ -288,13 +298,17 @@ describe('known bots', () => {
     });
   });
   it('needs attention on failed checks or a conflict', () => {
-    expect(bot({ checks: [{ name: 'CI', state: 'failed' }] }).state).toBe('needs-attention');
+    expect(bot({ checks: [{ name: 'CI', state: 'failed' }] })).toMatchObject({
+      state: 'needs-attention',
+      primary: 'Checks failed',
+      statuses: ['Checks failed', 'Waiting for your review'],
+    });
     expect(bot({ mergeable: 'CONFLICTING' }).state).toBe('needs-attention');
   });
   it('leaves unknown bots and untracked PRs unchanged', () => {
     expect(bot({ author: 'other-bot' })).toMatchObject({
       state: 'needs-attention',
-      primary: 'Open in a tracked repository',
+      primary: 'Waiting for your review',
       bot: false,
     });
     expect(bot({ reasons: ['direct-review-request'], reviewDecision: 'APPROVED' })).toMatchObject({
@@ -303,6 +317,6 @@ describe('known bots', () => {
     });
   });
   it('treats a watched bot PR as a bot PR', () => {
-    expect(bot({ reasons: ['watched'] })).toMatchObject({ bot: true, state: 'needs-attention' });
+    expect(bot({ reasons: ['watched'] })).toMatchObject({ bot: true, state: 'waiting' });
   });
 });
