@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/pablaber/pr-desk/compare/v1.9.1...v1.10.0) (2026-10-07)
+
+
+### Features
+
+* add checks badge and approve and merge for bot prs ([#104](https://github.com/pablaber/pr-desk/issues/104)) ([86709aa](https://github.com/pablaber/pr-desk/commit/86709aa35221efb9fb4b4e134f6fad2c31fc8c90))
+
 ## [1.9.1](https://github.com/pablaber/pr-desk/compare/v1.9.0...v1.9.1) (2026-10-07)
 
 
