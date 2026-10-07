@@ -1,10 +1,12 @@
 <script lang="ts">
+  import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import type { PullRequest } from '../lib/pr/types';
   let {
     pr,
     action,
     busy,
     error,
+    status,
     onconfirm,
     oncancel,
   }: {
@@ -12,6 +14,7 @@
     action: 'close-stale' | 'merge' | 'approve-merge';
     busy: boolean;
     error: string;
+    status: string;
     onconfirm: (method: string) => void;
     oncancel: () => void;
   } = $props();
@@ -70,6 +73,11 @@
       🤖 This PR has been closed via the PR Desk application because it is stale and hasn't been
       updated in {pr ? Math.floor((Date.now() - Date.parse(pr.updatedAt)) / 86400000) : 0} days.
     </blockquote>
+  {/if}
+  {#if busy && status}
+    <p class="pr-confirmation-status" role="status">
+      <LoaderCircle size={16} class="pr-confirmation-spinner" />{status}
+    </p>
   {/if}
   {#if error}<p role="alert">{error}</p>{/if}
   <div class="pr-confirmation-actions">
@@ -140,6 +148,27 @@
   }
   [role='alert'] {
     color: #b42318;
+  }
+  .pr-confirmation-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    font-weight: 600;
+  }
+  .pr-confirmation-status :global(.pr-confirmation-spinner) {
+    flex: none;
+    animation: pr-confirmation-spin 0.9s linear infinite;
+  }
+  @keyframes pr-confirmation-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pr-confirmation-status :global(.pr-confirmation-spinner) {
+      animation: none;
+    }
   }
   .pr-confirmation-actions {
     display: flex;

@@ -1913,6 +1913,7 @@ test('ready PRs merge only after confirmation with the selected method', async (
   await dialog.getByLabel('Merge method').selectOption('rebase');
   await dialog.getByRole('button', { name: 'Confirm merge', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Merging…' })).toBeDisabled();
+  await expect(dialog.getByRole('status')).toHaveText('Merging…');
   await expect(dialog).toBeHidden();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mergeCalls') ?? '[]'))).toEqual(
     [{ url: 'https://github.com/acme/platform/pull/1', headOid: 'a'.repeat(40), method: 'rebase' }],
@@ -2200,6 +2201,7 @@ test('bot PRs waiting for review approve and merge after confirmation', async ({
   await dialog.getByLabel('Merge method').selectOption('merge');
   await dialog.getByRole('button', { name: 'Approve and merge', exact: true }).click();
   await expect(dialog.getByRole('button', { name: 'Approving and merging…' })).toBeDisabled();
+  await expect(dialog.getByRole('status')).toHaveText('Approving and merging…');
   await expect(dialog).toBeHidden();
   expect(
     await page.evaluate(() => JSON.parse(localStorage.getItem('approveMergeCalls') ?? '[]')),

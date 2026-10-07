@@ -104,6 +104,7 @@
   let settingsView = $derived(settingsDraft ? { ...preferences, ...settingsDraft } : preferences);
   let actionPR = $state<PullRequest | null>(null);
   let actionError = $state('');
+  let actionStatus = $state('');
   let pendingAction = $state<'close-stale' | 'merge' | 'approve-merge'>('close-stale');
   let showHotkeys = $state(false);
   let filter = $state<TrackingReason | 'all'>('all'),
@@ -497,6 +498,7 @@
     try {
       if (pendingAction !== 'close-stale') {
         const merge = pendingAction === 'merge';
+        actionStatus = 'Checking the PR is still ready…';
         const fresh = await service.getPullRequest(pr.id);
         // A single-PR lookup carries no tracking reasons; the card's own reasons decide bot status.
         const freshResult = classify(
@@ -512,6 +514,7 @@
           throw new Error(
             'This PR changed or is no longer ready to merge. Cancel and refresh before trying again.',
           );
+        actionStatus = merge ? 'Merging…' : 'Approving and merging…';
         if (merge)
           await service.mergePullRequest(
             pr.id,
@@ -522,6 +525,7 @@
         else
           await service.approveAndMergePullRequest(pr.id, pr.headOid, method, knownBotKey(fresh));
       } else {
+        actionStatus = 'Closing and leaving a comment…';
         await service.closeStalePullRequest(pr.id);
       }
       snapshot.prs = snapshot.prs.filter((item) => item.id !== pr.id);
@@ -530,6 +534,7 @@
       actionError = String(e);
     } finally {
       saving = false;
+      actionStatus = '';
     }
   }
   async function restore(kind: 'ignored' | 'snoozed', id: string) {
@@ -961,6 +966,7 @@
   pr={actionPR}
   busy={saving || loading}
   error={actionError}
+  status={actionStatus}
   onconfirm={confirmAction}
   oncancel={() => {
     if (!saving) actionPR = null;
