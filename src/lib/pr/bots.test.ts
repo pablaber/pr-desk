@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { botKey, isKnownBot } from './bots';
+import { isKnownBot, knownBotKey } from './bots';
 
 describe('bots', () => {
-  it('normalizes the GraphQL, gh and bot-suffix forms to one key', () => {
-    expect(botKey('dependabot')).toBe('dependabot');
-    expect(botKey('app/dependabot')).toBe('dependabot');
-    expect(botKey('Dependabot[bot]')).toBe('dependabot');
+  it('keys GitHub Apps with a bot suffix and users by bare login', () => {
+    expect(knownBotKey({ author: 'Dependabot', authorIsBot: true })).toBe('dependabot[bot]');
+    expect(knownBotKey({ author: 'CI-User', authorIsBot: false })).toBe('ci-user');
   });
 
-  it('matches known bots in every author form', () => {
-    const known = ['dependabot[bot]'];
-    expect(isKnownBot('dependabot', known)).toBe(true);
-    expect(isKnownBot('app/dependabot', known)).toBe(true);
-    expect(isKnownBot('Dependabot[bot]', known)).toBe(true);
-    expect(isKnownBot('renovate', known)).toBe(false);
-    expect(isKnownBot('dependabot', [])).toBe(false);
+  it('matches known bots only with the same account type', () => {
+    const known = ['dependabot[bot]', 'ci-user'];
+    expect(isKnownBot({ author: 'dependabot', authorIsBot: true }, known)).toBe(true);
+    expect(isKnownBot({ author: 'CI-User', authorIsBot: false }, known)).toBe(true);
+    expect(isKnownBot({ author: 'dependabot', authorIsBot: false }, known)).toBe(false);
+    expect(isKnownBot({ author: 'ci-user', authorIsBot: true }, known)).toBe(false);
+    expect(isKnownBot({ author: 'renovate', authorIsBot: true }, known)).toBe(false);
+    expect(isKnownBot({ author: '', authorIsBot: false }, [''])).toBe(false);
   });
 });

@@ -8,6 +8,8 @@ export interface PullRequest {
   title: string;
   headOid: string;
   author: string;
+  // A GitHub App rather than a user account; GraphQL reports both by bare login.
+  authorIsBot: boolean;
   state: 'OPEN' | 'CLOSED' | 'MERGED';
   draft: boolean;
   updatedAt: string;

@@ -117,7 +117,7 @@ it('defaults to five minutes and migrates reserved v1 settings without losing pr
     settings: { automaticRefreshMinutes: 0 },
   };
   expect(migrateState(legacy)).toMatchObject({
-    schemaVersion: 11,
+    schemaVersion: 12,
     watchedPullRequests: ['acme/api#1'],
     settings: { automaticRefreshMinutes: 5, snoozeOptions: defaultSnoozeOptions() },
   });
@@ -136,7 +136,7 @@ it('preserves Never and all valid intervals, and repairs invalid stored interval
         .automaticRefreshMinutes,
     ).toBe(5);
   }
-  expect(() => migrateState({ ...defaultState(), schemaVersion: 12 })).toThrow('Unsupported');
+  expect(() => migrateState({ ...defaultState(), schemaVersion: 13 })).toThrow('Unsupported');
 });
 
 it('migrates older preferences and validates ignored repositories', () => {
@@ -150,7 +150,7 @@ it('migrates older preferences and validates ignored repositories', () => {
         settings: { automaticRefreshMinutes: 0 },
       }),
     ).toMatchObject({
-      schemaVersion: 11,
+      schemaVersion: 12,
       ignoreRules: [],
       trackedRepositories: ['acme/api'],
       settings: { automaticRefreshMinutes: schemaVersion === 1 ? 5 : 0 },
@@ -214,7 +214,7 @@ it('migrates all supported versions without losing independently saved preferenc
       settings: { automaticRefreshMinutes: 12, snoozeOptions: [] },
     };
     const migrated = migrateState(legacy);
-    expect(migrated.schemaVersion).toBe(11);
+    expect(migrated.schemaVersion).toBe(12);
     expect(migrated.checkRules).toEqual([]);
     expect(migrated.ignoreRules).toEqual(
       schemaVersion >= 3 ? [{ kind: 'repository', value: 'acme/api' }] : [],
@@ -383,7 +383,7 @@ it('loads pre-v8 preferences without labels', () => {
       labels: [label('x', 'Ignored')],
       labeledPullRequests: { 'acme/api#1': ['x'] },
     });
-    expect(migrated).toMatchObject({ schemaVersion: 11, labels: [], labeledPullRequests: {} });
+    expect(migrated).toMatchObject({ schemaVersion: 12, labels: [], labeledPullRequests: {} });
   }
 });
 it('round-trips v8 labels and canonicalizes their assignments', () => {
@@ -479,8 +479,9 @@ it('steps the interface scale and clamps at both ends', () => {
 });
 
 it('canonicalizes known bot names and rejects invalid ones', () => {
-  for (const input of ['dependabot', ' Dependabot[bot] ', 'app/dependabot'])
+  for (const input of [' Dependabot[bot] ', 'app/dependabot'])
     expect(parseKnownBot(input)).toBe('dependabot[bot]');
+  expect(parseKnownBot(' CI-User ')).toBe('ci-user');
   for (const input of ['', 'octo cat', '-bot', 'a/b', '@dependabot'])
     expect(() => parseKnownBot(input)).toThrow();
 });
@@ -489,8 +490,10 @@ it('seeds known bots when migrating from 10 and validates stored lists', () => {
   const v10 = { ...defaultState(), schemaVersion: 10 } as unknown as Record<string, unknown>;
   delete v10.knownBots;
   expect(migrateState(v10).knownBots).toEqual(['dependabot[bot]', 'renovate[bot]']);
-  const v11 = { ...defaultState(), knownBots: ['Foo', 'foo[bot]', 'app/bar'] };
+  const v11 = { ...defaultState(), schemaVersion: 11, knownBots: ['Foo', 'foo[bot]', 'app/bar'] };
   expect(migrateState(v11).knownBots).toEqual(['foo[bot]', 'bar[bot]']);
+  const v12 = { ...defaultState(), knownBots: ['ci-user', 'foo[bot]', 'Foo'] };
+  expect(migrateState(v12).knownBots).toEqual(['ci-user', 'foo[bot]', 'foo']);
   expect(migrateState({ ...defaultState(), knownBots: [] }).knownBots).toEqual([]);
   expect(() => migrateState({ ...defaultState(), knownBots: ['bad name'] })).toThrow(
     'Invalid preferences file',
@@ -544,7 +547,7 @@ it('rejects settings imports that are not valid exports', () => {
   expect(() => parseSettingsImport('nope')).toThrow("That isn't valid JSON.");
   for (const text of ['null', '5', '{}', exported({ app: 'other' }), exported({ kind: 'debug' })])
     expect(() => parseSettingsImport(text)).toThrow("This isn't a PR Desk settings export.");
-  expect(() => parseSettingsImport(exported({ schemaVersion: 12 }))).toThrow('newer PR Desk');
+  expect(() => parseSettingsImport(exported({ schemaVersion: 13 }))).toThrow('newer PR Desk');
   const invalid: Record<string, unknown>[] = [
     { trackedRepositories: ['no-owner'] },
     { trackedRepositories: [5] },

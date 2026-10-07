@@ -275,7 +275,7 @@ describe('non-blocking check rules', () => {
 
 describe('known bots', () => {
   const bot = (overrides: Partial<PullRequest> = {}) =>
-    run({ author: 'dependabot', reasons: ['tracked-repository'], ...overrides });
+    run({ author: 'dependabot', authorIsBot: true, reasons: ['tracked-repository'], ...overrides });
   it('needs attention until approved', () => {
     expect(bot()).toMatchObject({
       state: 'needs-attention',
@@ -316,6 +316,13 @@ describe('known bots', () => {
       canMerge: false,
     });
   });
+  it('accepts machine users by login and never a user named like a known App', () => {
+    const prefs = { ...local, knownBots: ['dependabot[bot]', 'ci-user'] };
+    const user = (author: string) =>
+      classify(pr({ author, reasons: ['tracked-repository'] }), 'me', prefs);
+    expect(user('CI-User')).toMatchObject({ bot: true });
+    expect(user('dependabot')).toMatchObject({ bot: false });
+  });
   it('treats a watched bot PR as a bot PR', () => {
     expect(bot({ reasons: ['watched'] })).toMatchObject({ bot: true, state: 'waiting' });
   });
@@ -324,6 +331,7 @@ describe('approve and merge', () => {
   const waiting = (overrides: Partial<PullRequest> = {}) =>
     pr({
       author: 'dependabot',
+      authorIsBot: true,
       reasons: ['tracked-repository'],
       reviewDecision: 'REVIEW_REQUIRED',
       mergeStateStatus: 'BLOCKED',

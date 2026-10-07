@@ -9,7 +9,7 @@ setup; this file covers how to work in the repository without re-reading all of 
 PR Desk is a macOS pull request dashboard: a Tauri 2 (Rust) shell around a Svelte 5 +
 TypeScript + Vite frontend. All GitHub access goes through the user's authenticated
 `gh` CLI — the app never handles tokens itself. Reviewing happens on GitHub; the app opens PRs in the browser.
-Ready PRs you authored, or by a known GitHub App bot, can be merged after confirmation through
+Ready PRs you authored, or by a known bot (a GitHub App or machine user), can be merged after confirmation through
 the dedicated merge_pr command. Known-bot PRs waiting for review with passing checks can be
 approved and merged after confirmation through approve_and_merge_pr.
 The confirmed Close as stale action closes stale PRs with a fixed automatic comment.
@@ -87,11 +87,13 @@ Inspect the generated screenshot and include the updated image in the change.
 - The Rust bridge is deliberately narrow: argument arrays rather than a shell, a
   45-second timeout, read-only GraphQL, and it never returns authentication output or
   tokens. The separate close_stale_pr command only closes open PRs with red staleness
-  and a fixed comment. The merge_pr command only merges ready PRs you authored, or by a known GitHub App bot, after confirmation,
+  and a fixed comment. The merge_pr command only merges ready PRs you authored, or by a known bot, after confirmation,
   revalidates readiness, and pins the mutation to the confirmed commit. The
   approve_and_merge_pr command only approves known-bot PRs waiting for review with passing
   checks, pins the approval to the confirmed commit, and merges only once merge_pr's readiness
-  checks pass. Keep mutations limited to these actions.
+  checks pass. A known bot is a GitHub App stored as `name[bot]` or a machine user stored as
+  its bare login, and the bridge checks the author's account type against that form.
+  Keep mutations limited to these actions.
 - The bridge only runs GraphQL operations named in `QUERY_NAMES` in
   `src-tauri/src/main.rs`. A new `query Desk…` in `src/lib/github/` must be added there
   in the same change, or every call fails at runtime with "Only named PR Desk read-only

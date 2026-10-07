@@ -70,7 +70,7 @@ it.each([
 describe('bot badge', () => {
   it('marks known bot PRs', () => {
     const item = classify(
-      pr({ author: 'dependabot', reasons: ['tracked-repository'] }),
+      pr({ author: 'dependabot', authorIsBot: true, reasons: ['tracked-repository'] }),
       'me',
       defaultState(),
       now,

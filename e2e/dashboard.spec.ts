@@ -57,10 +57,12 @@ test.beforeEach(async ({ page }) => {
             ? 'Bump lodash'
             : 'A watched pull request'),
       repository: { nameWithOwner: 'acme/platform' },
-      author: {
-        login:
-          number === 4 ? 'sam' : number === 6 ? 'jordan' : number === 7 ? 'dependabot' : 'alex',
-      },
+      author:
+        number === 7
+          ? localStorage.getItem('machineUserPr')
+            ? { __typename: 'User', login: 'release-user' }
+            : { __typename: 'Bot', login: 'dependabot' }
+          : { __typename: 'User', login: number === 4 ? 'sam' : number === 6 ? 'jordan' : 'alex' },
       state: (JSON.parse(localStorage.getItem('mergedPrs') ?? '[]') as number[]).includes(number)
         ? 'MERGED'
         : 'OPEN',
@@ -1050,7 +1052,7 @@ test('copies settings, then imports edited JSON from the textarea or a file', as
   await page.getByRole('button', { name: 'Copy settings' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Settings copied' })).toBeVisible();
   const exported = await copied();
-  expect(exported).toMatchObject({ app: 'pr-desk', kind: 'settings', schemaVersion: 11 });
+  expect(exported).toMatchObject({ app: 'pr-desk', kind: 'settings', schemaVersion: 12 });
   expect(exported).not.toHaveProperty('snoozedPullRequests');
 
   const json = page.getByRole('textbox', { name: 'Settings JSON' });
@@ -1547,7 +1549,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
     .click();
   await saveSettings(page);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
-  expect(saved.schemaVersion).toBe(11);
+  expect(saved.schemaVersion).toBe(12);
   expect(saved.ignoreRules).toEqual([]);
   expect(saved.ignoredPullRequests).toHaveProperty('acme/platform#2');
   expect(saved.settings.snoozeOptions).toEqual([]);
@@ -2156,7 +2158,7 @@ test('known bot PRs need attention until approved, then merge with the bot decla
         url: 'https://github.com/acme/platform/pull/7',
         headOid: 'a'.repeat(40),
         method: 'squash',
-        bot: 'dependabot',
+        bot: 'dependabot[bot]',
       },
     ],
   );
@@ -2206,11 +2208,32 @@ test('bot PRs waiting for review approve and merge after confirmation', async ({
       url: 'https://github.com/acme/platform/pull/7',
       headOid: 'a'.repeat(40),
       method: 'merge',
-      bot: 'dependabot',
+      bot: 'dependabot[bot]',
     },
   ]);
   expect(await page.evaluate(() => localStorage.getItem('mergeCalls'))).toBeNull();
   await expect(card).toHaveCount(0);
+});
+
+test('machine-user known bots approve and merge with their login declared', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('machineUserPr', '1'));
+  await trackBotPr(page);
+  const button = page.getByRole('button', { name: 'Approve and merge Bump lodash', exact: true });
+  await expect(page.locator('.pr-card', { hasText: 'Bump lodash' })).toHaveCount(1);
+  await expect(button).toHaveCount(0);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSettingsSection(page, 'Known bots');
+  await page.getByRole('textbox', { name: 'Bot name' }).fill('release-user');
+  await page.getByRole('button', { name: 'Add bot' }).click();
+  await saveSettings(page);
+  await closeSettings(page);
+  await button.click();
+  const dialog = page.getByRole('dialog', { name: 'Approve and merge pull request?' });
+  await dialog.getByRole('button', { name: 'Approve and merge', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('approveMergeCalls') ?? '[]')),
+  ).toMatchObject([{ bot: 'release-user' }]);
 });
 
 test('approve and merge failures keep the dialog and card available', async ({ page }) => {
@@ -2242,11 +2265,14 @@ test('known bots can be added and removed in Settings', async ({ page }) => {
   await dialog.getByRole('textbox', { name: 'Bot name' }).fill('app/Mend');
   await dialog.getByRole('button', { name: 'Add bot' }).click();
   await expect(dialog.getByText('mend[bot]', { exact: true })).toBeVisible();
+  await dialog.getByRole('textbox', { name: 'Bot name' }).fill('Release-User');
+  await dialog.getByRole('button', { name: 'Add bot' }).click();
+  await expect(dialog.getByText('release-user', { exact: true })).toBeVisible();
   await dialog
     .locator('.setting-row', { hasText: 'renovate[bot]' })
     .getByRole('button', { name: 'Remove' })
     .click();
   await saveSettings(page);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
-  expect(saved.knownBots).toEqual(['dependabot[bot]', 'mend[bot]']);
+  expect(saved.knownBots).toEqual(['dependabot[bot]', 'mend[bot]', 'release-user']);
 });

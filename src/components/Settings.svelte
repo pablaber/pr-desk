@@ -429,8 +429,9 @@
             {heading('Known bots', preferences.knownBots.length)}
           </h2>
           <p>
-            PRs by these GitHub App bots in tracked repositories or watched PRs move to Ready to
-            merge once approved, and can be merged from PR Desk.
+            PRs by these bots in tracked repositories or watched PRs move to Ready to merge once
+            approved, and can be merged from PR Desk. Add a GitHub App as name[bot], such as
+            renovate[bot], or a machine user account by its exact login.
           </p>
           <form
             onsubmit={(e) => {

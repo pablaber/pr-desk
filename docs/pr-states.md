@@ -122,6 +122,9 @@ The Waiting fallback picks its label from the first that applies:
   watched. In a tracked repository it needs attention as "Waiting for your review", like any
   other PR that is not yours; once approved it is Ready to merge or, if GitHub still blocks it,
   Waiting. A watched bot PR outside your tracked repositories waits for review in Waiting.
+- A known bot is a GitHub App, entered as `name[bot]`, or a machine user account, entered as its
+  bare login. The author's account type must match, so a user account never counts as an App
+  with the same name.
 - "Waiting for your review" is a status: when a higher rule such as "Checks failed" is primary,
   it still shows beneath it.
 - Thread and changes-requested rules apply only to owned PRs, not bot PRs.

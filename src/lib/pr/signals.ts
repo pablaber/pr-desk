@@ -10,7 +10,7 @@ export function deriveSignals(
   const owned = pr.author.toLowerCase() === login.toLowerCase();
   const bot =
     !owned &&
-    isKnownBot(pr.author, prefs.knownBots) &&
+    isKnownBot(pr, prefs.knownBots) &&
     (pr.reasons.includes('tracked-repository') || pr.reasons.includes('watched'));
   const managed = owned || bot;
   const waitingOn = [
