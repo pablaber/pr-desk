@@ -7,6 +7,8 @@
   import { version } from '../package.json';
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
   import Bug from '@lucide/svelte/icons/bug';
+  import Copy from '@lucide/svelte/icons/copy';
+  import Download from '@lucide/svelte/icons/download';
   import ClipboardCheck from '@lucide/svelte/icons/clipboard-check';
   import Clock from '@lucide/svelte/icons/clock';
   import CircleCheck from '@lucide/svelte/icons/circle-check';
@@ -62,6 +64,9 @@
     parseSnoozeOptions,
     preferenceDraft,
     draftDiffers,
+    exportSettings,
+    applySettingsImport,
+    type SettingsConfig,
     type AppState,
     type PreferenceDraft,
     type SnoozeOption,
@@ -603,6 +608,23 @@
       error = `Could not copy debug info: ${String(e)}`;
     }
   }
+  async function copySettings() {
+    try {
+      const config = exportSettings($state.snapshot(preferences) as AppState, new Date());
+      await navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+      showToast(Copy, 'Settings copied');
+    } catch (e) {
+      error = `Could not copy settings: ${String(e)}`;
+    }
+  }
+  async function importSettings(config: SettingsConfig): Promise<boolean> {
+    await change((next) => Object.assign(next, applySettingsImport(next, config)));
+    if (error) return false;
+    settingsDraft = null;
+    void refresh(true);
+    showToast(Download, 'Settings imported');
+    return true;
+  }
   async function open(url: string) {
     try {
       await openUrl(url);
@@ -909,6 +931,8 @@
     onopen={open}
     onunignore={(id) => restore('ignored', id)}
     oncopydebuginfo={() => void copyDebugInfo()}
+    oncopysettings={() => void copySettings()}
+    onimportsettings={importSettings}
   />
 {/if}
 <UnsavedChanges

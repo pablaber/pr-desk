@@ -485,3 +485,90 @@ export function draftDiffers(draft: PreferenceDraft, state: AppState): boolean {
     same(draft.checkRules.map(checkRuleKey), state.checkRules.map(checkRuleKey))
   );
 }
+
+// Configuration only: per-PR state (ignored, snoozed, labeled PRs) stays on the Mac it belongs to.
+export type SettingsConfig = Pick<
+  AppState,
+  | 'trackedRepositories'
+  | 'watchedPullRequests'
+  | 'knownBots'
+  | 'ignoreRules'
+  | 'checkRules'
+  | 'labels'
+  | 'settings'
+>;
+export function exportSettings(state: AppState, now: Date) {
+  return {
+    app: 'pr-desk',
+    kind: 'settings',
+    schemaVersion: state.schemaVersion,
+    exportedAt: now.toISOString(),
+    trackedRepositories: state.trackedRepositories,
+    watchedPullRequests: state.watchedPullRequests,
+    knownBots: state.knownBots,
+    ignoreRules: state.ignoreRules,
+    checkRules: state.checkRules,
+    labels: state.labels,
+    settings: state.settings,
+  };
+}
+const GENERIC_STORED_ERROR =
+  'Invalid preferences file. Your saved configuration has been left intact.';
+function invalidSettingsExport(error: unknown): Error {
+  const reason = error instanceof Error ? error.message : String(error);
+  return new Error(
+    `This settings export is invalid: ${
+      reason === GENERIC_STORED_ERROR || error instanceof TypeError
+        ? 'a rule, bot, label or setting has an invalid value.'
+        : reason.replace(' Your saved configuration has been left intact.', '')
+    }`,
+  );
+}
+export function parseSettingsImport(text: string): SettingsConfig {
+  let value: Record<string, unknown> | null;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new Error("That isn't valid JSON.");
+  }
+  if (!value || typeof value !== 'object' || value.app !== 'pr-desk' || value.kind !== 'settings')
+    throw new Error("This isn't a PR Desk settings export.");
+  const { schemaVersion } = value;
+  if (typeof schemaVersion === 'number' && schemaVersion > defaultState().schemaVersion)
+    throw new Error('This export is from a newer PR Desk. Update PR Desk to import it.');
+  try {
+    const state = migrateState({
+      schemaVersion,
+      trackedRepositories: value.trackedRepositories,
+      watchedPullRequests: value.watchedPullRequests,
+      knownBots: value.knownBots,
+      ignoreRules: value.ignoreRules,
+      checkRules: value.checkRules,
+      labels: value.labels,
+      settings: value.settings,
+      ignoredPullRequests: {},
+      snoozedPullRequests: {},
+      labeledPullRequests: {},
+    });
+    return {
+      trackedRepositories: [...new Set(state.trackedRepositories.map(parseRepository))],
+      watchedPullRequests: [...new Set(state.watchedPullRequests.map(parsePullRequest))],
+      knownBots: state.knownBots,
+      ignoreRules: state.ignoreRules,
+      checkRules: state.checkRules,
+      labels: state.labels,
+      settings: state.settings,
+    };
+  } catch (error) {
+    throw invalidSettingsExport(error);
+  }
+}
+export function applySettingsImport(current: AppState, config: SettingsConfig): AppState {
+  const known = new Set(config.labels.map((label) => label.id));
+  const labeledPullRequests: Record<string, string[]> = {};
+  for (const [id, ids] of Object.entries(current.labeledPullRequests)) {
+    const kept = ids.filter((labelId) => known.has(labelId));
+    if (kept.length) labeledPullRequests[id] = kept;
+  }
+  return { ...current, ...config, labeledPullRequests };
+}

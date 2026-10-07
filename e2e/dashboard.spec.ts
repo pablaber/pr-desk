@@ -720,6 +720,7 @@ test('settings opens as an overlay with a section sidebar and confirms unsaved e
     ['Ignore rules', 'funnel-x'],
     ['Ignored pull requests', 'eye-off'],
     ['Non-blocking checks', 'list-checks'],
+    ['Import & export', 'arrow-down-up'],
     ['Troubleshooting', 'bug'],
   ]) {
     const item = sidebar.getByRole('button', { name, exact: true });
@@ -1025,6 +1026,50 @@ test('copies debug info for the whole board from Settings', async ({ page }) => 
     column: 'ready-to-merge',
     matchedRules: expect.arrayContaining(['ready']),
   });
+});
+
+test('copies settings, then imports edited JSON from the textarea or a file', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const copied = await captureClipboard(page);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSettingsSection(page, 'Import & export');
+  await page.getByRole('button', { name: 'Copy settings' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Settings copied' })).toBeVisible();
+  const exported = await copied();
+  expect(exported).toMatchObject({ app: 'pr-desk', kind: 'settings', schemaVersion: 11 });
+  expect(exported).not.toHaveProperty('snoozedPullRequests');
+
+  const json = page.getByRole('textbox', { name: 'Settings JSON' });
+  await json.fill('not json');
+  await page.getByRole('button', { name: 'Review import' }).click();
+  await expect(page.getByRole('alert')).toContainText("That isn't valid JSON.");
+
+  await json.fill(JSON.stringify({ ...exported, trackedRepositories: ['acme/imported'] }));
+  await page.getByRole('button', { name: 'Review import' }).click();
+  const confirm = page.getByRole('region', { name: 'Confirm import' });
+  await expect(confirm).toContainText('1 tracked repository');
+  await confirm.getByRole('button', { name: 'Replace settings' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Settings imported' })).toBeVisible();
+  await expect(json).toHaveValue('');
+  await openSettingsSection(page, 'Tracked repositories');
+  await expect(page.locator('.setting-row').filter({ hasText: 'acme/imported' })).toHaveCount(1);
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!).trackedRepositories),
+  ).toEqual(['acme/imported']);
+
+  await openSettingsSection(page, 'Import & export');
+  await page.locator('input[type=file]').setInputFiles({
+    name: 'settings.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ ...exported, trackedRepositories: ['acme/from-file'] })),
+  });
+  await expect(page.getByRole('region', { name: 'Confirm import' })).toContainText(
+    '1 tracked repository',
+  );
+  await page.getByRole('button', { name: 'Replace settings' }).click();
+  await openSettingsSection(page, 'Tracked repositories');
+  await expect(page.locator('.setting-row').filter({ hasText: 'acme/from-file' })).toHaveCount(1);
 });
 
 test('copies debug info for one PR from the card menu', async ({ page }) => {

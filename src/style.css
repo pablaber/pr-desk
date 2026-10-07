@@ -774,6 +774,33 @@ footer {
 .settings-section p {
   font-size: 12px;
 }
+.settings-section h3 {
+  margin: 22px 0 6px;
+  font-size: 14px;
+}
+.settings-json {
+  width: 100%;
+  margin-top: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  resize: vertical;
+}
+.settings-transfer-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.settings-transfer-confirm {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #dde2d6;
+  border-radius: 8px;
+}
+.settings-transfer-confirm ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
 .settings-section form {
   display: flex;
   gap: 8px;
