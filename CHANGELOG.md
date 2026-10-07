@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.0](https://github.com/pablaber/pr-desk/compare/v1.8.0...v1.9.0) (2026-10-07)
+
+
+### Features
+
+* add known bots with review and merge handling ([#98](https://github.com/pablaber/pr-desk/issues/98)) ([a494214](https://github.com/pablaber/pr-desk/commit/a4942144d0002ceb5dce6111fc7f587753023d02))
+* add settings import and export ([#100](https://github.com/pablaber/pr-desk/issues/100)) ([50f3551](https://github.com/pablaber/pr-desk/commit/50f35512232277c70d44f48c4256100ee31b4e73))
+
 ## [1.8.0](https://github.com/pablaber/pr-desk/compare/v1.7.0...v1.8.0) (2026-10-06)
 
 
