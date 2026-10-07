@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/pablaber/pr-desk/compare/v1.9.0...v1.9.1) (2026-10-07)
+
+
+### Bug Fixes
+
+* show waiting for your review on others' tracked PRs, including bots ([#102](https://github.com/pablaber/pr-desk/issues/102)) ([279a463](https://github.com/pablaber/pr-desk/commit/279a46330adf63eb45aa8ad1d07e68a42595bf4a))
+
 ## [1.9.0](https://github.com/pablaber/pr-desk/compare/v1.8.0...v1.9.0) (2026-10-07)
 
 
