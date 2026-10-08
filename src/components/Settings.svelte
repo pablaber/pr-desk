@@ -20,8 +20,10 @@
   import Ignored from './Ignored.svelte';
   import InterfaceScaleControl from './InterfaceScale.svelte';
   import RefreshInterval from './RefreshInterval.svelte';
+  import SessionErrors from './SessionErrors.svelte';
   import SettingsTransfer from './SettingsTransfer.svelte';
   import SnoozeOptions from './SnoozeOptions.svelte';
+  import Toaster from './Toaster.svelte';
   import type {
     AppState,
     CheckRule,
@@ -33,6 +35,7 @@
   } from '../lib/store/app-state';
   import type { DashboardSnapshot } from '../lib/github/refresh';
   import type { GhCliInfo } from '../lib/github/types';
+  import type { SessionError } from '../lib/debug/session-errors.svelte';
   let {
     open,
     login,
@@ -62,6 +65,7 @@
     onopen,
     onunignore,
     oncopydebuginfo,
+    oncopyerror,
     oncopysettings,
     onimportsettings,
   }: {
@@ -95,6 +99,7 @@
     onopen: (url: string) => void;
     onunignore: (id: string) => void;
     oncopydebuginfo: () => void;
+    oncopyerror: (error: SessionError) => void;
     oncopysettings: () => void;
     onimportsettings: (config: SettingsConfig) => Promise<boolean>;
   } = $props();
@@ -623,13 +628,14 @@
         >
           <h2 id="settings-section-heading">Troubleshooting</h2>
           <p>
-            Copy the current board, refresh results and saved preferences as JSON, including how
-            each PR was placed. It contains repository names, PR titles and logins, but no
-            credentials.
+            Copy the current board, refresh results, saved preferences and this session’s errors as
+            JSON, including how each PR was placed. It contains repository names, PR titles and
+            logins, but no credentials.
           </p>
           <button type="button" class="settings-action" onclick={oncopydebuginfo}
             ><Bug size={13} /> Copy debug info</button
           >
+          <SessionErrors oncopy={oncopyerror} />
         </section>
       {/if}
     </div>
@@ -645,4 +651,6 @@
       </div>
     {/if}
   </div>
+  <!-- The open dialog sits in the top layer above the app's toasts, so it shows its own. -->
+  <Toaster />
 </dialog>

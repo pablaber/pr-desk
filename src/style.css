@@ -843,6 +843,9 @@ footer {
 .setting-row button {
   font-size: 11px;
 }
+.session-error code {
+  white-space: pre-wrap;
+}
 .empty-setting {
   padding: 12px 0;
 }
