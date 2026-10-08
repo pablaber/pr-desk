@@ -396,6 +396,16 @@ test('snooze, ignore, restore, watch, tracked repositories and persistence', asy
   await expect(
     page.locator('.pr-card').filter({ hasText: 'Add audit event retention' }),
   ).not.toContainText('Waiting for your review');
+  // Your own PRs in the tracked repository count as Mine only, on the card and in the filters.
+  const badge = (name: string) => page.locator('.pr-card .badge', { hasText: name });
+  await expect(badge('Tracked repo')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Tracked repos', exact: true }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(2);
+  await expect(badge('Mine')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Mine', exact: true }).click();
+  await expect(badge('Mine')).toHaveCount(3);
+  await expect(badge('Tracked repo')).toHaveCount(0);
+  await page.getByRole('button', { name: 'All', exact: true }).click();
   await page.screenshot({ path: '.context/tracked-repository.png', fullPage: true });
   const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
   expect(Object.keys(persisted)).not.toContain('prs');
