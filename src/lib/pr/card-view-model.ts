@@ -25,6 +25,12 @@ function checksStatus(checks: ClassifiedPR['pr']['checks']): ChecksStatus | null
   if (checks.some((c) => c.state === 'pending')) return 'pending';
   return 'passing';
 }
+// Your own PR follows the owned rules even in a tracked repository, so Mine replaces Tracked repo.
+function sourceBadges(reasons: TrackingReason[]) {
+  return reasons
+    .filter((r) => !(r === 'tracked-repository' && reasons.includes('owned')))
+    .map((r) => sourceLabels[r]);
+}
 export function cardViewModel(item: ClassifiedPR, now: number) {
   const minutes = Math.max(0, Math.floor((now - Date.parse(item.pr.updatedAt)) / 60000));
   const age =
@@ -49,7 +55,7 @@ export function cardViewModel(item: ClassifiedPR, now: number) {
   ];
   return {
     ...item,
-    badges: [...item.pr.reasons.map((r) => sourceLabels[r]), ...(item.bot ? ['Bot'] : [])],
+    badges: [...sourceBadges(item.pr.reasons), ...(item.bot ? ['Bot'] : [])],
     reviewBadge:
       item.pr.reviewDecision === 'APPROVED'
         ? { label: 'Approved', tone: 'approved' }

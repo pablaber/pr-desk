@@ -28,9 +28,10 @@ these, independent of the column.
 | Tracked repository    | Tracked repo   | every open PR in a repository listed in Settings |
 | Watched               | Watching       | a PR added individually in Settings              |
 
-Cards for known-bot PRs (see **bot** below) also carry a Bot badge. Only individual (`User`)
-review requests count; team review requests never do. A PR stays on the desk only while some
-source still finds it.
+Your own PR in a tracked repository shows Mine but not Tracked repo, because the owned rules
+apply to it. Cards for known-bot PRs (see **bot** below) also carry a Bot badge. Only individual
+(`User`) review requests count; team review requests never do. A PR stays on the desk only while
+some source still finds it.
 
 ## Step 1: hidden PRs
 

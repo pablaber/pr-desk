@@ -78,6 +78,22 @@ describe('bot badge', () => {
     expect(cardViewModel(item, now).badges).toEqual(['Tracked repo', 'Bot']);
   });
 });
+describe('source badges', () => {
+  it.each([
+    [['owned', 'tracked-repository'], ['Mine']],
+    [
+      ['owned', 'tracked-repository', 'watched'],
+      ['Mine', 'Watching'],
+    ],
+    [
+      ['tracked-repository', 'direct-review-request'],
+      ['Tracked repo', 'Review request'],
+    ],
+  ] as const)('shows %j as %j', (reasons, badges) => {
+    const item = classify(pr({ reasons: [...reasons] }), 'me', defaultState(), now)!;
+    expect(cardViewModel(item, now).badges).toEqual(badges);
+  });
+});
 describe('checks badge', () => {
   it.each([
     [[], null],
