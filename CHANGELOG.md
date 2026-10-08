@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.13.0](https://github.com/pablaber/pr-desk/compare/v1.12.0...v1.13.0) (2026-10-08)
+
+
+### Features
+
+* add icons to PR card badges ([#116](https://github.com/pablaber/pr-desk/issues/116)) ([967bb07](https://github.com/pablaber/pr-desk/commit/967bb07351c81240933187fd276ced59297e5448))
+* group stacked pull requests on the dashboard ([#114](https://github.com/pablaber/pr-desk/issues/114)) ([4df9ed0](https://github.com/pablaber/pr-desk/commit/4df9ed09a49c8a441c8f3c0207a3ac8fbca1ed8e))
+* keep session errors in troubleshooting and debug info ([#112](https://github.com/pablaber/pr-desk/issues/112)) ([9185ba8](https://github.com/pablaber/pr-desk/commit/9185ba8a82c06b61648fa3f39da29e226f01668b))
+
+
+### Bug Fixes
+
+* show only the mine badge on your PRs in tracked repos ([#115](https://github.com/pablaber/pr-desk/issues/115)) ([bf04797](https://github.com/pablaber/pr-desk/commit/bf04797dceadf265a314f985bc3590b1a298fef9))
+
 ## [1.12.0](https://github.com/pablaber/pr-desk/compare/v1.11.0...v1.12.0) (2026-10-08)
 
 
