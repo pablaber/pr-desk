@@ -75,7 +75,10 @@ describe('bot badge', () => {
       defaultState(),
       now,
     )!;
-    expect(cardViewModel(item, now).badges).toEqual(['Tracked repo', 'Bot']);
+    expect(cardViewModel(item, now).badges).toEqual([
+      { kind: 'tracked-repository', label: 'Tracked repo' },
+      { kind: 'bot', label: 'Bot' },
+    ]);
   });
 });
 describe('source badges', () => {
@@ -91,7 +94,7 @@ describe('source badges', () => {
     ],
   ] as const)('shows %j as %j', (reasons, badges) => {
     const item = classify(pr({ reasons: [...reasons] }), 'me', defaultState(), now)!;
-    expect(cardViewModel(item, now).badges).toEqual(badges);
+    expect(cardViewModel(item, now).badges.map((b) => b.label)).toEqual(badges);
   });
 });
 describe('checks badge', () => {

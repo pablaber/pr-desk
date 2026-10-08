@@ -538,6 +538,9 @@ i.waiting {
   flex-wrap: wrap;
 }
 .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   font-size: 9px;
   border: 1px solid #e4e9df;
   border-radius: 4px;
@@ -549,11 +552,6 @@ i.waiting {
 .badge.review,
 .badge.checks {
   font-weight: 600;
-}
-.badge.checks {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
 }
 .badge.review.approved,
 .badge.checks.passing {
