@@ -11,6 +11,7 @@ mirrors it:
 | Signals → rules and column | `src/lib/pr/dashboard-rules.ts` |
 | Sorting within a column    | `src/lib/pr/classify.ts`        |
 | Card badges and extras     | `src/lib/pr/card-view-model.ts` |
+| Stacked PR grouping        | `src/lib/pr/stacks.ts`          |
 | Check state normalization  | `src/lib/github/normalize.ts`   |
 
 Update this page whenever any of those change.
@@ -171,6 +172,21 @@ The common situations, from your point of view:
 | Waiting         | newest update first                                     |
 
 GitHub does not expose when a PR entered a state, so `updatedAt` approximates time in state.
+
+## Stacks
+
+A PR is stacked on another open PR in the same repository when its base branch is that PR's head
+branch. Fork heads never count, and a base branch that is the head of more than one open PR links
+to nothing. Chains that loop back on themselves stay unstacked.
+
+Visible PRs in one stack share a single stack card, newest layer first and the base branch last.
+Hidden, snoozed or filtered-out layers are not shown but still connect the layers around them; a
+stack with only one visible layer is an ordinary card. The stack sits in the column of its most
+urgent layer (Needs attention, then Ready to merge, then Waiting), ordered within that column by
+that layer as above. Column and summary counts include every PR the column shows.
+
+Stacking changes only placement. Each layer keeps its own rules, status, merge actions and Dock
+badge contribution.
 
 ## Card extras
 

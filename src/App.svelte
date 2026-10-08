@@ -28,6 +28,7 @@
   import { stalenessLevel } from './lib/pr/card-view-model';
   import type { PullRequest } from './lib/pr/types';
   import PRCard from './components/PRCard.svelte';
+  import PRStack from './components/PRStack.svelte';
   import AllClear from './components/AllClear.svelte';
   import Snoozed from './components/Snoozed.svelte';
   import Completed from './components/Completed.svelte';
@@ -71,7 +72,8 @@
     type PreferenceDraft,
     type SnoozeOption,
   } from './lib/store/app-state';
-  import { classify, sortPullRequests } from './lib/pr/classify';
+  import { classify, sortPullRequests, type ClassifiedPR } from './lib/pr/classify';
+  import { boardEntries } from './lib/pr/stacks';
   import { knownBotKey } from './lib/pr/bots';
   import { badgeCount } from './lib/pr/badge';
   import { buildDebugInfo } from './lib/debug/debug-info';
@@ -156,6 +158,16 @@
   );
   let visible = $derived(
     classified.filter((p) => filter === 'all' || p.pr.reasons.includes(filter)),
+  );
+  let entries = $derived(boardEntries(visible, snapshot.prs));
+  // A stack sits in its most urgent layer's column, so columns count the PRs they show.
+  let columnSizes = $derived(
+    Object.fromEntries(
+      columns.map((col) => [
+        col.state,
+        entries.filter((e) => e.lead.state === col.state).reduce((n, e) => n + e.items.length, 0),
+      ]),
+    ) as Record<DashboardState, number>,
   );
   let allClear = $derived(!showLoading && filter === 'all' && classified.length === 0);
   let dockBadge = $derived(
@@ -870,7 +882,7 @@
       </div>
       <div class="summary">
         {#each columns as col}<span
-            ><i class={col.state}></i><b>{visible.filter((p) => p.state === col.state).length}</b>
+            ><i class={col.state}></i><b>{columnSizes[col.state]}</b>
             {col.title}</span
           >{/each}
       </div>
@@ -889,6 +901,27 @@
             results shown</summary
           >{#each snapshot.warnings as warning}<p>{warning}</p>{/each}
         </details>{/if}
+      {#snippet card(item: ClassifiedPR, compact: boolean)}<PRCard
+          bind:this={cards[item.pr.id]}
+          {item}
+          {compact}
+          onhover={(id) => {
+            if (id) hoveredId = id;
+            else if (hoveredId === item.pr.id) hoveredId = null;
+          }}
+          {now}
+          snoozeOptions={preferences.settings.snoozeOptions}
+          busy={saving || loading}
+          stale={snapshot.staleIds.includes(item.pr.id)}
+          watching={preferences.watchedPullRequests.includes(item.pr.id)}
+          labels={labelsFor(preferences, item.pr.id)}
+          allLabels={preferences.labels}
+          onopen={open}
+          oncopy={copyUrl}
+          oncopydebuginfo={copyDebugInfo}
+          onaction={action}
+          onlabel={label}
+        />{/snippet}
       <div
         class="board"
         class:silent-refresh={loading && silentRefresh && !saving}
@@ -901,33 +934,16 @@
                 <div>
                   <i class={col.state}></i>
                   <h2>{col.title}</h2>
-                  <span class="column-count"
-                    >{visible.filter((p) => p.state === col.state).length}</span
-                  >
+                  <span class="column-count">{columnSizes[col.state]}</span>
                 </div>
                 <p>{col.subtitle}</p>
               </header>
               <div class="card-list">
-                {#each visible.filter((p) => p.state === col.state) as item (item.pr.id)}<PRCard
-                    bind:this={cards[item.pr.id]}
-                    {item}
-                    onhover={(id) => {
-                      if (id) hoveredId = id;
-                      else if (hoveredId === item.pr.id) hoveredId = null;
-                    }}
-                    {now}
-                    snoozeOptions={preferences.settings.snoozeOptions}
-                    busy={saving || loading}
-                    stale={snapshot.staleIds.includes(item.pr.id)}
-                    watching={preferences.watchedPullRequests.includes(item.pr.id)}
-                    labels={labelsFor(preferences, item.pr.id)}
-                    allLabels={preferences.labels}
-                    onopen={open}
-                    oncopy={copyUrl}
-                    oncopydebuginfo={copyDebugInfo}
-                    onaction={action}
-                    onlabel={label}
-                  />{:else}<div class="empty-column">
+                {#each entries.filter((e) => e.lead.state === col.state) as entry (entry.id)}{#if entry.stack}<PRStack
+                      items={entry.items}
+                      stack={entry.stack}
+                      row={card}
+                    />{:else}{@render card(entry.lead, false)}{/if}{:else}<div class="empty-column">
                     <span>
                       {#if col.state === 'ready-to-merge'}<CircleCheck
                           size={24}

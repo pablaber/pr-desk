@@ -12,6 +12,10 @@ export interface PullRequest {
   authorIsBot: boolean;
   state: 'OPEN' | 'CLOSED' | 'MERGED';
   draft: boolean;
+  baseRefName: string;
+  headRefName: string;
+  // The head branch lives in a fork, so no other PR in the repository can be based on it.
+  crossRepository: boolean;
   updatedAt: string;
   reviewDecision: string | null;
   mergeable: string;

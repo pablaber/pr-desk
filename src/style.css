@@ -398,6 +398,93 @@ i.waiting {
 .card-main:hover {
   background: #fdfefb;
 }
+.pr-card.compact {
+  box-shadow: none;
+}
+.pr-card.compact .card-main {
+  padding: 11px 12px;
+  gap: 6px;
+}
+.pr-card.compact .merge-button {
+  margin: 0 12px 12px;
+}
+/* Stacked PRs share one container; a rail with a dot per layer runs down to the base branch. */
+.pr-stack {
+  border: 1px solid #d6e0cf;
+  border-radius: 10px;
+  background: #f3f6ef;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+.stack-heading {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #5f7058;
+}
+.stack-repo {
+  font-weight: 400;
+  color: #7b8a73;
+  overflow-wrap: anywhere;
+}
+.stack-layers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.stack-layers li,
+.stack-base {
+  position: relative;
+  padding-left: 18px;
+}
+.stack-layers li::before,
+.stack-base::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: -8px;
+  bottom: 0;
+  width: 2px;
+  background: #cdd9c6;
+}
+.stack-layers li:first-child::before {
+  top: 17px;
+}
+.stack-layers li::after,
+.stack-base::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 12px;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid #9fb596;
+  background: white;
+}
+.stack-base {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 18px;
+  font-size: 10px;
+  color: #7b8a73;
+  overflow-wrap: anywhere;
+}
+.stack-base::before {
+  bottom: 50%;
+}
+.stack-base::after {
+  top: calc(50% - 5px);
+  background: #9fb596;
+}
 .merge-confirm-button,
 .merge-button {
   background: #287a3e;

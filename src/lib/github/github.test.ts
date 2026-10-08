@@ -16,6 +16,7 @@ function raw(): RawPR {
     author: { login: 'me' },
     repository: { nameWithOwner: 'Acme/API' },
     isDraft: false,
+    isCrossRepository: false,
     reviewRequests: connection([
       { requestedReviewer: { __typename: 'Team', login: 'me' } },
       { requestedReviewer: { __typename: 'User', login: 'reviewer' } },
