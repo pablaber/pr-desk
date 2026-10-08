@@ -7,6 +7,7 @@ import type { DashboardSnapshot } from '../github/refresh';
 import type { GhCliInfo } from '../github/types';
 import type { PullRequest } from '../pr/types';
 import type { AppState } from '../store/app-state';
+import type { SessionError } from './session-errors.svelte';
 
 export interface DebugInfoInput {
   version: string;
@@ -16,6 +17,7 @@ export interface DebugInfoInput {
   preferences: AppState;
   snapshot: DashboardSnapshot;
   cliInfo: GhCliInfo | null;
+  errors: SessionError[];
 }
 
 // Everything the board is derived from, plus how each PR was placed, so a pasted report explains
@@ -41,6 +43,7 @@ export function buildDebugInfo(input: DebugInfoInput, prId?: string) {
       staleIds: snapshot.staleIds,
       sources: snapshot.sources,
     },
+    errors: input.errors,
     preferences,
     pullRequests: placements.filter((p) => prId === undefined || p.pr.id === prId),
   };

@@ -19,6 +19,7 @@ function input(overrides: Partial<DebugInfoInput> = {}): DebugInfoInput {
       discoveryComplete: true,
     },
     cliInfo: null,
+    errors: [],
     ...overrides,
   };
 }
@@ -75,6 +76,20 @@ describe('debug info', () => {
     const info = buildDebugInfo(input({ snapshot: { ...input().snapshot, prs } }), 'acme/api#2');
     expect(info.pullRequests.map((p) => p.pr.id)).toEqual(['acme/api#2']);
     expect(info.board).toMatchObject({ needsAttention: 1, waiting: 1 });
+  });
+
+  it('includes the errors seen this session', () => {
+    const errors = [
+      {
+        source: 'refresh' as const,
+        message: 'Error: offline',
+        firstAt: '2026-09-30T11:00:00.000Z',
+        lastAt: '2026-09-30T11:30:00.000Z',
+        count: 3,
+      },
+    ];
+    expect(buildDebugInfo(input({ errors })).errors).toEqual(errors);
+    expect(buildDebugInfo(input({ errors }), 'acme/api#1').errors).toEqual(errors);
   });
 
   it('serializes to JSON', () => {

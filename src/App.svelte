@@ -75,6 +75,12 @@
   import { knownBotKey } from './lib/pr/bots';
   import { badgeCount } from './lib/pr/badge';
   import { buildDebugInfo } from './lib/debug/debug-info';
+  import {
+    recordError,
+    sessionErrors,
+    type ErrorSource,
+    type SessionError,
+  } from './lib/debug/session-errors.svelte';
   import { applyLabelOp, labelsFor, type LabelOp } from './lib/pr/labels';
   import { prunePreferences } from './lib/pr/prune';
   import { hotkeyFor, resolveHotkey } from './lib/hotkeys/match';
@@ -160,14 +166,14 @@
     // The badge is cosmetic, so a failure to set it must never surface as a dashboard error.
     getCurrentWindow()
       .setBadgeCount(dockBadge || undefined)
-      .catch(() => {});
+      .catch((e) => recordError('dock-badge', String(e)));
   });
   $effect(() => {
     if (!isTauri() || !initialized) return;
     // Zoom is cosmetic, so a failure to apply it must never surface as a dashboard error.
     getCurrentWebview()
       .setZoom(preferences.settings.interfaceScale / 100)
-      .catch(() => {});
+      .catch((e) => recordError('interface-scale', String(e)));
   });
   $effect(() => {
     if (screen === 'label' && !selectedLabel) screen = 'labels';
@@ -183,7 +189,8 @@
       (info) => {
         if (active) cliInfo = info;
       },
-      () => {
+      (e) => {
+        recordError('gh-cli', String(e));
         if (active) cliInfoError = true;
       },
     );
@@ -194,7 +201,17 @@
   onMount(() => {
     void start();
     const timer = setInterval(() => (now = Date.now()), 15000);
-    return () => clearInterval(timer);
+    const uncaught = (event: ErrorEvent) =>
+      recordError('uncaught', String(event.error ?? event.message));
+    const unhandled = (event: PromiseRejectionEvent) =>
+      recordError('uncaught', String(event.reason));
+    window.addEventListener('error', uncaught);
+    window.addEventListener('unhandledrejection', unhandled);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('error', uncaught);
+      window.removeEventListener('unhandledrejection', unhandled);
+    };
   });
   $effect(() => {
     const minutes = preferences.settings.automaticRefreshMinutes;
@@ -247,6 +264,7 @@
       initialized = true;
     } catch (e) {
       setupError = String(e);
+      recordError('setup', setupError);
     } finally {
       loading = false;
     }
@@ -260,7 +278,7 @@
       completed = await fetchCompleted(service, $state.snapshot(preferences), Date.now());
       now = Date.now();
     } catch (e) {
-      error = String(e);
+      showError('completed', String(e));
     } finally {
       completedLoading = false;
     }
@@ -280,11 +298,12 @@
     error = '';
     try {
       snapshot = await refreshDashboard(service, preferences, snapshot);
+      for (const warning of snapshot.warnings) recordError('refresh-warning', warning);
       await prune();
       now = Date.now();
       refreshed = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } catch (e) {
-      error = String(e);
+      showError('refresh', String(e));
     } finally {
       loading = false;
     }
@@ -318,6 +337,10 @@
     if (initialized && screen === 'completed') void loadCompleted();
     else void (initialized ? refresh() : start());
   }
+  function showError(source: ErrorSource, message: string) {
+    error = message;
+    recordError(source, message);
+  }
   async function persist(next: AppState) {
     await saveState(next);
     preferences = next;
@@ -331,7 +354,7 @@
       update(next);
       await persist(next);
     } catch (e) {
-      error = `Could not save preferences: ${String(e)}`;
+      showError('preferences', `Could not save preferences: ${String(e)}`);
     } finally {
       saving = false;
     }
@@ -381,8 +404,11 @@
       }
       return true;
     } catch (e) {
-      if (kind === 'repo') throw e;
-      error = String(e);
+      if (kind === 'repo') {
+        recordError('settings', String(e));
+        throw e;
+      }
+      showError('settings', String(e));
       return false;
     }
   }
@@ -398,7 +424,7 @@
       });
       return true;
     } catch (e) {
-      error = String(e);
+      showError('settings', String(e));
       return false;
     }
   }
@@ -532,6 +558,7 @@
       actionPR = null;
     } catch (e) {
       actionError = String(e);
+      recordError(pendingAction, actionError);
     } finally {
       saving = false;
       actionStatus = '';
@@ -592,15 +619,23 @@
       (event.target as HTMLElement | null)?.closest?.('[data-pr-id]')?.getAttribute('data-pr-id');
     return visible.find((p) => p.pr.id === id) ?? null;
   }
-  async function copyUrl(pr: PullRequest) {
+  async function copyText(text: () => string, icon: typeof Copy, copied: string, what: string) {
     try {
-      await navigator.clipboard.writeText(pr.url);
-      showToast(Link, `PR ${pr.repository}#${pr.number} URL copied to clipboard`);
+      await navigator.clipboard.writeText(text());
+      showToast(icon, copied);
     } catch (e) {
-      error = `Could not copy the PR URL: ${String(e)}`;
+      showError('clipboard', `Could not copy ${what}: ${String(e)}`);
     }
   }
-  async function copyDebugInfo(pr?: PullRequest) {
+  function copyUrl(pr: PullRequest) {
+    void copyText(
+      () => pr.url,
+      Link,
+      `PR ${pr.repository}#${pr.number} URL copied to clipboard`,
+      'the PR URL',
+    );
+  }
+  function copyDebugInfo(pr?: PullRequest) {
     const info = buildDebugInfo(
       {
         version,
@@ -610,27 +645,39 @@
         preferences: $state.snapshot(preferences) as AppState,
         snapshot: $state.snapshot(snapshot) as DashboardSnapshot,
         cliInfo: $state.snapshot(cliInfo),
+        errors: $state.snapshot(sessionErrors) as SessionError[],
       },
       pr?.id,
     );
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(info, null, 2));
-      showToast(
-        Bug,
-        pr ? `Debug info for ${pr.repository}#${pr.number} copied` : 'Debug info copied',
-      );
-    } catch (e) {
-      error = `Could not copy debug info: ${String(e)}`;
-    }
+    void copyText(
+      () => JSON.stringify(info, null, 2),
+      Bug,
+      pr
+        ? `Debug info for ${pr.repository}#${pr.number} copied to clipboard`
+        : 'Debug info copied to clipboard',
+      'debug info',
+    );
   }
-  async function copySettings() {
-    try {
-      const config = exportSettings($state.snapshot(preferences) as AppState, new Date());
-      await navigator.clipboard.writeText(JSON.stringify(config, null, 2));
-      showToast(Copy, 'Settings copied');
-    } catch (e) {
-      error = `Could not copy settings: ${String(e)}`;
-    }
+  function copyError(entry: SessionError) {
+    void copyText(
+      () => JSON.stringify(entry, null, 2),
+      Copy,
+      'Error copied to clipboard',
+      'the error',
+    );
+  }
+  function copySettings() {
+    void copyText(
+      () =>
+        JSON.stringify(
+          exportSettings($state.snapshot(preferences) as AppState, new Date()),
+          null,
+          2,
+        ),
+      Copy,
+      'Settings copied',
+      'settings',
+    );
   }
   async function importSettings(config: SettingsConfig): Promise<boolean> {
     await change((next) => Object.assign(next, applySettingsImport(next, config)));
@@ -644,7 +691,7 @@
     try {
       await openUrl(url);
     } catch (e) {
-      error = `Could not open GitHub: ${String(e)}`;
+      showError('open', `Could not open GitHub: ${String(e)}`);
     }
   }
 </script>
@@ -915,7 +962,8 @@
     {/if}
   </main>
 </div>
-<Toaster />
+<!-- Settings shows the toasts itself while open, since its modal dialog covers this one. -->
+{#if !(settingsOpen && initialized)}<Toaster />{/if}
 {#if initialized}
   <Settings
     open={settingsOpen}
@@ -945,8 +993,9 @@
     onsnoozeoptions={setSnoozeOptions}
     onopen={open}
     onunignore={(id) => restore('ignored', id)}
-    oncopydebuginfo={() => void copyDebugInfo()}
-    oncopysettings={() => void copySettings()}
+    oncopydebuginfo={() => copyDebugInfo()}
+    oncopyerror={copyError}
+    oncopysettings={copySettings}
     onimportsettings={importSettings}
   />
 {/if}

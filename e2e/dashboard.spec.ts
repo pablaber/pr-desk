@@ -1072,14 +1072,89 @@ test('copies debug info for the whole board from Settings', async ({ page }) => 
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await openSettingsSection(page, 'Troubleshooting');
   await page.getByRole('button', { name: 'Copy debug info' }).click();
+  // The modal dialog covers the app's own toasts, so the toast must render inside it.
+  const toast = page
+    .getByRole('dialog', { name: 'Settings' })
+    .getByRole('status')
+    .filter({ hasText: 'Debug info copied to clipboard' });
+  await expect(toast).toBeVisible();
+  await expect(toast.locator('.toast')).toHaveCSS('opacity', '1');
   await page.screenshot({ path: '.context/debug-settings.png' });
-  await expect(page.getByRole('status').filter({ hasText: 'Debug info copied' })).toBeVisible();
   const info = await copied();
-  expect(info).toMatchObject({ login: 'alex', refresh: { discoveryComplete: true } });
+  expect(info).toMatchObject({ login: 'alex', refresh: { discoveryComplete: true }, errors: [] });
   expect(info.pullRequests).toHaveLength(4);
   expect(info.pullRequests.find((p: any) => p.pr.number === 1)).toMatchObject({
     column: 'ready-to-merge',
     matchedRules: expect.arrayContaining(['ready']),
+  });
+});
+
+test('lists errors from this session in Troubleshooting and the debug info', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSettingsSection(page, 'Troubleshooting');
+  await expect(page.getByText('No errors this session.')).toBeVisible();
+  await closeSettings(page);
+
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async () => Promise.reject(new Error('clipboard denied')) },
+    });
+    const w = window as any;
+    const invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      if (command === 'github' && args?.operation === 'graphql') throw new Error('offline');
+      return invoke(command, args);
+    };
+  });
+  await page.locator('.pr-card').first().hover();
+  await page.keyboard.press('c');
+  await expect(page.getByRole('alert')).toContainText('clipboard denied');
+  for (let i = 0; i < 2; i++) {
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+  }
+  await expect(page.getByText(/refresh issue/)).toBeVisible();
+
+  const copied = await captureClipboard(page);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSettingsSection(page, 'Troubleshooting');
+  const errors = page.locator('.session-error');
+  await expect(errors.filter({ hasText: 'clipboard denied' })).toContainText(
+    /Could not copy the PR URL.*clipboard ·/,
+  );
+  await expect(errors.filter({ hasText: 'offline' }).first()).toContainText(
+    /refresh-warning · .* · 2 times since/,
+  );
+  await page.screenshot({ path: '.context/session-errors.png' });
+  await page.getByRole('button', { name: 'Copy debug info' }).click();
+  const info = await copied();
+  expect(info.errors).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ source: 'clipboard', count: 1 }),
+      expect.objectContaining({ source: 'refresh-warning', count: 2 }),
+    ]),
+  );
+
+  await errors
+    .filter({ hasText: 'clipboard denied' })
+    .getByRole('button', { name: 'Copy error' })
+    .click();
+  await expect(
+    page
+      .getByRole('dialog', { name: 'Settings' })
+      .getByRole('status')
+      .filter({ hasText: 'Error copied to clipboard' }),
+  ).toBeVisible();
+  const error = JSON.parse(await page.evaluate(() => (window as any).copied[1]));
+  expect(error).toEqual({
+    source: 'clipboard',
+    message: expect.stringContaining('Could not copy the PR URL'),
+    firstAt: expect.any(String),
+    lastAt: expect.any(String),
+    count: 1,
   });
 });
 
@@ -1134,7 +1209,9 @@ test('copies debug info for one PR from the card menu', async ({ page }) => {
   await card.getByRole('button', { name: /^Actions for/ }).click();
   await page.getByRole('button', { name: /Copy debug info/ }).click();
   await expect(
-    page.getByRole('status').filter({ hasText: 'Debug info for acme/platform#2 copied' }),
+    page
+      .getByRole('status')
+      .filter({ hasText: 'Debug info for acme/platform#2 copied to clipboard' }),
   ).toBeVisible();
   const info = await copied();
   expect(info.pullRequests).toHaveLength(1);
