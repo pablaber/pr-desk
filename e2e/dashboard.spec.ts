@@ -363,6 +363,40 @@ test('snooze, ignore, restore, watch, tracked repositories and persistence', asy
   expect(persisted.watchedPullRequests).toEqual(['acme/platform#5']);
 });
 
+test('an approved human PR in a tracked repository moves from review attention to waiting', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const w = window as any,
+      invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      const result = await invoke(command, args);
+      for (const pr of result?.repository?.pullRequests?.nodes ?? []) {
+        if (pr.number === 6 && localStorage.getItem('humanApproved')) {
+          pr.reviewDecision = 'APPROVED';
+          pr.mergeStateStatus = 'UNSTABLE';
+        }
+      }
+      return result;
+    };
+    localStorage.setItem('pendingChecks', '[6]');
+  });
+  await page.goto('/');
+  await trackPlatformRepository(page);
+  const card = page.locator('.pr-card', { hasText: 'Document the retry policy' });
+  await expect(card).toContainText('Waiting for your review');
+  await page.evaluate(() => localStorage.setItem('humanApproved', '1'));
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(
+    page.locator('.column').nth(2).locator('.pr-card', { hasText: 'Document the retry policy' }),
+  ).toBeVisible();
+  await expect(card).toContainText('Checks running');
+  await expect(card).toContainText('Approved');
+  await expect(card).not.toContainText('Waiting for your review');
+  await expect(card.getByRole('button', { name: /^Merge / })).toHaveCount(0);
+  await page.screenshot({ path: '.context/approved-human-pr.png', fullPage: true });
+});
+
 test('the card menu dismisses on an outside click and nests snooze choices', async ({ page }) => {
   await page.goto('/');
   const trigger = page.getByRole('button', {
@@ -2195,6 +2229,10 @@ test('cards show one Checks badge coloured by check status', async ({ page }) =>
 async function trackBotPr(page: Page) {
   await page.goto('/');
   await page.evaluate(() => localStorage.setItem('botPr', '1'));
+  await trackPlatformRepository(page);
+}
+
+async function trackPlatformRepository(page: Page) {
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await openSettingsSection(page, 'Tracked repositories');
   await page.getByRole('textbox', { name: 'Repository', exact: true }).fill('acme/platform');

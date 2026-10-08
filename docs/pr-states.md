@@ -85,19 +85,19 @@ unless a non-blocking check rule matches them; failures always count.
 Every rule is evaluated. The **highest-priority match** decides the column and the card's primary
 label; other matching rules (except the `waiting` catch-all) show as secondary status text.
 
-| Priority | Rule                   | Column              | Condition                                                               | Primary label                 |
-| -------: | ---------------------- | ------------------- | ----------------------------------------------------------------------- | ----------------------------- |
-|      100 | `review`               | **Needs attention** | review requested from you                                               | Review requested              |
-|       90 | `threads`              | **Needs attention** | owned and has active threads                                            | _N_ unresolved thread(s)      |
-|       80 | `changes`              | **Needs attention** | owned and changes requested                                             | Changes requested             |
-|       70 | `checks`               | **Needs attention** | managed and any failed check                                            | Checks failed                 |
-|       60 | `conflict`             | **Needs attention** | managed and conflict                                                    | Merge conflict                |
-|       55 | `queued`               | **Waiting**         | queued (anyone's PR)                                                    | Queued to merge · #_position_ |
-|       54 | `auto-merge`           | **Waiting**         | auto-merge enabled and not queued (anyone's PR)                         | Auto-merge enabled            |
-|       50 | `ready`                | **Ready to merge**  | ready                                                                   | Ready to merge                |
-|       50 | `ready-pending-checks` | **Ready to merge**  | ready, pending checks                                                   | Ready · _check names_ pending |
-|       10 | `tracked-repository`   | **Needs attention** | from a tracked repository, not owned, not draft, not an approved bot PR | Waiting for your review       |
-|        0 | `waiting`\*            | **Waiting**         | always (fallback)                                                       | see below                     |
+| Priority | Rule                   | Column              | Condition                                                     | Primary label                 |
+| -------: | ---------------------- | ------------------- | ------------------------------------------------------------- | ----------------------------- |
+|      100 | `review`               | **Needs attention** | review requested from you                                     | Review requested              |
+|       90 | `threads`              | **Needs attention** | owned and has active threads                                  | _N_ unresolved thread(s)      |
+|       80 | `changes`              | **Needs attention** | owned and changes requested                                   | Changes requested             |
+|       70 | `checks`               | **Needs attention** | managed and any failed check                                  | Checks failed                 |
+|       60 | `conflict`             | **Needs attention** | managed and conflict                                          | Merge conflict                |
+|       55 | `queued`               | **Waiting**         | queued (anyone's PR)                                          | Queued to merge · #_position_ |
+|       54 | `auto-merge`           | **Waiting**         | auto-merge enabled and not queued (anyone's PR)               | Auto-merge enabled            |
+|       50 | `ready`                | **Ready to merge**  | ready                                                         | Ready to merge                |
+|       50 | `ready-pending-checks` | **Ready to merge**  | ready, pending checks                                         | Ready · _check names_ pending |
+|       10 | `tracked-repository`   | **Needs attention** | from a tracked repository, not owned, not draft, not approved | Waiting for your review       |
+|        0 | `waiting`\*            | **Waiting**         | always (fallback)                                             | see below                     |
 
 \* Catch-all rule: it explains why the PR is on the desk and never appears in secondary status.
 
@@ -117,7 +117,8 @@ The Waiting fallback picks its label from the first that applies:
   conflict sits in Needs attention, not Waiting.
 - Once you review someone else's PR, the review-request search stops returning it, so it leaves
   the desk — unless it is watched (Waiting, "No action needed") or in a tracked repository
-  (Needs attention, "Waiting for your review").
+  (Waiting once approved, with "Checks running" or "No action needed"). An explicit personal
+  review request still needs attention, even when the aggregate review decision is approved.
 - A known bot's PR is only treated as managed when it comes from a tracked repository or is
   watched. In a tracked repository it needs attention as "Waiting for your review", like any
   other PR that is not yours; once approved it is Ready to merge or, if GitHub still blocks it,
@@ -144,7 +145,7 @@ The common situations, from your point of view:
 | Someone asked you to review                                                        | Needs attention |
 | Your PR has unresolved comments, requested changes, a failing check, or a conflict | Needs attention |
 | A known bot's PR you track has a failing check or a conflict                       | Needs attention |
-| Someone else's open PR in a repository you track, including unapproved bot PRs     | Needs attention |
+| Someone else's unapproved open PR in a repository you track, including bot PRs     | Needs attention |
 | Your PR or tracked bot PR is approved, green, and mergeable                        | Ready to merge  |
 | Same, but a non-blocking check is still pending                                    | Ready to merge  |
 | Any PR in a merge queue or with auto-merge on                                      | Waiting         |
