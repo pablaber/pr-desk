@@ -29,6 +29,33 @@ describe('dashboard rules', () => {
     });
     expect(classify(pr({ ...tracked, draft: true }), 'me', local)).toBeNull();
   });
+  it.each([
+    ['pending', 'Checks running'],
+    ['passing', 'No action needed'],
+  ] as const)(
+    'approved human PRs in tracked repositories wait with %s checks',
+    (state, primary) => {
+      const approved: Partial<PullRequest> = {
+        author: 'other',
+        reasons: ['tracked-repository'],
+        reviewDecision: 'APPROVED',
+        checks: [{ name: 'Analyze (actions)', state }],
+        mergeStateStatus: 'UNSTABLE',
+      };
+      expect(run(approved)).toMatchObject({
+        state: 'waiting',
+        primary,
+        statuses: [],
+        canMerge: false,
+      });
+      expect(run({ ...approved, directReviewers: ['me'] })).toMatchObject({
+        state: 'needs-attention',
+        primary: 'Review requested',
+        statuses: ['Review requested'],
+        canMerge: false,
+      });
+    },
+  );
   it('shows waiting for your review as a status beneath a higher-priority rule', () =>
     expect(
       run({

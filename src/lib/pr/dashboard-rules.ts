@@ -78,12 +78,9 @@ export const dashboardRules: DashboardRule[] = [
     id: 'tracked-repository',
     state: 'needs-attention',
     priority: 10,
-    // An approved bot PR has had its review; it now waits on merge requirements instead.
+    // Approval satisfies the tracked-repository review prompt; direct requests still apply.
     matches: (s) =>
-      s.trackedRepository &&
-      !s.owned &&
-      !s.pr.draft &&
-      !(s.bot && s.pr.reviewDecision === 'APPROVED'),
+      s.trackedRepository && !s.owned && !s.pr.draft && s.pr.reviewDecision !== 'APPROVED',
     getLabel: () => 'Waiting for your review',
   },
   {
