@@ -25,7 +25,7 @@
   // The app's CSP blocks data URLs, so keep the logo as a bundled file.
   import appIcon from '../src-tauri/icons/source.svg?no-inline';
   import PRConfirmation from './components/PRConfirmation.svelte';
-  import { stalenessLevel } from './lib/pr/card-view-model';
+  import { sourceReasons, stalenessLevel } from './lib/pr/card-view-model';
   import type { PullRequest } from './lib/pr/types';
   import PRCard from './components/PRCard.svelte';
   import PRStack from './components/PRStack.svelte';
@@ -157,7 +157,7 @@
       .sort(sortPullRequests),
   );
   let visible = $derived(
-    classified.filter((p) => filter === 'all' || p.pr.reasons.includes(filter)),
+    classified.filter((p) => filter === 'all' || sourceReasons(p.pr.reasons).includes(filter)),
   );
   let entries = $derived(boardEntries(visible, snapshot.prs));
   // A stack sits in its most urgent layer's column, so columns count the PRs they show.
