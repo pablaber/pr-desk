@@ -344,6 +344,35 @@ test('cards show green approval and red changes-requested badges', async ({ page
   await page.screenshot({ path: '.context/review-badges.png', fullPage: true });
 });
 
+test('each card badge carries its own icon', async ({ page }) => {
+  await trackBotPr(page);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSettingsSection(page, 'Watched pull requests');
+  await page
+    .getByRole('textbox', { name: 'Pull request URL' })
+    .fill('https://github.com/acme/platform/pull/5');
+  await page.getByRole('button', { name: 'Watch PR', exact: true }).click();
+  await saveSettings(page);
+  await closeSettings(page);
+  for (const [name, icon] of [
+    ['Mine', 'user-round'],
+    ['Review request', 'git-pull-request-arrow'],
+    ['Tracked repo', 'folder-git-2'],
+    ['Watching', 'eye'],
+    ['Bot', 'bot'],
+    ['Approved', 'thumbs-up'],
+    ['Changes requested', 'file-diff'],
+    ['Stale', 'hourglass'],
+  ]) {
+    const badge = page.locator('.pr-card .badge', { hasText: new RegExp(`^\\s*${name}$`) });
+    await expect(badge.first().locator(`svg.lucide-${icon}`)).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
+  }
+  await page.screenshot({ path: '.context/badge-icons-e2e.png', fullPage: true });
+});
+
 test('snooze, ignore, restore, watch, tracked repositories and persistence', async ({ page }) => {
   await page.goto('/');
   await page
@@ -460,9 +489,9 @@ test('the card menu dismisses on an outside click and nests snooze choices', asy
     exact: true,
   });
   // A real click lands on whatever is topmost, so drive the mouse instead of the element.
-  const clickOver = async (locator: typeof snooze) => {
+  const clickOver = async (locator: typeof snooze, across = 0.5) => {
     const box = (await locator.boundingBox())!;
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.click(box.x + box.width * across, box.y + box.height / 2);
   };
   await trigger.click();
   await expect(actions).toBeVisible();
@@ -484,7 +513,8 @@ test('the card menu dismisses on an outside click and nests snooze choices', asy
   expect(await page.evaluate(() => (window as any).opened)).toEqual([]);
   // A click on the card body behind the popup dismisses it instead of opening GitHub.
   await trigger.click();
-  await clickOver(cardBody);
+  // The popup covers the right of the card, so click the body's uncovered left side.
+  await clickOver(cardBody, 0.1);
   await expect(actions).toBeHidden();
   expect(await page.evaluate(() => (window as any).opened)).toEqual([]);
   // The submenu does not stay open across reopens.

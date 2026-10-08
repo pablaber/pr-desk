@@ -1,10 +1,12 @@
 import type { ClassifiedPR } from './classify';
 import type { TrackingReason } from './types';
-const sourceLabels: Record<TrackingReason, string> = {
+export type SourceBadge = TrackingReason | 'bot';
+const sourceLabels: Record<SourceBadge, string> = {
   owned: 'Mine',
   'direct-review-request': 'Review request',
   'tracked-repository': 'Tracked repo',
   watched: 'Watching',
+  bot: 'Bot',
 };
 export type ChecksStatus = 'passing' | 'pending' | 'failed';
 export type StalenessLevel = 'low' | 'medium' | 'high';
@@ -54,10 +56,9 @@ export function cardViewModel(item: ClassifiedPR, now: number) {
   ];
   return {
     ...item,
-    badges: [
-      ...sourceReasons(item.pr.reasons).map((r) => sourceLabels[r]),
-      ...(item.bot ? ['Bot'] : []),
-    ],
+    badges: [...sourceReasons(item.pr.reasons), ...(item.bot ? ['bot' as const] : [])].map(
+      (kind) => ({ kind, label: sourceLabels[kind] }),
+    ),
     reviewBadge:
       item.pr.reviewDecision === 'APPROVED'
         ? { label: 'Approved', tone: 'approved' }

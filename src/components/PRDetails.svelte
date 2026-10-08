@@ -1,10 +1,18 @@
 <script lang="ts">
+  import Bot from '@lucide/svelte/icons/bot';
   import CircleAlert from '@lucide/svelte/icons/circle-alert';
   import Check from '@lucide/svelte/icons/check';
   import Clock from '@lucide/svelte/icons/clock';
+  import Eye from '@lucide/svelte/icons/eye';
+  import FileDiff from '@lucide/svelte/icons/file-diff';
+  import FolderGit2 from '@lucide/svelte/icons/folder-git-2';
+  import GitPullRequestArrow from '@lucide/svelte/icons/git-pull-request-arrow';
+  import Hourglass from '@lucide/svelte/icons/hourglass';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+  import ThumbsUp from '@lucide/svelte/icons/thumbs-up';
+  import UserRound from '@lucide/svelte/icons/user-round';
   import X from '@lucide/svelte/icons/x';
-  import { cardViewModel } from '../lib/pr/card-view-model';
+  import { cardViewModel, type SourceBadge } from '../lib/pr/card-view-model';
   import type { ClassifiedPR } from '../lib/pr/classify';
   import type { PRLabel } from '../lib/store/app-state';
   let {
@@ -22,6 +30,14 @@
     compact?: boolean;
   } = $props();
   let card = $derived(cardViewModel(item, now));
+  // Tracked, watched and bot icons match their Settings sections, tying each badge to its setting.
+  const sourceIcons: Record<SourceBadge, typeof Bot> = {
+    owned: UserRound,
+    'direct-review-request': GitPullRequestArrow,
+    'tracked-repository': FolderGit2,
+    watched: Eye,
+    bot: Bot,
+  };
   const checksTitles = {
     passing: 'Checks passing',
     pending: 'Checks running',
@@ -35,9 +51,13 @@
 >
 <strong>{card.pr.title}</strong>
 <span class="badges"
-  >{#each compact ? [] : card.badges as badge}<span class="badge">{badge}</span
+  >{#each compact ? [] : card.badges as badge (badge.kind)}{@const Icon =
+      sourceIcons[badge.kind]}<span class="badge"><Icon size={10} /> {badge.label}</span
     >{/each}{#if card.reviewBadge}<span class="badge review {card.reviewBadge.tone}"
-      >{card.reviewBadge.label}</span
+      >{#if card.reviewBadge.tone === 'approved'}<ThumbsUp size={10} />{:else}<FileDiff
+          size={10}
+        />{/if}
+      {card.reviewBadge.label}</span
     >{/if}{#if card.checksBadge}<span
       class="badge checks {card.checksBadge}"
       title={checksTitles[card.checksBadge]}
@@ -47,7 +67,8 @@
         />{:else if card.checksBadge === 'pending'}<LoaderCircle size={10} />{:else}<X
           size={10}
         />{/if} Checks</span
-    >{/if}{#if card.staleness}<span class="badge staleness {card.staleness}">Stale</span
+    >{/if}{#if card.staleness}<span class="badge staleness {card.staleness}"
+      ><Hourglass size={10} /> Stale</span
     >{/if}{#each labels as label (label.id)}<span class="badge label"
       ><i class="label-dot" style:--label-color={label.color}></i>{label.name}</span
     >{/each}</span
