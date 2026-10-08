@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.12.0](https://github.com/pablaber/pr-desk/compare/v1.11.0...v1.12.0) (2026-10-08)
+
+
+### Features
+
+* show progress status in merge confirmation dialog ([#108](https://github.com/pablaber/pr-desk/issues/108)) ([b1bd117](https://github.com/pablaber/pr-desk/commit/b1bd1173f3ba6beb65c92f3b64c44fbfcad9ad53))
+* show running and failed states on the checks badge ([#110](https://github.com/pablaber/pr-desk/issues/110)) ([bf4a0d3](https://github.com/pablaber/pr-desk/commit/bf4a0d3d2082e657fbda497b36b5c7f1b19161cb))
+
+
+### Bug Fixes
+
+* stop prompting for review on approved tracked PRs ([#111](https://github.com/pablaber/pr-desk/issues/111)) ([81563d5](https://github.com/pablaber/pr-desk/commit/81563d55b47c6a20138afc0d8e030a34ef02eece))
+
 ## [1.11.0](https://github.com/pablaber/pr-desk/compare/v1.10.0...v1.11.0) (2026-10-07)
 
 
