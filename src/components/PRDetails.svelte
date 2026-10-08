@@ -12,7 +12,15 @@
     now,
     stale,
     labels = [],
-  }: { item: ClassifiedPR; now: number; stale: boolean; labels?: PRLabel[] } = $props();
+    compact = false,
+  }: {
+    item: ClassifiedPR;
+    now: number;
+    stale: boolean;
+    labels?: PRLabel[];
+    // A stack names the repository once and drops each layer's source badges.
+    compact?: boolean;
+  } = $props();
   let card = $derived(cardViewModel(item, now));
   const checksTitles = {
     passing: 'Checks passing',
@@ -22,13 +30,14 @@
 </script>
 
 <span class="repo"
-  >{card.pr.repository} <span class="number">#{card.pr.number}</span>
+  >{#if !compact}{card.pr.repository}{/if} <span class="number">#{card.pr.number}</span>
   <span class="author">{card.pr.author}</span></span
 >
 <strong>{card.pr.title}</strong>
 <span class="badges"
-  >{#each card.badges as badge}<span class="badge">{badge}</span>{/each}{#if card.reviewBadge}<span
-      class="badge review {card.reviewBadge.tone}">{card.reviewBadge.label}</span
+  >{#each compact ? [] : card.badges as badge}<span class="badge">{badge}</span
+    >{/each}{#if card.reviewBadge}<span class="badge review {card.reviewBadge.tone}"
+      >{card.reviewBadge.label}</span
     >{/if}{#if card.checksBadge}<span
       class="badge checks {card.checksBadge}"
       title={checksTitles[card.checksBadge]}

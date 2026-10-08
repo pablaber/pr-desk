@@ -67,6 +67,13 @@ test.beforeEach(async ({ page }) => {
         ? 'MERGED'
         : 'OPEN',
       isDraft: false,
+      // With stackedPrs set, #3 builds on #2 and #2 on #1.
+      baseRefName:
+        localStorage.getItem('stackedPrs') && [2, 3].includes(number)
+          ? `branch-${number - 1}`
+          : 'main',
+      headRefName: `branch-${number}`,
+      isCrossRepository: false,
       // Days since the last update, chosen to produce one card per staleness level.
       updatedAt: new Date(
         Date.now() - ([1 / 24, 10, 20, 30][number - 1] ?? 1 / 24) * 86400000,
@@ -252,6 +259,38 @@ test('dashboard classification, source filters, browser action, and screenshot',
   await page.getByRole('button', { name: 'All', exact: true }).click();
   await expect(summaryCounts).toHaveText(['1', '2', '1']);
   await page.screenshot({ path: '.context/dashboard.png', fullPage: true });
+});
+
+test('stacked PRs share one card in the column of their most urgent layer', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('stackedPrs', '1'));
+  await page.goto('/');
+  const stack = page.getByRole('region', { name: 'Stack of 3 pull requests in acme/platform' });
+  await expect(page.locator('.column').nth(1).locator('.pr-stack')).toHaveCount(1);
+  await expect(stack.locator('.stack-heading')).toContainText('3 PRs');
+  const layers = stack.locator('.pr-card');
+  await expect(layers).toHaveCount(3);
+  expect(
+    await layers.evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.prId)),
+  ).toEqual(['acme/platform#3', 'acme/platform#2', 'acme/platform#1']);
+  await expect(stack.locator('.stack-base')).toHaveText('main');
+  // Layers are not repeated as standalone cards, and columns count the PRs they show.
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect(page.locator('.summary b')).toHaveText(['0', '4', '0']);
+  await expect(layers.first().locator('.repo')).not.toContainText('acme/platform');
+  await expect(layers.first().locator('.badge', { hasText: 'Mine' })).toHaveCount(0);
+  await expect(
+    stack.getByRole('button', { name: 'Merge Reduce cache lookup latency', exact: true }),
+  ).toBeVisible();
+  await stack
+    .getByRole('button', { name: 'Open Refresh session token handling on GitHub', exact: true })
+    .click();
+  expect(await page.evaluate(() => (window as any).opened)).toEqual([
+    'https://github.com/acme/platform/pull/2',
+  ]);
+  await stack
+    .getByRole('button', { name: 'Actions for Add audit event retention', exact: true })
+    .click();
+  await expect(stack.getByRole('group', { name: 'PR actions' })).toBeVisible();
 });
 
 test('the Completed view lists recently merged pull requests and opens them', async ({ page }) => {

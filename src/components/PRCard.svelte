@@ -19,6 +19,7 @@
   import type { PRLabel, SnoozeOption } from '../lib/store/app-state';
   let {
     item,
+    compact = false,
     now,
     snoozeOptions,
     stale,
@@ -34,6 +35,7 @@
     onhover,
   }: {
     item: ClassifiedPR;
+    compact?: boolean;
     now: number;
     snoozeOptions: SnoozeOption[];
     stale: boolean;
@@ -104,6 +106,7 @@
 />
 <article
   class="pr-card"
+  class:compact
   data-pr-id={card.pr.id}
   bind:this={cardEl}
   oncontextmenu={(e) => {
@@ -122,7 +125,7 @@
     onclick={() => onopen(card.pr.url)}
     aria-label={`Open ${card.pr.title} on GitHub`}
   >
-    <PRDetails {item} {now} {stale} {labels} />
+    <PRDetails {item} {now} {stale} {labels} {compact} />
   </button>
   <button
     disabled={busy}

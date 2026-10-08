@@ -19,6 +19,9 @@ export interface RawPR {
   repository: { nameWithOwner: string };
   state: PullRequest['state'];
   isDraft: boolean;
+  baseRefName: string;
+  headRefName: string;
+  isCrossRepository: boolean;
   updatedAt: string;
   reviewDecision: string | null;
   mergeable: string;

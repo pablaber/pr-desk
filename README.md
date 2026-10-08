@@ -58,6 +58,8 @@ PR Desk has no in-app updater.
   [PR states](docs/pr-states.md) for the full rules.
 - Combines your own PRs, direct review requests, tracked repositories, and individually
   watched PRs in one dashboard.
+- Groups stacked PRs — each based on the branch of another open PR — into one stack card,
+  newest layer first down to the base branch, in the column of its most urgent layer.
 - Acts on the hovered card from the keyboard: O opens the PR on GitHub, S snoozes, L labels
   and I ignores it.
 - Filters by source and supports snoozing or individually ignoring PRs. Individually ignored
@@ -122,7 +124,7 @@ PR Desk never handles a GitHub token itself. GraphQL queries fetch:
 - `repository.pullRequest(number: ...)` for missing connection pages and PRs absent from
   discovery (watched PRs or IDs retained from failed sources).
 - Aggregate `reviewDecision`, `mergeable`, `mergeStateStatus`, draft/state/update
-  fields, reviewer requests, review threads, and the latest commit's status-check
+  fields, base and head branch names, reviewer requests, review threads, and the latest commit's status-check
   rollup.
 - Every check contributes to status. Pending/unknown checks never count as passing;
   success, neutral, and skipped checks pass. Empty check sets also pass. PR Desk can

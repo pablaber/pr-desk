@@ -16,7 +16,7 @@ function connections(cursors: (string | null | undefined)[] = [null, null, null]
     } } } } } }`,
   ].join(' ');
 }
-const fields = `url number title author { __typename login } repository { nameWithOwner } state isDraft updatedAt reviewDecision mergeable mergeStateStatus mergeQueueEntry { state position } autoMergeRequest { enabledAt }`;
+const fields = `url number title author { __typename login } repository { nameWithOwner } state isDraft baseRefName headRefName isCrossRepository updatedAt reviewDecision mergeable mergeStateStatus mergeQueueEntry { state position } autoMergeRequest { enabledAt }`;
 export function searchQuery(search: string, cursor: string | null) {
   return `query DeskSearch { search(query: ${q(search)}, type: ISSUE, first: 100, after: ${q(cursor)}) { issueCount ${page} nodes { ... on PullRequest { ${fields} ${connections()} } } } }`;
 }
