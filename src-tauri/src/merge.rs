@@ -112,8 +112,14 @@ fn merges_alone(pr: &Value) -> Result<(), String> {
 // gh pr view has no stack field; the REST pull carries it from this API version on.
 const API_VERSION: &str = "X-GitHub-Api-Version: 2026-03-10";
 
+// GitHub omits stack from the REST pull of an unstacked PR rather than returning null.
+fn with_stack(mut pr: Value, pull: &Value) -> Value {
+    pr["stack"] = pull["stack"].clone();
+    pr
+}
+
 async fn view(url: &str) -> Result<Value, String> {
-    let mut pr = gh(&["pr", "view", url, "--json", PR_FIELDS]).await?;
+    let pr = gh(&["pr", "view", url, "--json", PR_FIELDS]).await?;
     let pull = gh(&[
         "api",
         "--hostname",
@@ -123,10 +129,7 @@ async fn view(url: &str) -> Result<Value, String> {
         &pull_endpoint(url),
     ])
     .await?;
-    if let Some(stack) = pull.get("stack") {
-        pr["stack"] = stack.clone();
-    }
-    Ok(pr)
+    Ok(with_stack(pr, &pull))
 }
 
 fn validate_ready(
@@ -438,6 +441,10 @@ mod tests {
         let mut unknown = ready();
         unknown.as_object_mut().unwrap().remove("stack");
         assert!(validate_ready(&unknown, &oid, "me", None).is_err());
+        let unstacked = with_stack(unknown, &json!({"number":1}));
+        assert!(validate_ready(&unstacked, &oid, "me", None).is_ok());
+        let stacked = with_stack(ready(), &json!({"stack":above["stack"]}));
+        assert!(validate_ready(&stacked, &oid, "me", None).is_err());
         let mut bot = approvable();
         bot["stack"] = above["stack"].clone();
         assert!(validate_approvable(&bot, &oid, "me", "dependabot[bot]").is_err());
