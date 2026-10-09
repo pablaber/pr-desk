@@ -50,6 +50,8 @@ export function deriveSignals(
     checksPassing: checks.every((c) => c.state === 'passing'),
     waitingOn,
     conflict: pr.mergeable === 'CONFLICTING',
+    // GitHub only reports BEHIND when branch protection requires an up-to-date branch.
+    behind: pr.mergeStateStatus === 'BEHIND',
     queued: pr.mergeQueue !== null,
     autoMerge: pr.autoMerge,
     // Strict definition, which the in-app merge relies on.
@@ -77,6 +79,13 @@ export function deriveSignals(
       pr.mergeable === 'MERGEABLE' &&
       notQueued &&
       ['BLOCKED', 'CLEAN', 'HAS_HOOKS', 'UNSTABLE'].includes(pr.mergeStateStatus),
+    // Checks are not required: an outdated branch is often why they fail.
+    updatable:
+      managed &&
+      !pr.draft &&
+      pr.mergeStateStatus === 'BEHIND' &&
+      pr.mergeable === 'MERGEABLE' &&
+      notQueued,
   };
 }
 export type PullRequestSignals = ReturnType<typeof deriveSignals>;

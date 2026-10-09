@@ -85,7 +85,12 @@ test.beforeEach(async ({ page }) => {
             ? 'CHANGES_REQUESTED'
             : null,
       mergeable: 'MERGEABLE',
-      mergeStateStatus: 'CLEAN',
+      // A PR listed in behindPrs is up to date once its branch has been updated.
+      mergeStateStatus:
+        (JSON.parse(localStorage.getItem('behindPrs') ?? '[]') as number[]).includes(number) &&
+        !localStorage.getItem('updateCalls')
+          ? 'BEHIND'
+          : 'CLEAN',
       reviewRequests: connection(
         number === 4 ? [{ requestedReviewer: { __typename: 'User', login: 'alex' } }] : [],
       ),
@@ -168,6 +173,13 @@ test.beforeEach(async ({ page }) => {
           localStorage.setItem('approveMergeCalls', JSON.stringify(calls));
           if (localStorage.getItem('approveMergeFailure'))
             throw new Error('Approved on GitHub, but the merge failed.');
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          return;
+        }
+        if (command === 'update_pr_branch') {
+          const calls = JSON.parse(localStorage.getItem('updateCalls') ?? '[]');
+          calls.push(args);
+          localStorage.setItem('updateCalls', JSON.stringify(calls));
           await new Promise((resolve) => setTimeout(resolve, 200));
           return;
         }
@@ -2458,6 +2470,51 @@ test('approve and merge failures keep the dialog and card available', async ({ p
   await expect(dialog.getByRole('alert')).toContainText('the merge failed');
   await expect(page.locator('.pr-card', { hasText: 'Bump lodash' })).toHaveCount(1);
   await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeEnabled();
+});
+
+test('bot PRs behind their base update the branch after confirmation', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('behindPrs', '[7]'));
+  await trackBotPr(page);
+  const card = page.locator('.pr-card', { hasText: 'Bump lodash' });
+  await expect(card).toContainText('Behind main');
+  await expect(card).toContainText('Waiting for your review');
+  await expect(
+    card.getByRole('button', { name: 'Approve and merge Bump lodash', exact: true }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: '.context/update-branch-card.png', fullPage: true });
+  await card.getByRole('button', { name: 'Update branch for Bump lodash', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Update branch?' });
+  await expect(dialog).toContainText('merge the latest main into branch-7');
+  await expect(dialog.getByLabel('Merge method')).toHaveCount(0);
+  await page.screenshot({ path: '.context/update-branch-confirmation.png', fullPage: true });
+  await dialog.getByRole('button', { name: 'Update branch', exact: true }).click();
+  await expect(dialog.getByRole('status')).toHaveText('Updating branch…');
+  await expect(dialog).toBeHidden();
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('updateCalls') ?? '[]')),
+  ).toEqual([
+    {
+      url: 'https://github.com/acme/platform/pull/7',
+      headOid: 'a'.repeat(40),
+      bot: 'dependabot[bot]',
+    },
+  ]);
+  // The refresh after updating shows the branch up to date, so approval is offered again.
+  await expect(card).not.toContainText('Behind main');
+  await expect(
+    card.getByRole('button', { name: 'Approve and merge Bump lodash', exact: true }),
+  ).toHaveCount(1);
+});
+
+test('update branch is offered on your own PRs but not on others’', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('behindPrs', '[1, 4]'));
+  await page.goto('/');
+  const own = page.locator('.pr-card', { hasText: 'Reduce cache lookup latency' });
+  await expect(own).toContainText('Behind main');
+  await expect(own.locator('.merge-button')).toHaveText('Update branch…');
+  const others = page.locator('.pr-card', { hasText: 'Simplify deployment configuration' });
+  await expect(others).not.toContainText('Behind main');
+  await expect(others.locator('.merge-button')).toHaveCount(0);
 });
 
 test('approve and merge is not offered on bot PRs with failing checks', async ({ page }) => {

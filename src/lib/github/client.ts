@@ -50,6 +50,14 @@ export class GhGitHubService implements GitHubService {
       bot,
     });
   }
+  async updatePullRequestBranch(input: string, headOid: string, bot?: string) {
+    const [repository, number] = parsePullRequest(input).split('#');
+    await invoke('update_pr_branch', {
+      url: `https://github.com/${repository}/pull/${number}`,
+      headOid,
+      bot,
+    });
+  }
   getCliInfo() {
     return invoke<GhCliInfo>('github', { operation: 'info' });
   }

@@ -11,7 +11,8 @@ TypeScript + Vite frontend. All GitHub access goes through the user's authentica
 `gh` CLI — the app never handles tokens itself. Reviewing happens on GitHub; the app opens PRs in the browser.
 Ready PRs you authored, or by a known bot (a GitHub App or machine user), can be merged after confirmation through
 the dedicated merge_pr command. Known-bot PRs waiting for review with passing checks can be
-approved and merged after confirmation through approve_and_merge_pr.
+approved and merged after confirmation through approve_and_merge_pr. Your PRs and known-bot
+PRs that GitHub reports behind their base can have the branch updated through update_pr_branch.
 The confirmed Close as stale action closes stale PRs with a fixed automatic comment.
 
 Pinned and expected versions: Rust 1.94.0 (`rust-toolchain.toml`, installed by rustup
@@ -60,7 +61,7 @@ Inspect the generated screenshot and include the updated image in the change.
 | Path                                | What lives there                                                                                                      |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `src-tauri/src/main.rs`             | the Rust bridge: `gh auth status`, allowlisted read-only GraphQL (`QUERY_NAMES`), close as stale                      |
-| `src-tauri/src/merge.rs`            | merge_pr and approve_and_merge_pr: revalidate, then mutate pinned to the confirmed commit                             |
+| `src-tauri/src/merge.rs`            | merge_pr, approve_and_merge_pr, update_pr_branch: revalidate, then mutate pinned to the confirmed commit              |
 | `src/lib/github/`                   | `queries.ts` GraphQL text, `normalize.ts` raw → domain, `refresh.ts` orchestration/concurrency, `client.ts` transport |
 | `src/lib/pr/`                       | `signals.ts` → `dashboard-rules.ts` → `classify.ts` → `card-view-model.ts`                                            |
 | `src/lib/store/app-state.ts`        | versioned preferences and all input validation                                                                        |
@@ -93,6 +94,8 @@ Inspect the generated screenshot and include the updated image in the change.
   checks, pins the approval to the confirmed commit, and merges only once merge_pr's readiness
   checks pass. A known bot is a GitHub App stored as `name[bot]` or a machine user stored as
   its bare login, and the bridge checks the author's account type against that form.
+  The update_pr_branch command only updates PRs you authored, or by a known bot, that GitHub
+  reports `BEHIND`, and pins the update to the confirmed head commit.
   Keep mutations limited to these actions.
 - The bridge only runs GraphQL operations named in `QUERY_NAMES` in
   `src-tauri/src/main.rs`. A new `query Desk…` in `src/lib/github/` must be added there

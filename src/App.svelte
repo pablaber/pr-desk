@@ -113,7 +113,9 @@
   let actionPR = $state<PullRequest | null>(null);
   let actionError = $state('');
   let actionStatus = $state('');
-  let pendingAction = $state<'close-stale' | 'merge' | 'approve-merge'>('close-stale');
+  let pendingAction = $state<'close-stale' | 'merge' | 'approve-merge' | 'update-branch'>(
+    'close-stale',
+  );
   let showHotkeys = $state(false);
   let filter = $state<TrackingReason | 'all'>('all'),
     loading = $state(false),
@@ -493,7 +495,12 @@
     confirmClose = settingsOpen = false;
   }
   async function action(id: string, action: string, until?: string) {
-    if (action === 'close-stale' || action === 'merge' || action === 'approve-merge') {
+    if (
+      action === 'close-stale' ||
+      action === 'merge' ||
+      action === 'approve-merge' ||
+      action === 'update-branch'
+    ) {
       if (saving || loading) return;
       const pr = snapshot.prs.find((pr) => pr.id === id);
       if (
@@ -501,9 +508,7 @@
         (action === 'close-stale'
           ? stalenessLevel(pr.updatedAt, Date.now()) === 'high'
           : !snapshot.staleIds.includes(id) &&
-            classify(pr, login, preferences, Date.now())?.[
-              action === 'merge' ? 'canMerge' : 'canApproveAndMerge'
-            ])
+            classify(pr, login, preferences, Date.now())?.[capability[action]])
       ) {
         pendingAction = action;
         actionError = '';
@@ -528,15 +533,23 @@
       Object.assign(next, applyLabelOp(next, op));
     });
   }
+  const capability = {
+    merge: 'canMerge',
+    'approve-merge': 'canApproveAndMerge',
+    'update-branch': 'canUpdateBranch',
+  } as const;
   async function confirmAction(method: string) {
     if (!actionPR || saving || loading) return;
     const pr = actionPR;
+    const updating = pendingAction === 'update-branch';
     saving = true;
     actionError = '';
     try {
       if (pendingAction !== 'close-stale') {
         const merge = pendingAction === 'merge';
-        actionStatus = 'Checking the PR is still ready…';
+        actionStatus = updating
+          ? 'Checking the PR still needs updating…'
+          : 'Checking the PR is still ready…';
         const fresh = await service.getPullRequest(pr.id);
         // A single-PR lookup carries no tracking reasons; the card's own reasons decide bot status.
         const freshResult = classify(
@@ -545,15 +558,24 @@
           preferences,
           Date.now(),
         );
-        if (
-          fresh.headOid !== pr.headOid ||
-          !freshResult?.[merge ? 'canMerge' : 'canApproveAndMerge']
-        )
+        if (fresh.headOid !== pr.headOid || !freshResult?.[capability[pendingAction]])
           throw new Error(
-            'This PR changed or is no longer ready to merge. Cancel and refresh before trying again.',
+            updating
+              ? 'This PR changed or no longer needs a branch update. Cancel and refresh before trying again.'
+              : 'This PR changed or is no longer ready to merge. Cancel and refresh before trying again.',
           );
-        actionStatus = merge ? 'Merging…' : 'Approving and merging…';
-        if (merge)
+        actionStatus = updating
+          ? 'Updating branch…'
+          : merge
+            ? 'Merging…'
+            : 'Approving and merging…';
+        if (updating)
+          await service.updatePullRequestBranch(
+            pr.id,
+            pr.headOid,
+            freshResult.bot ? knownBotKey(fresh) : undefined,
+          );
+        else if (merge)
           await service.mergePullRequest(
             pr.id,
             pr.headOid,
@@ -566,7 +588,8 @@
         actionStatus = 'Closing and leaving a comment…';
         await service.closeStalePullRequest(pr.id);
       }
-      snapshot.prs = snapshot.prs.filter((item) => item.id !== pr.id);
+      // An updated PR stays open while its checks re-run, so refresh rather than drop it.
+      if (!updating) snapshot.prs = snapshot.prs.filter((item) => item.id !== pr.id);
       actionPR = null;
     } catch (e) {
       actionError = String(e);
@@ -575,6 +598,7 @@
       saving = false;
       actionStatus = '';
     }
+    if (updating && !actionPR) await refresh();
   }
   async function restore(kind: 'ignored' | 'snoozed', id: string) {
     await change((next) => {

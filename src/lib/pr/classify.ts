@@ -43,6 +43,7 @@ export function describePullRequest(
     priority: primary.priority,
     canMerge: signals.ready && primary.state === 'ready-to-merge',
     canApproveAndMerge: signals.approvable,
+    canUpdateBranch: signals.updatable,
     primary: primary.getLabel(signals),
     statuses: matches.filter((r) => r.showAsStatus !== false).map((r) => r.getLabel(signals)),
   };

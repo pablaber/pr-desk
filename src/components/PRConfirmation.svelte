@@ -11,7 +11,7 @@
     oncancel,
   }: {
     pr: PullRequest | null;
-    action: 'close-stale' | 'merge' | 'approve-merge';
+    action: 'close-stale' | 'merge' | 'approve-merge' | 'update-branch';
     busy: boolean;
     error: string;
     status: string;
@@ -19,7 +19,8 @@
     oncancel: () => void;
   } = $props();
   let method = $state('squash');
-  let merging = $derived(action !== 'close-stale');
+  let merging = $derived(action === 'merge' || action === 'approve-merge');
+  let updating = $derived(action === 'update-branch');
   let approving = $derived(action === 'approve-merge');
   let dialog = $state<HTMLDialogElement>();
   let confirm = $state<HTMLButtonElement>();
@@ -47,10 +48,18 @@
       ? 'Approve and merge pull request?'
       : merging
         ? 'Merge pull request?'
-        : 'Close as stale?'}
+        : updating
+          ? 'Update branch?'
+          : 'Close as stale?'}
   </h2>
   <p id="pr-confirmation-description">
-    Are you sure you want to {approving ? 'approve and merge' : merging ? 'merge' : 'close'}
+    Are you sure you want to {approving
+      ? 'approve and merge'
+      : merging
+        ? 'merge'
+        : updating
+          ? 'update'
+          : 'close'}
     <strong>{pr?.title}</strong> on GitHub?
   </p>
   {#if merging}
@@ -66,6 +75,12 @@
     <p>
       This will {approving ? 'approve, then merge,' : 'merge'} using your GitHub account. The repository
       must allow the selected method.
+    </p>
+  {:else if updating}
+    <p>{pr?.repository} #{pr?.number}</p>
+    <p>
+      This will merge the latest <code>{pr?.baseRefName}</code> into
+      <code>{pr?.headRefName}</code> using your GitHub account. Checks will run again.
     </p>
   {:else}
     <p>PR Desk will leave this comment using your GitHub account:</p>
@@ -84,7 +99,11 @@
     <button disabled={busy} onclick={oncancel}>Cancel</button>
     <button
       bind:this={confirm}
-      class={merging ? 'merge-confirm-button' : 'destructive-button'}
+      class={merging
+        ? 'merge-confirm-button'
+        : updating
+          ? 'update-branch-button'
+          : 'destructive-button'}
       disabled={busy}
       onclick={() => onconfirm(method)}
       >{merging
@@ -95,9 +114,13 @@
           : approving
             ? 'Approve and merge'
             : 'Confirm merge'
-        : busy
-          ? 'Closing…'
-          : 'Close as stale'}</button
+        : updating
+          ? busy
+            ? 'Updating…'
+            : 'Update branch'
+          : busy
+            ? 'Closing…'
+            : 'Close as stale'}</button
     >
   </div>
 </dialog>
