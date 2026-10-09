@@ -196,7 +196,8 @@ urgent layer (Needs attention, then Ready to merge, then Waiting), ordered withi
 that layer as above. Column and summary counts include every PR the column shows.
 
 Stacking changes only placement. Each layer keeps its own rules, status, merge actions and Dock
-badge contribution.
+badge contribution. In-app merge refuses a layer of a GitHub stack that sits above other open PRs,
+because GitHub would merge those with it; merge the bottom layer first.
 
 ## Card extras
 
