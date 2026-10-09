@@ -13,7 +13,11 @@ const modifiers: { flag: ModifierFlag; glyph: string; aria: string; spoken: stri
 
 // Microsoft's style guide spells punctuation key names out rather than leaving a screen
 // reader to announce the bare glyph.
-const spokenNames: Record<string, string> = { ',': 'Comma', '?': 'Question mark' };
+const spokenNames: Record<string, string> = {
+  ',': 'Comma',
+  '?': 'Question mark',
+  '\\': 'Backslash',
+};
 
 function mainKey(hotkey: Hotkey): string {
   return hotkey.key.length === 1 ? hotkey.key.toUpperCase() : hotkey.key;

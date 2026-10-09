@@ -69,6 +69,7 @@
       `refresh: ${preview.settings.automaticRefreshMinutes === 0 ? 'never' : `every ${count(preview.settings.automaticRefreshMinutes, 'minute')}`}`,
       `dock badge: ${dockBadgeLabels[preview.settings.dockBadge]}`,
       `interface size: ${preview.settings.interfaceScale}%`,
+      `sidebar: ${preview.settings.sidebarCollapsed ? 'collapsed' : 'expanded'}`,
     ],
   );
 </script>

@@ -117,7 +117,7 @@ it('defaults to five minutes and migrates reserved v1 settings without losing pr
     settings: { automaticRefreshMinutes: 0 },
   };
   expect(migrateState(legacy)).toMatchObject({
-    schemaVersion: 12,
+    schemaVersion: 13,
     watchedPullRequests: ['acme/api#1'],
     settings: { automaticRefreshMinutes: 5, snoozeOptions: defaultSnoozeOptions() },
   });
@@ -136,7 +136,7 @@ it('preserves Never and all valid intervals, and repairs invalid stored interval
         .automaticRefreshMinutes,
     ).toBe(5);
   }
-  expect(() => migrateState({ ...defaultState(), schemaVersion: 13 })).toThrow('Unsupported');
+  expect(() => migrateState({ ...defaultState(), schemaVersion: 14 })).toThrow('Unsupported');
 });
 
 it('migrates older preferences and validates ignored repositories', () => {
@@ -150,7 +150,7 @@ it('migrates older preferences and validates ignored repositories', () => {
         settings: { automaticRefreshMinutes: 0 },
       }),
     ).toMatchObject({
-      schemaVersion: 12,
+      schemaVersion: 13,
       ignoreRules: [],
       trackedRepositories: ['acme/api'],
       settings: { automaticRefreshMinutes: schemaVersion === 1 ? 5 : 0 },
@@ -214,7 +214,7 @@ it('migrates all supported versions without losing independently saved preferenc
       settings: { automaticRefreshMinutes: 12, snoozeOptions: [] },
     };
     const migrated = migrateState(legacy);
-    expect(migrated.schemaVersion).toBe(12);
+    expect(migrated.schemaVersion).toBe(13);
     expect(migrated.checkRules).toEqual([]);
     expect(migrated.ignoreRules).toEqual(
       schemaVersion >= 3 ? [{ kind: 'repository', value: 'acme/api' }] : [],
@@ -383,7 +383,7 @@ it('loads pre-v8 preferences without labels', () => {
       labels: [label('x', 'Ignored')],
       labeledPullRequests: { 'acme/api#1': ['x'] },
     });
-    expect(migrated).toMatchObject({ schemaVersion: 12, labels: [], labeledPullRequests: {} });
+    expect(migrated).toMatchObject({ schemaVersion: 13, labels: [], labeledPullRequests: {} });
   }
 });
 it('round-trips v8 labels and canonicalizes their assignments', () => {
@@ -471,6 +471,36 @@ it('keeps each valid interface scale and rejects an invalid stored one', () => {
     }),
   ).toThrow('Invalid preferences file');
 });
+it('defaults the sidebar to expanded, for new and pre-v13 preferences', () => {
+  expect(defaultState().settings.sidebarCollapsed).toBe(false);
+  const { sidebarCollapsed: _, ...settings } = defaultState().settings;
+  for (const schemaVersion of [12, 13])
+    expect(
+      migrateState({ ...defaultState(), schemaVersion, settings }).settings.sidebarCollapsed,
+    ).toBe(false);
+  expect(
+    migrateState({
+      ...defaultState(),
+      schemaVersion: 12,
+      settings: { ...defaultState().settings, sidebarCollapsed: true },
+    }).settings.sidebarCollapsed,
+  ).toBe(false);
+});
+it('keeps a stored sidebar state and rejects an invalid one', () => {
+  for (const sidebarCollapsed of [true, false])
+    expect(
+      migrateState({
+        ...defaultState(),
+        settings: { ...defaultState().settings, sidebarCollapsed },
+      }).settings.sidebarCollapsed,
+    ).toBe(sidebarCollapsed);
+  expect(() =>
+    migrateState({
+      ...defaultState(),
+      settings: { ...defaultState().settings, sidebarCollapsed: 'yes' },
+    }),
+  ).toThrow('Invalid preferences file');
+});
 it('steps the interface scale and clamps at both ends', () => {
   expect(stepInterfaceScale(100, 1)).toBe(115);
   expect(stepInterfaceScale(100, -1)).toBe(90);
@@ -547,7 +577,7 @@ it('rejects settings imports that are not valid exports', () => {
   expect(() => parseSettingsImport('nope')).toThrow("That isn't valid JSON.");
   for (const text of ['null', '5', '{}', exported({ app: 'other' }), exported({ kind: 'debug' })])
     expect(() => parseSettingsImport(text)).toThrow("This isn't a PR Desk settings export.");
-  expect(() => parseSettingsImport(exported({ schemaVersion: 13 }))).toThrow('newer PR Desk');
+  expect(() => parseSettingsImport(exported({ schemaVersion: 14 }))).toThrow('newer PR Desk');
   const invalid: Record<string, unknown>[] = [
     { trackedRepositories: ['no-owner'] },
     { trackedRepositories: [5] },
