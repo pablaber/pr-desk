@@ -64,12 +64,14 @@ Each visible PR is reduced to a handful of booleans. The terms used in the rule 
 | **changes requested**     | GitHub's aggregate `reviewDecision` is `CHANGES_REQUESTED`                                                                                                                                                                                                                |
 | **failed checks**         | any check on the latest commit failed — including optional and non-blocking checks                                                                                                                                                                                        |
 | **conflict**              | `mergeable` is `CONFLICTING`                                                                                                                                                                                                                                              |
+| **behind**                | `mergeStateStatus` is `BEHIND` — GitHub only reports this when branch protection requires an up-to-date branch                                                                                                                                                            |
 | **queued**                | the PR is in a merge queue                                                                                                                                                                                                                                                |
 | **auto-merge**            | auto-merge is enabled                                                                                                                                                                                                                                                     |
 | **non-blocking pending**  | a check matching a Settings → Non-blocking checks rule for this repository is still pending                                                                                                                                                                               |
 | **approved**              | managed, not a draft, `reviewDecision` is `APPROVED`, every check passes (ignoring non-blocking pending ones), and `mergeable` is `MERGEABLE`                                                                                                                             |
 | **ready**                 | approved, not queued, no auto-merge, **no** non-blocking pending checks, and `mergeStateStatus` is `CLEAN`, `HAS_HOOKS` or `UNSTABLE`                                                                                                                                     |
 | **ready, pending checks** | approved, not queued, no auto-merge, **some** non-blocking pending checks, and `mergeStateStatus` is `BLOCKED`, `CLEAN`, `HAS_HOOKS` or `UNSTABLE`                                                                                                                        |
+| **updatable**             | managed, not a draft, behind, `mergeable` is `MERGEABLE`, not queued, no auto-merge; checks may be in any state                                                                                                                                                           |
 | **approvable**            | bot, not a draft, `reviewDecision` is neither `APPROVED` nor `CHANGES_REQUESTED`, every check passes (non-blocking pending ones included), `mergeable` is `MERGEABLE`, not queued, no auto-merge, and `mergeStateStatus` is `BLOCKED`, `CLEAN`, `HAS_HOOKS` or `UNSTABLE` |
 
 ### Check states
@@ -95,6 +97,7 @@ label; other matching rules (except the `waiting` catch-all) show as secondary s
 |       80 | `changes`              | **Needs attention** | owned and changes requested                                   | Changes requested             |
 |       70 | `checks`               | **Needs attention** | managed and any failed check                                  | Checks failed                 |
 |       60 | `conflict`             | **Needs attention** | managed and conflict                                          | Merge conflict                |
+|       58 | `behind`               | **Needs attention** | managed and behind                                            | Behind _base branch_          |
 |       55 | `queued`               | **Waiting**         | queued (anyone's PR)                                          | Queued to merge · #_position_ |
 |       54 | `auto-merge`           | **Waiting**         | auto-merge enabled and not queued (anyone's PR)               | Auto-merge enabled            |
 |       50 | `ready`                | **Ready to merge**  | ready                                                         | Ready to merge                |
@@ -138,6 +141,9 @@ The Waiting fallback picks its label from the first that applies:
   `BLOCKED` is tolerated only while a non-blocking check is pending, because GitHub does not say
   which rule is blocking.
 - An approvable bot PR accepts `BLOCKED`, since the missing review is what blocks it.
+- GitHub reports `BEHIND` ahead of `BLOCKED`, so a bot PR behind its base is not approvable even
+  when its review is the other thing missing. Updating the branch re-runs its checks; once they
+  pass it becomes approvable.
 
 ## Quick lookup
 
@@ -148,6 +154,7 @@ The common situations, from your point of view:
 | Someone asked you to review                                                        | Needs attention |
 | Your PR has unresolved comments, requested changes, a failing check, or a conflict | Needs attention |
 | A known bot's PR you track has a failing check or a conflict                       | Needs attention |
+| Your PR or a tracked bot PR is behind a base branch that must be up to date        | Needs attention |
 | Someone else's unapproved open PR in a repository you track, including bot PRs     | Needs attention |
 | Your PR or tracked bot PR is approved, green, and mergeable                        | Ready to merge  |
 | Same, but a non-blocking check is still pending                                    | Ready to merge  |
@@ -163,6 +170,7 @@ The common situations, from your point of view:
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Merge…**             | the `ready` rule placed the card in Ready to merge and its data is fresh. Never for "Ready · … pending" cards. Re-validated before merging.                                                                                                                                                                                                       |
 | **Approve and merge…** | approvable and its data is fresh; the card stays where its rules put it, usually Needs attention as "Waiting for your review". Re-validated before approving; the approval is pinned to the confirmed commit, and the merge waits until GitHub reports the PR ready. If GitHub still blocks the merge, the approval stays and the dialog says so. |
+| **Update branch…**     | updatable and its data is fresh. Re-validated before updating; GitHub merges the base branch into the PR, pinned to the confirmed head commit, and the dashboard refreshes. The card stays on the desk while checks re-run.                                                                                                                       |
 | **Close as stale…**    | red staleness: not updated for more than 28 days                                                                                                                                                                                                                                                                                                  |
 
 ## Sorting

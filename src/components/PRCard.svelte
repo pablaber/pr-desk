@@ -6,6 +6,7 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import GitMerge from '@lucide/svelte/icons/git-merge';
+  import GitPullRequestArrow from '@lucide/svelte/icons/git-pull-request-arrow';
   import PRDetails from './PRDetails.svelte';
   import LabelChoices from './LabelChoices.svelte';
   import SnoozeChoices from './SnoozeChoices.svelte';
@@ -146,6 +147,15 @@
       disabled={busy || stale}
       onclick={() => act('merge')}
       aria-label={`Merge ${card.pr.title}`}><GitMerge size={14} /> Merge…</button
+    >
+  {/if}
+  {#if card.canUpdateBranch}
+    <button
+      class="merge-button update-branch-button"
+      disabled={busy || stale}
+      onclick={() => act('update-branch')}
+      aria-label={`Update branch for ${card.pr.title}`}
+      ><GitPullRequestArrow size={14} /> Update branch…</button
     >
   {/if}
   {#if card.canApproveAndMerge}

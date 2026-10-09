@@ -47,6 +47,13 @@ export const dashboardRules: DashboardRule[] = [
     getLabel: () => 'Merge conflict',
   },
   {
+    id: 'behind',
+    state: 'needs-attention',
+    priority: 58,
+    matches: (s) => s.managed && s.behind,
+    getLabel: (s) => `Behind ${s.pr.baseRefName}`,
+  },
+  {
     id: 'queued',
     state: 'waiting',
     priority: 55,

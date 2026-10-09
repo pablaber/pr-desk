@@ -8,6 +8,7 @@ export type ErrorSource =
   | 'close-stale'
   | 'merge'
   | 'approve-merge'
+  | 'update-branch'
   | 'clipboard'
   | 'open'
   | 'gh-cli'

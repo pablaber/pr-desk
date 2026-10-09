@@ -19,11 +19,16 @@ async fn gh(args: &[&str]) -> Result<Value, String> {
     serde_json::from_slice(&output.stdout).map_err(|_| "Invalid GitHub response".into())
 }
 
-fn validate_input(url: &str, head_oid: &str, method: &str) -> Result<(), String> {
+fn validate_head(url: &str, head_oid: &str) -> Result<(), String> {
     crate::validate_pr_url(url)?;
     if head_oid.len() != 40 || !head_oid.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err("Missing or invalid commit. Refresh before merging.".into());
+        return Err("Missing or invalid commit. Refresh before trying again.".into());
     }
+    Ok(())
+}
+
+fn validate_input(url: &str, head_oid: &str, method: &str) -> Result<(), String> {
+    validate_head(url, head_oid)?;
     if !["squash", "merge", "rebase"].contains(&method) {
         return Err("Unsupported merge method".into());
     }
@@ -108,6 +113,26 @@ fn validate_approvable(pr: &Value, head_oid: &str, login: &str, bot: &str) -> Re
         || !pr["autoMergeRequest"].is_null()
     {
         return Err("This PR changed or can no longer be approved and merged. Cancel and refresh before trying again.".into());
+    }
+    Ok(())
+}
+
+// GitHub only reports BEHIND when branch protection requires an up-to-date branch.
+fn validate_updatable(
+    pr: &Value,
+    head_oid: &str,
+    login: &str,
+    bot: Option<&str>,
+) -> Result<(), String> {
+    if pr["state"] != "OPEN"
+        || pr["isDraft"] != false
+        || pr["headRefOid"] != head_oid
+        || pr["mergeable"] != "MERGEABLE"
+        || pr["mergeStateStatus"] != "BEHIND"
+        || !author_allowed(pr, login, bot)
+        || !pr["autoMergeRequest"].is_null()
+    {
+        return Err("This PR changed or no longer needs a branch update. Cancel and refresh before trying again.".into());
     }
     Ok(())
 }
@@ -203,6 +228,38 @@ pub async fn approve_and_merge_pr(
             .await
             .map_err(|e| format!("Approved on GitHub, but the merge failed. {e}"))
     }).await.map_err(|_| "Approve and merge timed out. Refresh the PR on GitHub before retrying; it may already be approved or merged.".to_string())?
+}
+
+// Merges the base branch into the PR; GitHub rejects the update if the head moved since
+// the confirmation.
+#[tauri::command]
+pub async fn update_pr_branch(
+    url: String,
+    head_oid: String,
+    bot: Option<String>,
+) -> Result<(), String> {
+    validate_head(&url, &head_oid)?;
+    tokio::time::timeout(Duration::from_secs(45), async {
+        let user = gh(&["api", "--hostname", "github.com", "user"]).await?;
+        let pr = gh(&["pr", "view", &url, "--json", PR_FIELDS]).await?;
+        validate_updatable(
+            &pr,
+            &head_oid,
+            user["login"].as_str().unwrap_or(""),
+            bot.as_deref(),
+        )?;
+        let endpoint = format!("{}/update-branch", pull_endpoint(&url));
+        gh(&["api", "--hostname", "github.com", "--method", "PUT", &endpoint,
+            "-f", &format!("expected_head_sha={head_oid}")])
+            .await
+            .map_err(|_| "Could not update this branch. Check your repository permissions on GitHub, then refresh before retrying; the update may already have started.".to_string())?;
+        Ok(())
+    })
+    .await
+    .map_err(|_| {
+        "Branch update timed out. Refresh the PR on GitHub before retrying; it may already be updated."
+            .to_string()
+    })?
 }
 
 #[cfg(test)]
@@ -389,6 +446,52 @@ mod tests {
                 validate_approvable(&pr, &oid, "me", "dependabot[bot]").is_err(),
                 "{key}"
             );
+        }
+    }
+
+    fn updatable() -> Value {
+        let mut pr = ready();
+        pr["reviewDecision"] = json!("REVIEW_REQUIRED");
+        pr["mergeStateStatus"] = json!("BEHIND");
+        pr["statusCheckRollup"] =
+            json!([{"__typename":"CheckRun","status":"COMPLETED","conclusion":"FAILURE"}]);
+        pr
+    }
+
+    #[test]
+    fn updatable_accepts_owned_and_known_bot_prs_behind_their_base() {
+        let oid = "a".repeat(40);
+        assert!(validate_updatable(&updatable(), &oid, "ME", None).is_ok());
+        let mut app = updatable();
+        app["author"] = json!({"login":"app/dependabot","is_bot":true});
+        assert!(validate_updatable(&app, &oid, "me", Some("dependabot[bot]")).is_ok());
+        assert!(validate_updatable(&app, &oid, "me", None).is_err());
+        assert!(validate_updatable(&app, &oid, "me", Some("renovate[bot]")).is_err());
+        assert!(validate_updatable(&updatable(), &oid, "other", None).is_err());
+        assert!(validate_head("https://github.com/acme/api/pull/1", &oid).is_ok());
+        assert!(validate_head("https://github.com/acme/api/pull/1", "bad").is_err());
+        assert!(validate_head("--help", &oid).is_err());
+    }
+
+    #[test]
+    fn updatable_rejects_changed_head_and_states_not_behind() {
+        let oid = "a".repeat(40);
+        for (key, value) in [
+            ("state", json!("CLOSED")),
+            ("isDraft", json!(true)),
+            ("headRefOid", json!("b".repeat(40))),
+            ("mergeable", json!("UNKNOWN")),
+            ("mergeStateStatus", json!("BLOCKED")),
+            ("mergeStateStatus", json!("CLEAN")),
+            ("mergeStateStatus", json!("DIRTY")),
+            (
+                "autoMergeRequest",
+                json!({"enabledAt":"2026-09-20T10:00:00Z"}),
+            ),
+        ] {
+            let mut pr = updatable();
+            pr[key] = value;
+            assert!(validate_updatable(&pr, &oid, "me", None).is_err(), "{key}");
         }
     }
 }

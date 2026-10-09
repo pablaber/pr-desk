@@ -262,7 +262,8 @@ fn main() {
             github,
             close_stale_pr,
             merge::merge_pr,
-            merge::approve_and_merge_pr
+            merge::approve_and_merge_pr,
+            merge::update_pr_branch
         ])
         .run(tauri::generate_context!())
         .expect("error running PR Desk");

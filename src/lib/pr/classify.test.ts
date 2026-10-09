@@ -282,7 +282,7 @@ describe('non-blocking check rules', () => {
       classify(blocked({ reviewDecision: 'REVIEW_REQUIRED' }), 'me', withRule()),
     ).toMatchObject({ state: 'waiting', primary: 'Waiting for review' }));
   it('waits on merge requirements once the PR is approved', () =>
-    expect(classify(blocked({ mergeStateStatus: 'BEHIND' }), 'me', withRule())).toMatchObject({
+    expect(classify(blocked({ mergeStateStatus: 'UNKNOWN' }), 'me', withRule())).toMatchObject({
       state: 'waiting',
       primary: 'Waiting on merge requirements',
     }));
@@ -405,5 +405,54 @@ describe('approve and merge', () => {
       prefs,
     );
     expect(item?.canApproveAndMerge).toBe(false);
+  });
+});
+describe('update branch', () => {
+  const behind = (overrides: Partial<PullRequest> = {}) =>
+    classify(
+      pr({
+        author: 'dependabot',
+        authorIsBot: true,
+        reasons: ['tracked-repository'],
+        reviewDecision: 'REVIEW_REQUIRED',
+        mergeStateStatus: 'BEHIND',
+        checks: [{ name: 'CI', state: 'passing' }],
+        ...overrides,
+      }),
+      'me',
+      local,
+    );
+  it('flags a bot PR behind its base ahead of the review prompt', () =>
+    expect(behind()).toMatchObject({
+      state: 'needs-attention',
+      primary: 'Behind main',
+      statuses: ['Behind main', 'Waiting for your review'],
+      canUpdateBranch: true,
+      canApproveAndMerge: false,
+    }));
+  it('flags owned PRs, even with failed checks', () =>
+    expect(
+      behind({
+        author: 'me',
+        reasons: ['owned'],
+        reviewDecision: 'APPROVED',
+        checks: [{ name: 'CI', state: 'failed' }],
+      }),
+    ).toMatchObject({ state: 'needs-attention', canUpdateBranch: true, canMerge: false }));
+  it('names the base branch', () =>
+    expect(behind({ baseRefName: 'develop' })?.primary).toBe('Behind develop'));
+  it('does not act on other people’s PRs', () =>
+    expect(behind({ author: 'someone' })).toMatchObject({
+      primary: 'Waiting for your review',
+      canUpdateBranch: false,
+    }));
+  it.each([
+    ['an up-to-date branch', { mergeStateStatus: 'BLOCKED' }],
+    ['an unknown mergeability', { mergeable: 'UNKNOWN' }],
+    ['a merge queue entry', { mergeQueue: { state: 'QUEUED', position: 1 } }],
+    ['auto-merge', { autoMerge: true }],
+    ['a draft', { draft: true, author: 'me', reasons: ['owned'] }],
+  ] as [string, Partial<PullRequest>][])('is not offered for %s', (_, overrides) => {
+    expect(behind(overrides)?.canUpdateBranch ?? false).toBe(false);
   });
 });

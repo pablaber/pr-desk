@@ -505,6 +505,22 @@ i.waiting {
   outline: 2px solid #287a3e;
   outline-offset: 3px;
 }
+/* Like GitHub's Update branch, a secondary action rather than a merge. */
+.update-branch-button,
+.merge-button.update-branch-button {
+  background: #f6f8f6;
+  border-color: #d0d8d0;
+  color: #252936;
+}
+.update-branch-button:hover:not(:disabled),
+.merge-button.update-branch-button:hover:not(:disabled) {
+  background: #eaefea;
+  border-color: #c2ccc2;
+}
+.update-branch-button:focus-visible,
+.merge-button.update-branch-button:focus-visible {
+  outline-color: #488066;
+}
 .repo {
   font-size: 10px;
   color: #7b8a73;
