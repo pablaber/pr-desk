@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.15.0](https://github.com/pablaber/pr-desk/compare/v1.14.0...v1.15.0) (2026-10-09)
+
+
+### Features
+
+* toggle the sidebar with ⌘B ([#122](https://github.com/pablaber/pr-desk/issues/122)) ([6d7bff7](https://github.com/pablaber/pr-desk/commit/6d7bff725717801c8373b784fd1c07ff1a256482))
+
+
+### Bug Fixes
+
+* allow merging pull requests that are not stacked ([#124](https://github.com/pablaber/pr-desk/issues/124)) ([b386dd6](https://github.com/pablaber/pr-desk/commit/b386dd6d7fa41fe56c4e6bb2047fc023d17fb0ef))
+
 ## [1.14.0](https://github.com/pablaber/pr-desk/compare/v1.13.0...v1.14.0) (2026-10-09)
 
 
