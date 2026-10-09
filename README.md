@@ -9,7 +9,7 @@ is ready to merge, and what can wait. Select a card to review or comment on GitH
 **Merge…** button with a confirmation and a choice of squash, merge commit, or rebase.
 PR Desk rechecks readiness and the commit before merging through your authenticated
 GitHub CLI. Repository permissions and merge rules still apply; repositories requiring
-a merge queue may need to be merged on GitHub. Known-bot PRs waiting for your review whose
+a merge queue may need to be merged on GitHub, and GitHub stacks merge from the bottom PR up. Known-bot PRs waiting for your review whose
 checks all pass and that GitHub can merge have an **Approve and merge…** button that approves
 the confirmed commit, then merges it. Your PRs and known-bot PRs that branch protection holds
 back as behind their base branch show "Behind main" in Needs attention with an **Update branch…**

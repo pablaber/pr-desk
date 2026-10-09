@@ -89,7 +89,9 @@ Inspect the generated screenshot and include the updated image in the change.
   45-second timeout, read-only GraphQL, and it never returns authentication output or
   tokens. The separate close_stale_pr command only closes open PRs with red staleness
   and a fixed comment. The merge_pr command only merges ready PRs you authored, or by a known bot, after confirmation,
-  revalidates readiness, and pins the mutation to the confirmed commit. The
+  revalidates readiness, and pins the mutation to the confirmed commit. It merges through
+  GitHub's async merge API as a direct merge and refuses a PR stacked above other open PRs,
+  because merging it would land them too. The
   approve_and_merge_pr command only approves known-bot PRs waiting for review with passing
   checks, pins the approval to the confirmed commit, and merges only once merge_pr's readiness
   checks pass. A known bot is a GitHub App stored as `name[bot]` or a machine user stored as

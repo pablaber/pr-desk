@@ -5,6 +5,10 @@ use tokio::process::Command;
 const FAILURE: &str = "Could not merge this PR. Check repository permissions, allowed merge methods, and branch or merge queue rules on GitHub. Refresh before retrying; the merge may already have succeeded.";
 
 async fn gh(args: &[&str]) -> Result<Value, String> {
+    gh_or(args, FAILURE).await
+}
+
+async fn gh_or(args: &[&str], failure: &str) -> Result<Value, String> {
     let output = Command::new(crate::gh_path()?)
         .args(args)
         .env("GH_PROMPT_DISABLED", "1")
@@ -14,9 +18,28 @@ async fn gh(args: &[&str]) -> Result<Value, String> {
         .await
         .map_err(|_| "Could not launch GitHub CLI".to_string())?;
     if !output.status.success() {
-        return Err(FAILURE.into());
+        let body = serde_json::from_slice(&output.stdout).unwrap_or_default();
+        return Err(with_reason(failure, &body));
     }
     serde_json::from_slice(&output.stdout).map_err(|_| "Invalid GitHub response".into())
+}
+
+// gh api prints GitHub's error body on failure; its message names the rule that refused
+// the request, such as a required merge queue or a disallowed merge method.
+fn with_reason(failure: &str, body: &Value) -> String {
+    let reason = body["message"]
+        .as_str()
+        .unwrap_or("")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    if reason.is_empty() {
+        return failure.into();
+    }
+    format!(
+        "{failure} GitHub said: {}",
+        reason.chars().take(300).collect::<String>()
+    )
 }
 
 fn validate_head(url: &str, head_oid: &str) -> Result<(), String> {
@@ -73,12 +96,46 @@ fn checks_pass(pr: &Value) -> bool {
     }
 }
 
+// Merging a stacked PR also lands every open PR below it, so only an unstacked PR or the
+// bottom of a stack merges exactly what was confirmed. A missing stack field is not trusted.
+fn merges_alone(pr: &Value) -> Result<(), String> {
+    let alone = match &pr["stack"] {
+        Value::Null => pr.get("stack").is_some(),
+        stack => stack["position"] == 1,
+    };
+    if !alone {
+        return Err("This PR is stacked on other open PRs. Merge the bottom of the stack first, then refresh.".into());
+    }
+    Ok(())
+}
+
+// gh pr view has no stack field; the REST pull carries it from this API version on.
+const API_VERSION: &str = "X-GitHub-Api-Version: 2026-03-10";
+
+async fn view(url: &str) -> Result<Value, String> {
+    let mut pr = gh(&["pr", "view", url, "--json", PR_FIELDS]).await?;
+    let pull = gh(&[
+        "api",
+        "--hostname",
+        "github.com",
+        "-H",
+        API_VERSION,
+        &pull_endpoint(url),
+    ])
+    .await?;
+    if let Some(stack) = pull.get("stack") {
+        pr["stack"] = stack.clone();
+    }
+    Ok(pr)
+}
+
 fn validate_ready(
     pr: &Value,
     head_oid: &str,
     login: &str,
     bot: Option<&str>,
 ) -> Result<(), String> {
+    merges_alone(pr)?;
     if pr["state"] != "OPEN"
         || pr["isDraft"] != false
         || pr["headRefOid"] != head_oid
@@ -97,6 +154,7 @@ fn validate_ready(
 
 // The missing review is what makes GitHub report BLOCKED, so it is accepted before approving.
 fn validate_approvable(pr: &Value, head_oid: &str, login: &str, bot: &str) -> Result<(), String> {
+    merges_alone(pr)?;
     let author = pr["author"]["login"].as_str().unwrap_or("");
     if pr["state"] != "OPEN"
         || pr["isDraft"] != false
@@ -143,14 +201,17 @@ fn pull_endpoint(url: &str) -> String {
     format!("repos/{repository}/pulls/{number}")
 }
 
-// Pin the mutation to the commit shown in the confirmation; never enable auto-merge
-// or bypass repository rules. GitHub atomically rejects a changed head.
+// Pin the mutation to the commit shown in the confirmation; never enable auto-merge, join a
+// merge queue or bypass repository rules. GitHub atomically rejects a changed head. The
+// synchronous merge endpoint refuses stacked PRs, so merges go through the async API.
 async fn merge(url: &str, head_oid: &str, method: &str) -> Result<(), String> {
-    let endpoint = format!("{}/merge", pull_endpoint(url));
-    let result = gh(&[
+    let endpoint = format!("{}/merge-async", pull_endpoint(url));
+    let mut result = gh(&[
         "api",
         "--hostname",
         "github.com",
+        "-H",
+        API_VERSION,
         "--method",
         "PUT",
         &endpoint,
@@ -158,12 +219,34 @@ async fn merge(url: &str, head_oid: &str, method: &str) -> Result<(), String> {
         &format!("sha={head_oid}"),
         "-f",
         &format!("merge_method={method}"),
+        "-f",
+        "merge_action=direct_merge",
     ])
     .await?;
-    if result["merged"] != true {
-        return Err(FAILURE.into());
+    let uuid = result["details"]["uuid"].as_str().unwrap_or("").to_string();
+    for _ in 0..10 {
+        if result["status"] != "pending" || !valid_uuid(&uuid) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        let poll = format!("{endpoint}/{uuid}");
+        result = gh(&["api", "--hostname", "github.com", "-H", API_VERSION, &poll]).await?;
     }
-    Ok(())
+    merge_outcome(&result)
+}
+
+fn valid_uuid(uuid: &str) -> bool {
+    !uuid.is_empty() && uuid.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-')
+}
+
+fn merge_outcome(result: &Value) -> Result<(), String> {
+    match result["status"].as_str() {
+        Some("merged") => Ok(()),
+        Some("pending") => Err(
+            "GitHub is still merging this PR. Refresh in a moment to see whether it merged.".into(),
+        ),
+        _ => Err(with_reason(FAILURE, &result["details"])),
+    }
 }
 
 #[tauri::command]
@@ -176,7 +259,7 @@ pub async fn merge_pr(
     validate_input(&url, &head_oid, &method)?;
     tokio::time::timeout(Duration::from_secs(45), async {
         let user = gh(&["api", "--hostname", "github.com", "user"]).await?;
-        let pr = gh(&["pr", "view", &url, "--json", PR_FIELDS]).await?;
+        let pr = view(&url).await?;
         validate_ready(
             &pr,
             &head_oid,
@@ -203,19 +286,19 @@ pub async fn approve_and_merge_pr(
     tokio::time::timeout(Duration::from_secs(45), async {
         let user = gh(&["api", "--hostname", "github.com", "user"]).await?;
         let login = user["login"].as_str().unwrap_or("");
-        let pr = gh(&["pr", "view", &url, "--json", PR_FIELDS]).await?;
+        let pr = view(&url).await?;
         validate_approvable(&pr, &head_oid, login, &bot)?;
         // The approval is pinned to the confirmed commit, like the merge that follows it.
         let reviews = format!("{}/reviews", pull_endpoint(&url));
-        gh(&["api", "--hostname", "github.com", "--method", "POST", &reviews,
-            "-f", &format!("commit_id={head_oid}"), "-f", "event=APPROVE"])
-            .await
-            .map_err(|_| "Could not approve this PR. Check your repository permissions on GitHub, then refresh before retrying.".to_string())?;
+        gh_or(&["api", "--hostname", "github.com", "--method", "POST", &reviews,
+            "-f", &format!("commit_id={head_oid}"), "-f", "event=APPROVE"],
+            "Could not approve this PR. Check your repository permissions on GitHub, then refresh before retrying.")
+            .await?;
         // GitHub recomputes the review decision and merge state asynchronously after a review.
         let mut ready = false;
         for _ in 0..10 {
             tokio::time::sleep(Duration::from_secs(2)).await;
-            let pr = gh(&["pr", "view", &url, "--json", PR_FIELDS]).await?;
+            let pr = view(&url).await?;
             if validate_ready(&pr, &head_oid, login, Some(&bot)).is_ok() {
                 ready = true;
                 break;
@@ -249,10 +332,10 @@ pub async fn update_pr_branch(
             bot.as_deref(),
         )?;
         let endpoint = format!("{}/update-branch", pull_endpoint(&url));
-        gh(&["api", "--hostname", "github.com", "--method", "PUT", &endpoint,
-            "-f", &format!("expected_head_sha={head_oid}")])
-            .await
-            .map_err(|_| "Could not update this branch. Check your repository permissions on GitHub, then refresh before retrying; the update may already have started.".to_string())?;
+        gh_or(&["api", "--hostname", "github.com", "--method", "PUT", &endpoint,
+            "-f", &format!("expected_head_sha={head_oid}")],
+            "Could not update this branch. Check your repository permissions on GitHub, then refresh before retrying; the update may already have started.")
+            .await?;
         Ok(())
     })
     .await
@@ -270,7 +353,7 @@ mod tests {
     fn ready() -> Value {
         json!({"state":"OPEN", "isDraft":false, "headRefOid":"a".repeat(40),
             "author":{"login":"me"}, "reviewDecision":"APPROVED", "mergeable":"MERGEABLE",
-            "mergeStateStatus":"CLEAN", "statusCheckRollup":[]})
+            "mergeStateStatus":"CLEAN", "statusCheckRollup":[], "stack":null})
     }
 
     #[test]
@@ -294,6 +377,70 @@ mod tests {
         ] {
             assert!(validate_input(url, &oid, method).is_err());
         }
+    }
+
+    #[test]
+    fn failures_carry_github_reason_when_present() {
+        let body = json!({"message":"Repository rule violations found\n\nChanges must be made through the merge queue","status":"405"});
+        assert_eq!(
+            with_reason("Failed.", &body),
+            "Failed. GitHub said: Repository rule violations found Changes must be made through the merge queue"
+        );
+        for body in [
+            Value::Null,
+            json!("text"),
+            json!({"message":"  "}),
+            json!({"status":"500"}),
+        ] {
+            assert_eq!(with_reason("Failed.", &body), "Failed.");
+        }
+        let long = json!({"message":"x".repeat(400)});
+        assert_eq!(with_reason("", &long).len(), " GitHub said: ".len() + 300);
+    }
+
+    #[test]
+    fn async_merge_succeeds_only_once_merged() {
+        assert!(merge_outcome(&json!({"status":"merged","details":{"sha":"a"}})).is_ok());
+        assert!(
+            merge_outcome(&json!({"status":"pending","details":{"uuid":"1-a"}}))
+                .unwrap_err()
+                .contains("still merging")
+        );
+        assert!(merge_outcome(
+            &json!({"status":"failed","details":{"message":"Required status check is expected"}})
+        )
+        .unwrap_err()
+        .ends_with("GitHub said: Required status check is expected"));
+        for result in [
+            json!({"status":"enqueued","details":{}}),
+            json!({}),
+            Value::Null,
+        ] {
+            assert_eq!(merge_outcome(&result), Err(FAILURE.to_string()));
+        }
+        assert!(valid_uuid("0f8e2c1a-3b4d-4e5f-8a9b-0c1d2e3f4a5b"));
+        for uuid in ["", "../merge", "a/b", "a?b"] {
+            assert!(!valid_uuid(uuid), "{uuid}");
+        }
+    }
+
+    #[test]
+    fn only_unstacked_prs_or_stack_bottoms_merge() {
+        let oid = "a".repeat(40);
+        let mut bottom = ready();
+        bottom["stack"] = json!({"number":3,"size":2,"position":1,"base":{"ref":"main"}});
+        assert!(validate_ready(&bottom, &oid, "me", None).is_ok());
+        let mut above = bottom.clone();
+        above["stack"]["position"] = json!(2);
+        assert!(validate_ready(&above, &oid, "me", None)
+            .unwrap_err()
+            .contains("stacked"));
+        let mut unknown = ready();
+        unknown.as_object_mut().unwrap().remove("stack");
+        assert!(validate_ready(&unknown, &oid, "me", None).is_err());
+        let mut bot = approvable();
+        bot["stack"] = above["stack"].clone();
+        assert!(validate_approvable(&bot, &oid, "me", "dependabot[bot]").is_err());
     }
 
     #[test]
