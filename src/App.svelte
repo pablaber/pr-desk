@@ -29,6 +29,7 @@
   import type { PullRequest } from './lib/pr/types';
   import PRCard from './components/PRCard.svelte';
   import PRStack from './components/PRStack.svelte';
+  import RefreshOverlay from './components/RefreshOverlay.svelte';
   import AllClear from './components/AllClear.svelte';
   import Snoozed from './components/Snoozed.svelte';
   import Completed from './components/Completed.svelte';
@@ -127,6 +128,12 @@
     completedLoading = $state(false);
   let showLoading = $derived(loading && !silentRefresh);
   let refreshBusy = $derived(showLoading || (screen === 'completed' && completedLoading));
+  // Only a refresh the user asked for covers the content; background refreshes leave it usable.
+  let manualRefreshing = $state(false);
+  let refreshOverlay = $derived(manualRefreshing && refreshBusy);
+  $effect(() => {
+    if (manualRefreshing && !refreshBusy) manualRefreshing = false;
+  });
   let error = $state(''),
     setupError = $state(''),
     now = $state(Date.now()),
@@ -343,6 +350,7 @@
       );
   }
   function manualRefresh() {
+    manualRefreshing = true;
     if (loading && silentRefresh) {
       // Reuse the in-flight request, but acknowledge the explicit refresh action.
       silentRefresh = false;
@@ -649,7 +657,7 @@
     }
   }
   function cardTarget(event: KeyboardEvent) {
-    if (screen !== 'dashboard') return null;
+    if (screen !== 'dashboard' || refreshOverlay) return null;
     const id =
       hoveredId ??
       (event.target as HTMLElement | null)?.closest?.('[data-pr-id]')?.getAttribute('data-pr-id');
@@ -820,7 +828,7 @@
       <span class="version">v{version}</span>
     </div>
   </aside>
-  <main>
+  <main inert={refreshOverlay}>
     <div class="toolbar">
       <span
         >Workspace / {screen === 'dashboard'
@@ -1001,6 +1009,7 @@
       </footer>
     {/if}
   </main>
+  {#if refreshOverlay}<RefreshOverlay />{/if}
 </div>
 <!-- Settings shows the toasts itself while open, since its modal dialog covers this one. -->
 {#if !(settingsOpen && initialized)}<Toaster />{/if}

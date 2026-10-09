@@ -148,6 +148,10 @@ or disabled. Each interval begins after the previous refresh completes; manual r
 and setting changes restart the timer, and requests never overlap. A separate 15-second
 clock updates ages and snooze visibility.
 
+A manual refresh (the toolbar button or ⌘R) frosts the content area behind a loading card until
+it finishes; the sidebar stays sharp and navigable. Automatic and background refreshes leave the
+content usable.
+
 ## Verification
 
 Run the same checks used by CI before pushing:

@@ -736,11 +736,8 @@ test('auto refresh defaults to five minutes, reschedules, and persists Never', a
   await expect.poll(count).toBe(2);
 });
 
-test('automatic refresh does not overlap a slow manual refresh', async ({ page }) => {
-  await page.clock.install();
-  await page.goto('/');
-  const refresh = page.getByRole('button', { name: 'Refresh', exact: true });
-  await expect(refresh).toBeEnabled();
+// Each refresh then waits for window.releaseRefresh() before it can finish.
+async function holdRefreshes(page: Page) {
   await page.evaluate(() => {
     const w = window as any;
     const invoke = w.__TAURI_INTERNALS__.invoke;
@@ -753,6 +750,40 @@ test('automatic refresh does not overlap a slow manual refresh', async ({ page }
       return result;
     };
   });
+}
+
+test('a manual refresh frosts the content while the sidebar stays usable', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  const refresh = page.getByRole('button', { name: 'Refresh', exact: true });
+  await expect(refresh).toBeEnabled();
+  await holdRefreshes(page);
+  const overlay = page.locator('.refresh-overlay');
+  // A background refresh leaves the content usable.
+  await page.clock.runFor(300_000);
+  await expect.poll(() => page.evaluate(() => (window as any).refreshCount)).toBe(2);
+  await expect(overlay).toBeHidden();
+  await page.evaluate(() => (window as any).releaseRefresh());
+  await expect(refresh).toBeEnabled();
+  await page.keyboard.press('Meta+r');
+  await expect(overlay).toBeVisible();
+  await expect(overlay).toContainText('Refreshing pull requests…');
+  await expect(page.locator('main')).toHaveAttribute('inert', '');
+  await page.screenshot({ path: '.context/refresh-overlay.png', animations: 'disabled' });
+  await page.getByRole('button', { name: 'Snoozed', exact: true }).click();
+  await expect(page.getByText('Workspace / Snoozed')).toBeVisible();
+  await expect(overlay).toBeVisible();
+  await page.evaluate(() => (window as any).releaseRefresh());
+  await expect(overlay).toBeHidden();
+  await expect(page.locator('main')).not.toHaveAttribute('inert');
+});
+
+test('automatic refresh does not overlap a slow manual refresh', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('/');
+  const refresh = page.getByRole('button', { name: 'Refresh', exact: true });
+  await expect(refresh).toBeEnabled();
+  await holdRefreshes(page);
   await refresh.click();
   const refreshing = page.getByRole('button', { name: 'Refreshing…' });
   await expect(refreshing).toBeDisabled();
