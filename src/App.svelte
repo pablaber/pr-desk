@@ -15,6 +15,9 @@
   import Link from '@lucide/svelte/icons/link';
   import GitMerge from '@lucide/svelte/icons/git-merge';
   import GitPullRequest from '@lucide/svelte/icons/git-pull-request';
+  import Keyboard from '@lucide/svelte/icons/keyboard';
+  import PanelLeftClose from '@lucide/svelte/icons/panel-left-close';
+  import PanelLeftOpen from '@lucide/svelte/icons/panel-left-open';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import SettingsIcon from '@lucide/svelte/icons/settings';
@@ -118,6 +121,7 @@
     'close-stale',
   );
   let showHotkeys = $state(false);
+  let sidebarCollapsed = $derived(preferences.settings.sidebarCollapsed);
   let filter = $state<TrackingReason | 'all'>('all'),
     loading = $state(false),
     saving = $state(false),
@@ -140,6 +144,7 @@
     refreshed = $state('');
   const refreshHotkey = hotkeyFor('refresh');
   const dashboardHotkey = hotkeyFor('open-dashboard');
+  const sidebarHotkey = hotkeyFor('toggle-sidebar');
   const snoozedHotkey = hotkeyFor('open-snoozed');
   const completedHotkey = hotkeyFor('open-completed');
   const labelsHotkey = hotkeyFor('open-labels');
@@ -257,6 +262,13 @@
     if (!isInterfaceScale(scale)) return;
     await change((next) => {
       next.settings.interfaceScale = scale;
+    });
+  }
+  // Until preferences load, saving would write defaults over the user's file.
+  async function toggleSidebar() {
+    if (!initialized) return;
+    await change((next) => {
+      next.settings.sidebarCollapsed = !next.settings.sidebarCollapsed;
     });
   }
   // The shortcuts have no control on screen to show the result, so they confirm it in a toast.
@@ -648,6 +660,7 @@
       void zoomTo(stepInterfaceScale(preferences.settings.interfaceScale, -1), ZoomOut);
     else if (hotkey.action === 'zoom-reset') void zoomTo(100, ZoomIn);
     else if (hotkey.action === 'toggle-shortcuts') showHotkeys = !showHotkeys;
+    else if (hotkey.action === 'toggle-sidebar') void toggleSidebar();
     else if (target) {
       if (hotkey.action === 'open-pr') open(target.pr.url);
       else if (hotkey.action === 'copy-pr') copyUrl(target.pr);
@@ -742,11 +755,43 @@
 
 <svelte:head><title>PR Desk</title></svelte:head>
 <svelte:window onkeydown={handleHotkey} />
-<div class="app-shell">
-  <aside>
+{#snippet navButton(
+  label: string,
+  Icon: typeof LayoutGrid,
+  active: boolean,
+  onclick: () => void,
+  hotkey: ReturnType<typeof hotkeyFor>,
+)}
+  <button
+    class:active
+    {onclick}
+    aria-label={sidebarCollapsed ? label : null}
+    aria-keyshortcuts={hotkey ? ariaKeyShortcut(hotkey) : null}
+    data-tip={sidebarCollapsed ? `${label}${hotkey ? ` ${compactKeys(hotkey)}` : ''}` : null}
+    ><Icon size={15} /><span class="nav-text">{label}</span>
+    {#if hotkey}<span class="nav-hotkey nav-text" aria-hidden="true">{compactKeys(hotkey)}</span
+      >{/if}</button
+  >
+{/snippet}
+<div class="app-shell" class:sidebar-animated={initialized}>
+  <aside class:collapsed={sidebarCollapsed}>
     <div class="brand">
       <img class="brand-mark" src={appIcon} alt="" width="32" height="32" />
-      <span>PR Desk</span>
+      <span class="nav-text">PR Desk</span>
+      <button
+        class="sidebar-toggle"
+        onclick={toggleSidebar}
+        disabled={!initialized}
+        aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        aria-expanded={!sidebarCollapsed}
+        aria-keyshortcuts={sidebarHotkey ? ariaKeyShortcut(sidebarHotkey) : null}
+        data-tip={sidebarCollapsed
+          ? `Expand sidebar${sidebarHotkey ? ` ${compactKeys(sidebarHotkey)}` : ''}`
+          : null}
+        >{#if sidebarCollapsed}<PanelLeftOpen size={15} />{:else}<PanelLeftClose
+            size={15}
+          />{/if}</button
+      >
     </div>
     <div class="brand-user">
       {#if avatarUrl}<span class="avatar-wrap"
@@ -755,61 +800,49 @@
             class:connected={initialized}
           ></span></span
         >{:else}<span class="connection-dot" class:connected={initialized}></span>{/if}<span
-        class="brand-user-login">{login || 'GitHub CLI'}</span
+        class="brand-user-login nav-text">{login || 'GitHub CLI'}</span
       >
     </div>
     <div class="nav-label">WORKSPACE</div>
     <nav aria-label="Main navigation">
-      <button
-        class:active={screen === 'dashboard'}
-        onclick={() => (screen = 'dashboard')}
-        aria-keyshortcuts={dashboardHotkey ? ariaKeyShortcut(dashboardHotkey) : null}
-        ><LayoutGrid size={15} /> Dashboard
-        {#if dashboardHotkey}<span class="nav-hotkey" aria-hidden="true"
-            >{compactKeys(dashboardHotkey)}</span
-          >{/if}</button
-      >
-      <button
-        class:active={screen === 'snoozed'}
-        onclick={() => (screen = 'snoozed')}
-        aria-keyshortcuts={snoozedHotkey ? ariaKeyShortcut(snoozedHotkey) : null}
-      >
-        <Clock size={15} /> Snoozed
-        {#if snoozedHotkey}<span class="nav-hotkey" aria-hidden="true"
-            >{compactKeys(snoozedHotkey)}</span
-          >{/if}
-      </button>
-      <button
-        class:active={screen === 'completed'}
-        onclick={() => (screen = 'completed')}
-        aria-keyshortcuts={completedHotkey ? ariaKeyShortcut(completedHotkey) : null}
-      >
-        <GitMerge size={15} /> Completed
-        {#if completedHotkey}<span class="nav-hotkey" aria-hidden="true"
-            >{compactKeys(completedHotkey)}</span
-          >{/if}
-      </button>
-      <button
-        class:active={screen === 'labels' || screen === 'label'}
-        onclick={() => (screen = 'labels')}
-        aria-keyshortcuts={labelsHotkey ? ariaKeyShortcut(labelsHotkey) : null}
-      >
-        <Tag size={15} /> Labels
-        {#if labelsHotkey}<span class="nav-hotkey" aria-hidden="true"
-            >{compactKeys(labelsHotkey)}</span
-          >{/if}
-      </button>
+      {@render navButton(
+        'Dashboard',
+        LayoutGrid,
+        screen === 'dashboard',
+        () => (screen = 'dashboard'),
+        dashboardHotkey,
+      )}
+      {@render navButton(
+        'Snoozed',
+        Clock,
+        screen === 'snoozed',
+        () => (screen = 'snoozed'),
+        snoozedHotkey,
+      )}
+      {@render navButton(
+        'Completed',
+        GitMerge,
+        screen === 'completed',
+        () => (screen = 'completed'),
+        completedHotkey,
+      )}
+      {@render navButton(
+        'Labels',
+        Tag,
+        screen === 'labels' || screen === 'label',
+        () => (screen = 'labels'),
+        labelsHotkey,
+      )}
     </nav>
     <div class="sidebar-utilities">
       <nav aria-label="Preferences">
-        <button
-          onclick={() => (settingsOpen = true)}
-          aria-keyshortcuts={settingsHotkey ? ariaKeyShortcut(settingsHotkey) : null}
-          ><SettingsIcon size={15} /> Settings{#if settingsHotkey}<span
-              class="nav-hotkey"
-              aria-hidden="true">{compactKeys(settingsHotkey)}</span
-            >{/if}</button
-        >
+        {@render navButton(
+          'Settings',
+          SettingsIcon,
+          false,
+          () => (settingsOpen = true),
+          settingsHotkey,
+        )}
       </nav>
     </div>
     <div class="sidebar-bottom">
@@ -819,8 +852,13 @@
             class="shortcuts-button"
             onclick={() => (showHotkeys = true)}
             aria-keyshortcuts={ariaKeyShortcut(shortcutsHotkey)}
-            >Keyboard shortcuts<span class="shortcuts-key" aria-hidden="true"
-              >{compactKeys(shortcutsHotkey)}</span
+            aria-label={sidebarCollapsed ? 'Keyboard shortcuts' : null}
+            data-tip={sidebarCollapsed
+              ? `Keyboard shortcuts ${compactKeys(shortcutsHotkey)}`
+              : null}
+            ><Keyboard size={13} /><span class="nav-text">Keyboard shortcuts</span><span
+              class="shortcuts-key nav-text"
+              aria-hidden="true">{compactKeys(shortcutsHotkey)}</span
             ></button
           >
         </div>

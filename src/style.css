@@ -74,11 +74,17 @@ p {
   color: #79827b;
 }
 .app-shell {
+  --sidebar-width: 190px;
   display: flex;
   min-height: 100vh;
 }
+.app-shell:has(aside.collapsed) {
+  --sidebar-width: 60px;
+}
 aside {
-  width: 190px;
+  width: var(--sidebar-width);
+  /* Above the board, so collapsed-rail tooltips are not covered, and below the card menu backdrop. */
+  z-index: 3;
   flex-shrink: 0;
   background: #f2f5f0;
   border-right: 1px solid #dfe5dc;
@@ -205,7 +211,7 @@ nav button.active {
   border-radius: 50%;
 }
 main {
-  margin-left: 190px;
+  margin-left: var(--sidebar-width);
   flex: 1;
   min-width: 0;
 }
@@ -243,7 +249,7 @@ main {
 /* A manual refresh frosts the content beside the sidebar, which stays sharp and navigable. */
 .refresh-overlay {
   position: fixed;
-  inset: 0 0 0 190px;
+  inset: 0 0 0 var(--sidebar-width);
   z-index: 6;
   display: grid;
   place-items: center;
@@ -1796,4 +1802,90 @@ fieldset:disabled .segmented-control input {
   border: 1px solid #e1e7dc;
   border-radius: 8px;
   background: #fff;
+}
+
+/* Sidebar collapse. Collapsed, the sidebar is an icon rail; labels move into hover tooltips.
+   It only animates once preferences have loaded, so a saved collapsed sidebar does not slide shut
+   at launch. */
+.app-shell.sidebar-animated aside {
+  transition:
+    width 0.18s ease,
+    padding 0.18s ease;
+}
+.app-shell.sidebar-animated main {
+  transition: margin-left 0.18s ease;
+}
+.sidebar-toggle {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: #9aa398;
+  padding: 5px;
+  border-radius: 5px;
+}
+.sidebar-toggle:hover {
+  background: #e1e9dd;
+  color: #294d36;
+}
+aside .nav-text {
+  white-space: nowrap;
+}
+aside.collapsed {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+aside.collapsed .nav-text,
+aside.collapsed .nav-label,
+aside.collapsed .version {
+  display: none;
+}
+aside.collapsed .brand {
+  flex-direction: column;
+  gap: 18px;
+  padding: 0;
+}
+aside.collapsed .brand-user {
+  margin: 14px 0 0;
+}
+aside.collapsed .avatar-wrap {
+  margin-right: 0;
+}
+aside.collapsed > nav {
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid #e4e9e1;
+}
+aside.collapsed nav button,
+aside.collapsed .shortcuts-button {
+  justify-content: center;
+  padding: 10px 0;
+}
+aside.collapsed .sidebar-toggle {
+  margin-left: 0;
+}
+aside.collapsed .shortcuts-row {
+  margin: 4px 0 0;
+  padding: 10px 0 0;
+}
+aside [data-tip] {
+  position: relative;
+}
+aside [data-tip]:hover::after,
+aside [data-tip]:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #294d36;
+  color: #f2f5f0;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 5px 8px;
+  border-radius: 5px;
+  box-shadow: 0 4px 12px #1d2b2026;
+  pointer-events: none;
 }

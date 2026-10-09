@@ -80,6 +80,14 @@ export const hotkeys: Hotkey[] = [
     description: 'Open labels',
   },
   {
+    action: 'toggle-sidebar',
+    section: 'navigation',
+    key: '\\',
+    meta: true,
+    whileTyping: true,
+    description: 'Collapse or expand the sidebar',
+  },
+  {
     // Shift is 'any' because reaching ? needs it on some layouts and not on others.
     action: 'toggle-shortcuts',
     section: 'other',

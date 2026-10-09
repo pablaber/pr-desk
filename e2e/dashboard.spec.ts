@@ -986,6 +986,31 @@ test('the interface size follows the chosen step and the zoom shortcuts', async 
   await expect.poll(savedScale).toBe(100);
 });
 
+test('the sidebar collapses to an icon rail and remembers it', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const sidebar = page.locator('aside');
+  const savedCollapsed = () =>
+    page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!).settings.sidebarCollapsed);
+  await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
+  await expect.poll(savedCollapsed).toBe(true);
+  await expect(sidebar.getByText('Dashboard', { exact: true })).toBeHidden();
+  await expect.poll(() => sidebar.evaluate((el) => el.getBoundingClientRect().width)).toBe(60);
+  // Icon-only buttons keep their names, and hovering shows the name with the shortcut.
+  const snoozed = page.getByRole('button', { name: 'Snoozed', exact: true });
+  await snoozed.hover();
+  await expect(snoozed).toHaveAttribute('data-tip', 'Snoozed ⇧S');
+  await page.screenshot({ path: '.context/sidebar-collapsed.png' });
+  await snoozed.click();
+  await expect(page.getByRole('heading', { name: 'Snoozed', exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Expand sidebar', exact: true })).toBeVisible();
+  await page.keyboard.press('Meta+\\');
+  await expect.poll(savedCollapsed).toBe(false);
+  await expect(sidebar.getByText('Dashboard', { exact: true })).toBeVisible();
+  await expect.poll(() => sidebar.evaluate((el) => el.getBoundingClientRect().width)).toBe(190);
+});
+
 test('hotkeys switch screens and stay out of the way while typing', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.pr-card')).toHaveCount(4);
@@ -1033,6 +1058,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'Open snoozed pull requests',
     'Open recently merged pull requests',
     'Open labels',
+    'Collapse or expand the sidebar',
     'Open the hovered PR on GitHub',
     'Copy the hovered PR URL',
     'Snooze the hovered PR',
@@ -1052,6 +1078,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     '⇧+S',
     '⇧+C',
     '⇧+L',
+    '⌘+\\',
     'O',
     'Enter',
     'C',
@@ -1070,6 +1097,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'Shift plus S',
     'Shift plus C',
     'Shift plus L',
+    'Command plus Backslash',
     'O or Enter',
     'C',
     'S',
@@ -1289,7 +1317,7 @@ test('copies settings, then imports edited JSON from the textarea or a file', as
   await page.getByRole('button', { name: 'Copy settings' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Settings copied' })).toBeVisible();
   const exported = await copied();
-  expect(exported).toMatchObject({ app: 'pr-desk', kind: 'settings', schemaVersion: 12 });
+  expect(exported).toMatchObject({ app: 'pr-desk', kind: 'settings', schemaVersion: 13 });
   expect(exported).not.toHaveProperty('snoozedPullRequests');
 
   const json = page.getByRole('textbox', { name: 'Settings JSON' });
@@ -1788,7 +1816,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
     .click();
   await saveSettings(page);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
-  expect(saved.schemaVersion).toBe(12);
+  expect(saved.schemaVersion).toBe(13);
   expect(saved.ignoreRules).toEqual([]);
   expect(saved.ignoredPullRequests).toHaveProperty('acme/platform#2');
   expect(saved.settings.snoozeOptions).toEqual([]);

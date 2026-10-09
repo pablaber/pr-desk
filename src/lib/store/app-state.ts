@@ -36,7 +36,7 @@ export interface PRLabel {
 export type DockBadgeMode = 'off' | 'ready-to-merge' | 'needs-attention' | 'both';
 export type InterfaceScale = 90 | 100 | 115 | 130;
 export interface AppState {
-  schemaVersion: 12;
+  schemaVersion: 13;
   trackedRepositories: string[];
   ignoreRules: IgnoreRule[];
   checkRules: CheckRule[];
@@ -51,6 +51,7 @@ export interface AppState {
     snoozeOptions: SnoozeOption[];
     dockBadge: DockBadgeMode;
     interfaceScale: InterfaceScale;
+    sidebarCollapsed: boolean;
   };
 }
 export const MAX_SNOOZE_OPTIONS = 5;
@@ -62,7 +63,7 @@ export const defaultSnoozeOptions = (): SnoozeOption[] => [
 ];
 const defaultKnownBots = (): string[] => ['dependabot[bot]', 'renovate[bot]'];
 export const defaultState = (): AppState => ({
-  schemaVersion: 12,
+  schemaVersion: 13,
   trackedRepositories: [],
   ignoreRules: [],
   checkRules: [],
@@ -77,6 +78,7 @@ export const defaultState = (): AppState => ({
     snoozeOptions: defaultSnoozeOptions(),
     dockBadge: 'both',
     interfaceScale: 100,
+    sidebarCollapsed: false,
   },
 });
 export async function loadState(): Promise<AppState> {
@@ -95,7 +97,7 @@ export function migrateState(value: unknown): AppState {
     labeledPullRequests?: unknown;
     knownBots?: unknown;
   };
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(stored.schemaVersion))
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].includes(stored.schemaVersion))
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
@@ -121,7 +123,7 @@ export function migrateState(value: unknown): AppState {
     watchedPullRequests: stored.watchedPullRequests,
     ignoredPullRequests: stored.ignoredPullRequests,
     snoozedPullRequests: stored.snoozedPullRequests,
-    schemaVersion: 12,
+    schemaVersion: 13,
     knownBots: readStoredKnownBots(stored),
     ignoreRules: readStoredIgnoreRules(stored),
     checkRules: readStoredCheckRules(stored),
@@ -135,6 +137,7 @@ export function migrateState(value: unknown): AppState {
           : defaultSnoozeOptions(),
       dockBadge: readStoredDockBadge(stored),
       interfaceScale: readStoredInterfaceScale(stored),
+      sidebarCollapsed: readStoredSidebarCollapsed(stored),
     },
   };
 }
@@ -169,6 +172,15 @@ function readStoredInterfaceScale(stored: {
   if (!isInterfaceScale(scale))
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
   return scale;
+}
+function readStoredSidebarCollapsed(stored: { schemaVersion: number; settings?: unknown }) {
+  if (stored.schemaVersion < 13) return false;
+  const collapsed = (stored.settings as { sidebarCollapsed?: unknown } | undefined)
+    ?.sidebarCollapsed;
+  if (collapsed === undefined) return false;
+  if (typeof collapsed !== 'boolean')
+    throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
+  return collapsed;
 }
 // A saved file that no longer validates must never be silently rewritten with defaults. An
 // absent list is different from an empty one: only the empty list means "the user removed them".
