@@ -18,11 +18,11 @@ describe('resolveHotkey', () => {
     expect(resolveHotkey(press('L', { shiftKey: true }), { tagName: 'INPUT' })).toBeNull();
   });
 
-  it('toggles the sidebar with ⌘\\, including while typing', () => {
-    expect(resolveHotkey(press('\\', { metaKey: true }), { tagName: 'INPUT' })?.action).toBe(
+  it('toggles the sidebar with ⌘B, including while typing', () => {
+    expect(resolveHotkey(press('b', { metaKey: true }), { tagName: 'INPUT' })?.action).toBe(
       'toggle-sidebar',
     );
-    expect(resolveHotkey(press('\\'))).toBeNull();
+    expect(resolveHotkey(press('b'))).toBeNull();
   });
 
   it('matches the zoom bindings, including while typing', () => {

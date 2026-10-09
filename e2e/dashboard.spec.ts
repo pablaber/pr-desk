@@ -1005,7 +1005,7 @@ test('the sidebar collapses to an icon rail and remembers it', async ({ page }) 
   await expect(page.getByRole('heading', { name: 'Snoozed', exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Expand sidebar', exact: true })).toBeVisible();
-  await page.keyboard.press('Meta+\\');
+  await page.keyboard.press('Meta+b');
   await expect.poll(savedCollapsed).toBe(false);
   await expect(sidebar.getByText('Dashboard', { exact: true })).toBeVisible();
   await expect.poll(() => sidebar.evaluate((el) => el.getBoundingClientRect().width)).toBe(190);
@@ -1078,7 +1078,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     '⇧+S',
     '⇧+C',
     '⇧+L',
-    '⌘+\\',
+    '⌘+B',
     'O',
     'Enter',
     'C',
@@ -1097,7 +1097,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'Shift plus S',
     'Shift plus C',
     'Shift plus L',
-    'Command plus Backslash',
+    'Command plus B',
     'O or Enter',
     'C',
     'S',

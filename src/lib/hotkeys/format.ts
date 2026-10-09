@@ -16,7 +16,6 @@ const modifiers: { flag: ModifierFlag; glyph: string; aria: string; spoken: stri
 const spokenNames: Record<string, string> = {
   ',': 'Comma',
   '?': 'Question mark',
-  '\\': 'Backslash',
 };
 
 function mainKey(hotkey: Hotkey): string {

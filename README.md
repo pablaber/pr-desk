@@ -91,7 +91,7 @@ PR Desk has no in-app updater.
   and only Save writes them and refreshes the dashboard, in the background. Closing Settings
   with unsaved changes asks whether to save, discard, or keep editing.
 - Opens Settings (⌘,) as a full-window overlay with a sidebar of sections; Esc closes it.
-- Collapses the sidebar to an icon rail (⌘\ or its panel button) with names and shortcuts in
+- Collapses the sidebar to an icon rail (⌘B or its panel button) with names and shortcuts in
   hover tooltips; the choice is remembered across launches.
 - Offers configurable automatic refresh while keeping failed refresh results visible
   and clearly marked as stale.
