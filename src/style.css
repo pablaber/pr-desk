@@ -240,8 +240,48 @@ main {
     transform: rotate(360deg);
   }
 }
+/* A manual refresh frosts the content beside the sidebar, which stays sharp and navigable. */
+.refresh-overlay {
+  position: fixed;
+  inset: 0 0 0 190px;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  background: #fafbf98c;
+  backdrop-filter: blur(3px);
+  animation: refresh-overlay-in 0.15s ease-out;
+}
+.refresh-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 26px 34px;
+  background: #fff;
+  border: 1px solid #dce2dc;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px #26332e1f;
+}
+.refresh-overlay-card b {
+  font-size: 14px;
+  font-weight: 650;
+}
+.refresh-overlay-card small {
+  color: #79827b;
+}
+.refresh-overlay-card .lucide {
+  color: #488066;
+  animation: refresh-spin 0.9s linear infinite;
+}
+@keyframes refresh-overlay-in {
+  from {
+    opacity: 0;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .toolbar button.refreshing .lucide {
+  .toolbar button.refreshing .lucide,
+  .refresh-overlay,
+  .refresh-overlay-card .lucide {
     animation: none;
   }
 }
