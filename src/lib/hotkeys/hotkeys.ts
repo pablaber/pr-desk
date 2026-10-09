@@ -82,7 +82,7 @@ export const hotkeys: Hotkey[] = [
   {
     action: 'toggle-sidebar',
     section: 'navigation',
-    key: '\\',
+    key: 'b',
     meta: true,
     whileTyping: true,
     description: 'Collapse or expand the sidebar',
