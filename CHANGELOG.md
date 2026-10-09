@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.14.0](https://github.com/pablaber/pr-desk/compare/v1.13.0...v1.14.0) (2026-10-09)
+
+
+### Features
+
+* collapse the sidebar to an icon rail ([#120](https://github.com/pablaber/pr-desk/issues/120)) ([4b0c62f](https://github.com/pablaber/pr-desk/commit/4b0c62f15ca8bbd5b14cd3aebf10517e81e1b6d9))
+* show a loading overlay during manual refresh ([#119](https://github.com/pablaber/pr-desk/issues/119)) ([1d43a22](https://github.com/pablaber/pr-desk/commit/1d43a22b645caf63b69a74eb23932bd6f4e0b3fe))
+* update pull request branches that are behind their base ([#117](https://github.com/pablaber/pr-desk/issues/117)) ([b95df37](https://github.com/pablaber/pr-desk/commit/b95df371f06139f64c4f7b4000aaf0190f20562b))
+
+
+### Bug Fixes
+
+* merge stacked pull requests through github's async merge api ([#121](https://github.com/pablaber/pr-desk/issues/121)) ([6444828](https://github.com/pablaber/pr-desk/commit/644482816cd60e74280550a35c5bf38903668b73))
+
 ## [1.13.0](https://github.com/pablaber/pr-desk/compare/v1.12.0...v1.13.0) (2026-10-08)
 
 
