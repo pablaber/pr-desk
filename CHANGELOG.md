@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.16.0](https://github.com/pablaber/pr-desk/compare/v1.15.0...v1.16.0) (2026-10-13)
+
+
+### Features
+
+* celebrate merges with an animated check ([#126](https://github.com/pablaber/pr-desk/issues/126)) ([aa38745](https://github.com/pablaber/pr-desk/commit/aa38745a582f2538873c71225be7985b9dc02a33))
+* filter the dashboard by repository ([#128](https://github.com/pablaber/pr-desk/issues/128)) ([179d615](https://github.com/pablaber/pr-desk/commit/179d615710d8d2157625ec1dd2bdf7b5b5f19013))
+* show approvable bot pull requests in ready to merge ([#125](https://github.com/pablaber/pr-desk/issues/125)) ([2b159fb](https://github.com/pablaber/pr-desk/commit/2b159fb4b39aa53276512538cf8889904e485d48))
+
 ## [1.15.0](https://github.com/pablaber/pr-desk/compare/v1.14.0...v1.15.0) (2026-10-09)
 
 
