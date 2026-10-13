@@ -40,6 +40,7 @@ npm run fallow:dead-code
 npm run fallow:dupes   # both must be clean; see Static analysis below
 npm test               # vitest, src only
 node --test scripts/update-homebrew.test.mjs
+node --test scripts/updater-release.test.mjs
 npm run build          # vite build
 
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
@@ -70,6 +71,10 @@ Inspect the generated screenshot and include the updated image in the change.
 | `.fallowrc.jsonc`                   | Fallow config; the only place for analyzer exceptions, each with its reason                                           |
 | `e2e/dashboard.spec.ts`             | Playwright against the real UI with the Tauri boundary mocked                                                         |
 | `scripts/`                          | `install.sh`, `notarize-macos.sh`, `update-homebrew.mjs` (+ its `node --test` suite)                                  |
+| `scripts/updater-release.mjs`       | updater archive/signature validation and `latest.json` generation (+ its `node --test` suite)                         |
+| `scripts/macos-verify.sh`           | shared Gatekeeper checks sourced by `notarize-macos.sh` and `verify-updater-archive.sh`                               |
+| `scripts/verify-updater-archive.sh` | extracts the updater archive and verifies the app inside it                                                           |
+| `src-tauri/tauri.release.conf.json` | release-only overlay enabling updater artifacts; only the release workflow passes it                                  |
 | `docs/pr-states.md`                 | reference tables for which conditions put a PR in which column                                                        |
 | `docs/macos-signing.md`             | signing and notarization reference                                                                                    |
 
@@ -173,8 +178,10 @@ Ask before:
 
 - changing the persisted preferences schema, or the GraphQL query surface;
 - touching anything signing-related — `bundle.macOS` in `src-tauri/tauri.conf.json`,
-  the `release` job in `.github/workflows/release-please.yml`, or
-  `scripts/notarize-macos.sh`. **Read [`docs/macos-signing.md`](docs/macos-signing.md)
+  `src-tauri/tauri.release.conf.json`, the `release` job in
+  `.github/workflows/release-please.yml`, `scripts/notarize-macos.sh`,
+  `scripts/macos-verify.sh`, `scripts/verify-updater-archive.sh`, or
+  `scripts/updater-release.mjs`. **Read [`docs/macos-signing.md`](docs/macos-signing.md)
   first.** It documents the credentials, the non-obvious failure modes (Tauri only
   _warns_ when notarization credentials are missing; Keychain Access does not export
   the certificate chain), and how to verify a build.
@@ -263,12 +270,14 @@ required in branch protection for `main`.
 ## Releases
 
 Push to `main` → tests → Release Please opens or updates a release PR → merging it tags
-a GitHub Release → a macOS job builds, signs and notarizes the bundles → the
+a GitHub Release → a macOS job builds, signs and notarizes the bundles, verifies and
+uploads the signed updater archive, then publishes `latest.json` last → the
 `pablaber/homebrew-tap` cask is updated. Release Please and the tap update both
 authenticate through a GitHub App (`RELEASE_PLEASE_APP_CLIENT_ID` /
 `RELEASE_PLEASE_APP_PRIVATE_KEY`), not a PAT. Only a real `release_created` output
 starts the build; a failed tap update can be re-run from that workflow run.
-`README.md` covers the required variables and secrets.
+`docs/development.md` covers the required variables and secrets, including the updater
+signing key.
 
 ## Gotchas
 

@@ -68,6 +68,17 @@ jobs:
       - run: npm ci
       - name: Install pinned Rust toolchain and target
         run: rustup target add aarch64-apple-darwin
+      - name: Check updater signing secrets
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          for name in TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing repository secret $name; see docs/development.md \"Updater signing key\"." >&2
+              exit 1
+            fi
+          done
       - name: Stage the App Store Connect notarization key
         id: apple
         env:
@@ -120,9 +131,11 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_PATH: ${{ steps.apple.outputs.api_key_path }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           releaseId: ${{ needs.release-please.outputs.release_id }}
-          args: --target aarch64-apple-darwin --bundles app,dmg --verbose
+          args: --target aarch64-apple-darwin --bundles app,dmg --config src-tauri/tauri.release.conf.json --verbose
           retryAttempts: 1
           includeUpdaterJson: false
       - name: Notarize the DMG and verify Gatekeeper acceptance
@@ -148,6 +161,40 @@ jobs:
           gh api "repos/pablaber/pr-desk/releases/$RELEASE_ID" > "$RUNNER_TEMP/release.json"
           node scripts/update-homebrew.mjs metadata "$RUNNER_TEMP/release.json" \
             src-tauri/target/aarch64-apple-darwin/release/bundle/dmg >> "$GITHUB_OUTPUT"
+      - name: Verify the uploaded updater archive and signature
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.release-please.outputs.release_id }}
+        run: |
+          gh api "repos/pablaber/pr-desk/releases/$RELEASE_ID" > "$RUNNER_TEMP/updater-release.json"
+          node scripts/updater-release.mjs verify "$RUNNER_TEMP/updater-release.json" \
+            src-tauri/target/aarch64-apple-darwin/release/bundle src-tauri/tauri.conf.json
+      - name: Verify the notarized app inside the updater archive
+        env:
+          RELEASE_VERSION: ${{ steps.homebrew.outputs.version }}
+        run: |
+          ./scripts/verify-updater-archive.sh \
+            src-tauri/target/aarch64-apple-darwin/release/bundle "$RELEASE_VERSION"
+      - name: Generate latest.json
+        run: |
+          node scripts/updater-release.mjs latest "$RUNNER_TEMP/updater-release.json" \
+            src-tauri/target/aarch64-apple-darwin/release/bundle src-tauri/tauri.conf.json \
+            "$RUNNER_TEMP/latest.json"
+      # Last release asset on purpose: the app treats a missing latest.json as retryable,
+      # so nothing may advertise this version before every check above has passed.
+      - name: Publish latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.release-please.outputs.release_tag }}
+        run: gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/latest.json" --repo pablaber/pr-desk --clobber
+      - name: Verify published latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.release-please.outputs.release_id }}
+        run: |
+          gh api "repos/pablaber/pr-desk/releases/$RELEASE_ID" > "$RUNNER_TEMP/published-release.json"
+          node scripts/updater-release.mjs verify-latest "$RUNNER_TEMP/published-release.json" \
+            "$RUNNER_TEMP/latest.json"
       - name: Remove the staged notarization key
         if: always() && steps.apple.outputs.api_key_path != ''
         run: rm -f "${{ steps.apple.outputs.api_key_path }}"
