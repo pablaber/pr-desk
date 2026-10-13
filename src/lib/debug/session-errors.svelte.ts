@@ -14,6 +14,7 @@ export type ErrorSource =
   | 'gh-cli'
   | 'dock-badge'
   | 'interface-scale'
+  | 'updates'
   | 'uncaught';
 
 export interface SessionError {

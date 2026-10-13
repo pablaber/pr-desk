@@ -31,5 +31,11 @@
     "macOS": {
       "signingIdentity": "-"
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "REPLACE_WITH_UPDATER_PUBLIC_KEY",
+      "endpoints": ["https://github.com/pablaber/pr-desk/releases/latest/download/latest.json"]
+    }
   }
 }

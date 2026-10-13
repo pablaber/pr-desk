@@ -4,9 +4,12 @@
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { openUrl } from '@tauri-apps/plugin-opener';
+  import { relaunch } from '@tauri-apps/plugin-process';
+  import { check } from '@tauri-apps/plugin-updater';
   import { version } from '../package.json';
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
   import Bug from '@lucide/svelte/icons/bug';
+  import CircleArrowDown from '@lucide/svelte/icons/circle-arrow-down';
   import Copy from '@lucide/svelte/icons/copy';
   import Download from '@lucide/svelte/icons/download';
   import ClipboardCheck from '@lucide/svelte/icons/clipboard-check';
@@ -44,6 +47,8 @@
   import UnsavedChanges from './components/UnsavedChanges.svelte';
   import HotkeyHelp from './components/HotkeyHelp.svelte';
   import Toaster from './components/Toaster.svelte';
+  import UpdateDialog from './components/UpdateDialog.svelte';
+  import { UpdateService } from './lib/updates/updater';
   import { showToast } from './lib/toast/toasts.svelte';
   import type { GhCliInfo } from './lib/github/types';
   import { GhGitHubService } from './lib/github/client';
@@ -134,6 +139,18 @@
     saving = $state(false),
     initialized = $state(false);
   let silentRefresh = $state(false);
+  const updates = new UpdateService({
+    check,
+    relaunch,
+    // Every preference write and confirmed GitHub action runs under saving; reads can be abandoned.
+    busy: () => saving,
+    onError: (message) => recordError('updates', message),
+    // npm run dev has no Tauri at all, and npm run tauri dev serves from Vite's dev server.
+    enabled: isTauri() && !import.meta.env.DEV,
+  });
+  let update = $state.raw(updates.state);
+  let updateOffered = $derived(update.version !== null);
+  let updateLabel = $derived(updateOffered ? 'Update available' : 'Check for updates');
   let refreshQueued = false;
   let completed = $state<CompletedSnapshot | null>(null),
     completedLoading = $state(false);
@@ -240,6 +257,9 @@
   });
   onMount(() => {
     void start();
+    // Independent of gh, so updates stay reachable when GitHub sign-in fails.
+    const unsubscribe = updates.subscribe((state) => (update = state));
+    updates.start();
     const timer = setInterval(() => (now = Date.now()), 15000);
     const uncaught = (event: ErrorEvent) =>
       recordError('uncaught', String(event.error ?? event.message));
@@ -248,6 +268,8 @@
     window.addEventListener('error', uncaught);
     window.addEventListener('unhandledrejection', unhandled);
     return () => {
+      unsubscribe();
+      updates.dispose();
       clearInterval(timer);
       window.removeEventListener('error', uncaught);
       window.removeEventListener('unhandledrejection', unhandled);
@@ -664,7 +686,7 @@
     await refresh();
   }
   function handleHotkey(event: KeyboardEvent) {
-    if (actionPR || confirmClose) return;
+    if (actionPR || confirmClose || update.dialogOpen) return;
     const hotkey = resolveHotkey(event, event.target as HTMLElement | null);
     if (!hotkey) return;
     // Enter must keep activating a focused button or link rather than open the hovered PR.
@@ -899,7 +921,17 @@
           >
         </div>
       {/if}
-      <span class="version">v{version}</span>
+      <div class="version-row">
+        <span class="version">v{version}</span>
+        <button
+          class="update-button"
+          class:offered={updateOffered}
+          onclick={() => (updateOffered ? updates.openDialog() : void updates.checkNow())}
+          aria-label={sidebarCollapsed ? updateLabel : null}
+          data-tip={sidebarCollapsed ? updateLabel : null}
+          ><CircleArrowDown size={12} /><span class="nav-text">{updateLabel}</span></button
+        >
+      </div>
     </div>
   </aside>
   <main inert={refreshOverlay}>
@@ -1139,6 +1171,14 @@
   oncancel={() => {
     if (!saving) confirmClose = false;
   }}
+/>
+<UpdateDialog
+  {update}
+  installedVersion={version}
+  onupdate={() => void updates.install()}
+  onretry={() => void updates.retry()}
+  onlater={() => updates.dismiss()}
+  onopen={open}
 />
 <HotkeyHelp open={showHotkeys} onclose={() => (showHotkeys = false)} />
 

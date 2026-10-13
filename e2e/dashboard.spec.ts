@@ -31,8 +31,15 @@ test.beforeEach(async ({ page }) => {
       refreshCount: number;
       badges: (number | null)[];
       zooms: number[];
+      updateChecks: number;
+      closedResources: number[];
+      restarts: number;
+      finishDownload: () => void;
     };
     w.opened = [];
+    w.updateChecks = 0;
+    w.closedResources = [];
+    w.restarts = 0;
     w.badges = [];
     w.zooms = [];
     w.refreshCount = 0;
@@ -146,7 +153,45 @@ test.beforeEach(async ({ page }) => {
         currentWindow: { label: 'main' },
         currentWebview: { windowLabel: 'main', label: 'main' },
       },
+      // Channels register their handler here; the mock calls a channel's onmessage directly.
+      transformCallback: () => Math.floor(Math.random() * 1e9),
+      unregisterCallback: () => {},
       invoke: async (command: string, args: Record<string, any>) => {
+        // The updater: updateVersion offers that version, updateCheckFailures fails that many
+        // checks first, and a download waits for finishDownload() when holdDownload is set.
+        if (command === 'plugin:updater|check') {
+          w.updateChecks++;
+          const failures = Number(localStorage.getItem('updateCheckFailures') ?? 0);
+          if (failures > 0) {
+            localStorage.setItem('updateCheckFailures', String(failures - 1));
+            throw new Error('Could not fetch a valid release JSON from the remote');
+          }
+          const version = localStorage.getItem('updateVersion');
+          return version
+            ? { rid: w.updateChecks, currentVersion: '1.0.0', version, rawJson: {} }
+            : null;
+        }
+        if (command === 'plugin:updater|download_and_install') {
+          const send = (event: unknown) => args.onEvent.onmessage(event);
+          const unknownSize = !!localStorage.getItem('updateUnknownSize');
+          send({ event: 'Started', data: unknownSize ? {} : { contentLength: 8_000_000 } });
+          send({ event: 'Progress', data: { chunkLength: 2_000_000 } });
+          if (localStorage.getItem('holdDownload'))
+            await new Promise<void>((resolve) => (w.finishDownload = resolve));
+          if (localStorage.getItem('updateInstallFailure'))
+            throw new Error('signature verification failed');
+          send({ event: 'Progress', data: { chunkLength: 6_000_000 } });
+          send({ event: 'Finished' });
+          return;
+        }
+        if (command === 'plugin:resources|close') {
+          w.closedResources.push(args.rid);
+          return;
+        }
+        if (command === 'plugin:process|restart') {
+          w.restarts++;
+          return;
+        }
         if (command === 'plugin:window|set_badge_count') {
           w.badges.push(args.value ?? null);
           return;
@@ -202,7 +247,11 @@ test.beforeEach(async ({ page }) => {
           return;
         }
         if (command !== 'github') throw new Error(`Unexpected command ${command}`);
-        if (args.operation === 'auth') return null;
+        if (args.operation === 'auth') {
+          if (localStorage.getItem('authFailure'))
+            throw new Error('You are not logged into any GitHub hosts. Run gh auth login.');
+          return null;
+        }
         if (args.operation === 'info') return { version: '2.80.0', path: '/opt/homebrew/bin/gh' };
         const query = args.query as string;
         if (query.includes('DeskViewer'))
@@ -2729,4 +2778,163 @@ test('known bots can be added and removed in Settings', async ({ page }) => {
   await saveSettings(page);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
   expect(saved.knownBots).toEqual(['dependabot[bot]', 'mend[bot]', 'release-user']);
+});
+
+test('an automatic check offers an update in the sidebar and installs it only on request', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('updateVersion', '99.0.0');
+    localStorage.setItem('holdDownload', '1');
+  });
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const offer = page.getByRole('button', { name: 'Update available', exact: true });
+  await expect(offer).toBeVisible();
+  // The label fits beside the version inside the expanded sidebar.
+  const { right } = await offer.evaluate((el) => el.getBoundingClientRect());
+  expect(right).toBeLessThanOrEqual(190 - 14);
+  const dialog = page.getByRole('dialog', { name: 'Update available' });
+  // Finding an update never interrupts with a modal.
+  await expect(dialog).toBeHidden();
+  expect(await page.evaluate(() => (window as any).updateChecks)).toBe(1);
+  const installed = (await page.locator('.version').textContent())!;
+  await offer.click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('dd')).toHaveText([installed, 'v99.0.0']);
+  await dialog.getByRole('button', { name: 'Release notes', exact: true }).click();
+  expect(await page.evaluate(() => (window as any).opened)).toEqual([
+    'https://github.com/pablaber/pr-desk/releases/tag/v99.0.0',
+  ]);
+  await page.screenshot({ path: '.context/update-available.png' });
+  await dialog.getByRole('button', { name: 'Update and restart', exact: true }).click();
+  const downloading = page.getByRole('dialog', { name: 'Downloading update…' });
+  await expect(downloading.getByRole('status')).toHaveText('2.0 MB of 8.0 MB');
+  await expect(downloading.locator('progress')).toHaveAttribute('value', '2000000');
+  await expect(downloading.getByRole('button', { name: 'Later', exact: true })).toBeDisabled();
+  await expect(downloading.getByRole('button', { name: 'Updating…', exact: true })).toBeDisabled();
+  await page.screenshot({ path: '.context/update-downloading.png' });
+  // Escape cannot abandon an update in progress.
+  await page.keyboard.press('Escape');
+  await expect(downloading).toBeVisible();
+  expect(await page.evaluate(() => (window as any).restarts)).toBe(0);
+  await page.evaluate(() => (window as any).finishDownload());
+  await expect.poll(() => page.evaluate(() => (window as any).restarts)).toBe(1);
+  await expect(page.getByRole('dialog', { name: 'Restarting PR Desk…' })).toBeVisible();
+  // The installed update's resource is released before the restart.
+  expect(await page.evaluate(() => (window as any).closedResources)).toEqual([1]);
+});
+
+test('the update dialog works from the keyboard and Later keeps the offer', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const checkButton = page.getByRole('button', { name: 'Check for updates', exact: true });
+  await checkButton.focus();
+  await page.keyboard.press('Enter');
+  const current = page.getByRole('dialog', { name: 'PR Desk is up to date' });
+  await expect(current).toBeVisible();
+  await expect(current.getByRole('button', { name: 'Close', exact: true })).toBeFocused();
+  // Hotkeys stay inert behind the dialog.
+  await page.keyboard.press('Shift+S');
+  await expect(page.getByRole('heading', { name: 'Snoozed', exact: true })).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(current).toBeHidden();
+  await expect(checkButton).toBeFocused();
+
+  await page.evaluate(() => localStorage.setItem('updateVersion', '99.0.0'));
+  await page.keyboard.press('Enter');
+  const available = page.getByRole('dialog', { name: 'Update available' });
+  await expect(available.getByRole('button', { name: 'Update and restart' })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(available.getByRole('button', { name: 'Later', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(available).toBeHidden();
+  const offer = page.getByRole('button', { name: 'Update available', exact: true });
+  await expect(offer).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(available).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(available).toBeHidden();
+  // Launch, then one check per Check for updates; reopening the offer does not check again.
+  expect(await page.evaluate(() => (window as any).updateChecks)).toBe(3);
+  expect(await page.evaluate(() => (window as any).restarts)).toBe(0);
+});
+
+test('update check failures stay quiet automatically and offer a retry when asked', async ({
+  page,
+}) => {
+  // The launch check and the first manual check both find no published metadata.
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('loaded')) localStorage.setItem('updateCheckFailures', '2');
+    sessionStorage.setItem('loaded', '1');
+  });
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect.poll(() => page.evaluate(() => (window as any).updateChecks)).toBe(1);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
+  const failed = page.getByRole('dialog', { name: 'Could not check for updates' });
+  await expect(failed.getByRole('alert')).toContainText('Try again in a few minutes');
+  // Missing metadata is never reported as being up to date.
+  await expect(page.getByText('PR Desk is up to date')).toHaveCount(0);
+  await page.evaluate(() => localStorage.setItem('updateVersion', '99.0.0'));
+  await failed.getByRole('button', { name: 'Try again', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Update available' })).toBeVisible();
+  expect(await page.evaluate(() => (window as any).updateChecks)).toBe(3);
+});
+
+test('a failed install never restarts and can be retried', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('updateVersion', '99.0.0');
+    localStorage.setItem('updateUnknownSize', '1');
+    localStorage.setItem('holdDownload', '1');
+    localStorage.setItem('updateInstallFailure', '1');
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Update available', exact: true }).click();
+  await page.getByRole('button', { name: 'Update and restart', exact: true }).click();
+  // Without a reported size the bar is indeterminate and shows the bytes so far.
+  const downloading = page.getByRole('dialog', { name: 'Downloading update…' });
+  await expect(downloading.getByRole('status')).toHaveText('2.0 MB downloaded');
+  await expect(downloading.locator('progress')).not.toHaveAttribute('value');
+  await page.evaluate(() => (window as any).finishDownload());
+  const failed = page.getByRole('dialog', { name: 'Update failed' });
+  await expect(failed.getByRole('alert')).toContainText('could not be installed');
+  await expect(failed.getByRole('button', { name: 'Try again', exact: true })).toBeFocused();
+  expect(await page.evaluate(() => (window as any).restarts)).toBe(0);
+  await page.evaluate(() => {
+    localStorage.removeItem('updateInstallFailure');
+    localStorage.removeItem('holdDownload');
+  });
+  await failed.getByRole('button', { name: 'Try again', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).restarts)).toBe(1);
+});
+
+test('updates stay available when GitHub authentication fails', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('authFailure', '1');
+    localStorage.setItem('updateVersion', '99.0.0');
+  });
+  await page.goto('/');
+  await expect(page.locator('.setup [role="alert"]')).toContainText('not logged into');
+  const offer = page.getByRole('button', { name: 'Update available', exact: true });
+  await offer.click();
+  await page.getByRole('button', { name: 'Update and restart', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).restarts)).toBe(1);
+});
+
+test('the collapsed sidebar names the update action in its tooltip', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('updateVersion', '99.0.0'));
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
+  const offer = page.getByRole('button', { name: 'Update available', exact: true });
+  await expect(offer).toHaveAttribute('data-tip', 'Update available');
+  await expect(offer.locator('svg.lucide-circle-arrow-down')).toBeVisible();
+  await expect
+    .poll(() => offer.evaluate((el) => el.getBoundingClientRect().right))
+    .toBeLessThanOrEqual(60);
+  await offer.click();
+  await expect(page.getByRole('dialog', { name: 'Update available' })).toBeVisible();
 });

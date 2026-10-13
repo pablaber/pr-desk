@@ -125,15 +125,47 @@ aside {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.version-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
 .version {
   display: inline-block;
   font-size: 10px;
   font-weight: 500;
   color: #849181;
-  margin-top: 12px;
   border: 1px solid #d6ded1;
   border-radius: 4px;
   padding: 2px 4px;
+}
+.update-button {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: #9aa398;
+  font-size: 11px;
+  padding: 2px 0;
+  white-space: nowrap;
+}
+.update-button:hover {
+  background: transparent;
+  color: #62725e;
+}
+.update-button.offered {
+  color: #3f6746;
+  font-weight: 600;
+}
+.update-button .nav-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Beside the version there is room for the label only; the icon stands in for it when collapsed. */
+aside:not(.collapsed) .update-button .lucide {
+  display: none;
 }
 .nav-label {
   font-size: 9px;
@@ -1940,6 +1972,12 @@ aside.collapsed .sidebar-toggle {
 aside.collapsed .shortcuts-row {
   margin: 4px 0 0;
   padding: 10px 0 0;
+}
+aside.collapsed .version-row {
+  justify-content: center;
+}
+aside.collapsed .update-button {
+  padding: 6px 0;
 }
 aside [data-tip] {
   position: relative;

@@ -44,14 +44,29 @@ Homebrew adds the public
 `PR Desk.app` in `/Applications`. Published releases are Developer ID signed and
 notarized by Apple.
 
-To upgrade, quit PR Desk and run:
+### Updates
+
+PR Desk checks for a new release at launch and every 24 hours while it is open; **Check
+for updates** beside the version in the sidebar checks on demand. A newer release turns
+that button into **Update available** without interrupting you. Nothing downloads until
+you choose **Update and restart**: PR Desk downloads the release, verifies its signature,
+installs it, and restarts once any preference save or confirmed GitHub action has
+finished. **Later** keeps the offer for the session. If an install fails, the running
+version is left in place.
+
+Update checks and downloads fetch public assets from
+[GitHub Releases](https://github.com/pablaber/pr-desk/releases) over HTTPS with the app's
+own network client, so they work even when `gh` is signed out. This is the only network
+access that does not go through `gh`; pull request access still uses only your GitHub CLI.
+
+Homebrew keeps working alongside in-app updates. Because the cask is marked
+`auto_updates`, `brew upgrade` skips PR Desk unless asked explicitly; to upgrade through
+Homebrew, quit PR Desk and run:
 
 ```sh
 brew update
-brew upgrade --cask pr-desk
+brew upgrade --cask --greedy pablaber/tap/pr-desk
 ```
-
-PR Desk has no in-app updater.
 
 ## Key features
 
@@ -117,7 +132,9 @@ PR Desk has no in-app updater.
 
 ## GitHub access
 
-All requests run through the installed authenticated `gh` CLI against GitHub.com:
+All GitHub API requests run through the installed authenticated `gh` CLI against
+GitHub.com (the update check, which reads public release assets, is the one exception;
+see [Updates](#updates)):
 
 ```text
 gh auth status --hostname github.com
@@ -147,8 +164,10 @@ trigger attention. GitHub search's 1,000-result ceiling is reported as an error 
 than silently truncating. Detail query failures are reported individually.
 
 References: [GitHub check fields](https://docs.github.com/en/graphql/reference/checks),
-[Tauri Store](https://v2.tauri.app/plugin/store/), and
-[Tauri Opener](https://v2.tauri.app/plugin/opener/).
+[Tauri Store](https://v2.tauri.app/plugin/store/),
+[Tauri Opener](https://v2.tauri.app/plugin/opener/),
+[Tauri Updater](https://v2.tauri.app/plugin/updater/), and
+[Tauri Process](https://v2.tauri.app/plugin/process/).
 
 ## Current limits
 

@@ -255,9 +255,16 @@ mod tests {
 }
 
 fn main() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_opener::init());
+    // Update checks and downloads use the updater's own HTTPS client against public release
+    // assets, not gh; every package must pass the signature check against plugins.updater.pubkey.
+    #[cfg(desktop)]
+    let builder = builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init());
+    builder
         .invoke_handler(tauri::generate_handler![
             github,
             close_stale_pr,
