@@ -43,6 +43,7 @@
     <SnoozedRow
       {row}
       {now}
+      titleTagRules={preferences.titleTagRules}
       {busy}
       stale={snapshot.staleIds.includes(row.id)}
       snoozeOptions={preferences.settings.snoozeOptions}

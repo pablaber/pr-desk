@@ -64,6 +64,7 @@
       count(preview.knownBots.length, 'known bot'),
       count(preview.ignoreRules.length, 'ignore rule'),
       count(preview.checkRules.length, 'non-blocking check rule'),
+      count(preview.titleTagRules.length, 'title tag rule'),
       count(preview.labels.length, 'label'),
       `snooze options: ${preview.settings.snoozeOptions.map(snoozeOptionLabel).join(', ') || 'none'}`,
       `refresh: ${preview.settings.automaticRefreshMinutes === 0 ? 'never' : `every ${count(preview.settings.automaticRefreshMinutes, 'minute')}`}`,

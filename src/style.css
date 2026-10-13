@@ -1961,3 +1961,14 @@ aside [data-tip]:focus-visible::after {
   box-shadow: 0 4px 12px #1d2b2026;
   pointer-events: none;
 }
+
+/* Title tags fill the whole badge with a colour hashed from the tag, unlike labels' dot, so a
+   ticket key reads as the PR's identity rather than a filing choice. */
+.badge.title-tag {
+  --tag-color: #8a9483;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--tag-color) 70%, #26332e);
+  border-color: color-mix(in srgb, var(--tag-color) 40%, transparent);
+  background: color-mix(in srgb, var(--tag-color) 14%, transparent);
+}

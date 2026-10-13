@@ -3,6 +3,7 @@ import {
   parsePullRequest,
   parseIgnoreRule,
   parseCheckRule,
+  parseTitleTagRule,
   parseRepositoryPattern,
   parseRepository,
   parseKnownBot,
@@ -117,7 +118,7 @@ it('defaults to five minutes and migrates reserved v1 settings without losing pr
     settings: { automaticRefreshMinutes: 0 },
   };
   expect(migrateState(legacy)).toMatchObject({
-    schemaVersion: 13,
+    schemaVersion: 14,
     watchedPullRequests: ['acme/api#1'],
     settings: { automaticRefreshMinutes: 5, snoozeOptions: defaultSnoozeOptions() },
   });
@@ -136,7 +137,7 @@ it('preserves Never and all valid intervals, and repairs invalid stored interval
         .automaticRefreshMinutes,
     ).toBe(5);
   }
-  expect(() => migrateState({ ...defaultState(), schemaVersion: 14 })).toThrow('Unsupported');
+  expect(() => migrateState({ ...defaultState(), schemaVersion: 15 })).toThrow('Unsupported');
 });
 
 it('migrates older preferences and validates ignored repositories', () => {
@@ -150,7 +151,7 @@ it('migrates older preferences and validates ignored repositories', () => {
         settings: { automaticRefreshMinutes: 0 },
       }),
     ).toMatchObject({
-      schemaVersion: 13,
+      schemaVersion: 14,
       ignoreRules: [],
       trackedRepositories: ['acme/api'],
       settings: { automaticRefreshMinutes: schemaVersion === 1 ? 5 : 0 },
@@ -214,8 +215,9 @@ it('migrates all supported versions without losing independently saved preferenc
       settings: { automaticRefreshMinutes: 12, snoozeOptions: [] },
     };
     const migrated = migrateState(legacy);
-    expect(migrated.schemaVersion).toBe(13);
+    expect(migrated.schemaVersion).toBe(14);
     expect(migrated.checkRules).toEqual([]);
+    expect(migrated.titleTagRules).toEqual([]);
     expect(migrated.ignoreRules).toEqual(
       schemaVersion >= 3 ? [{ kind: 'repository', value: 'acme/api' }] : [],
     );
@@ -288,6 +290,7 @@ it('drafts only the Settings lists and reports whether they differ from the save
     'checkRules',
     'ignoreRules',
     'knownBots',
+    'titleTagRules',
     'trackedRepositories',
     'watchedPullRequests',
   ]);
@@ -345,6 +348,33 @@ it('detects check rule edits in the draft', () => {
   expect(draftDiffers(draft, { ...state, checkRules: [...draft.checkRules] })).toBe(false);
 });
 
+it('validates title tag rules and surfaces regex errors', () => {
+  expect(parseTitleTagRule('  \\b([A-Z]+-\\d+)\\b  ')).toEqual({ pattern: '\\b([A-Z]+-\\d+)\\b' });
+  expect(() => parseTitleTagRule('   ')).toThrow('single-line regular expression');
+  expect(() => parseTitleTagRule('a\nb')).toThrow('single-line regular expression');
+  expect(() => parseTitleTagRule('a'.repeat(201))).toThrow('1 to 200 characters');
+  expect(parseTitleTagRule('a'.repeat(200)).pattern).toHaveLength(200);
+  expect(() => parseTitleTagRule('([A-Z]+')).toThrow('Invalid regular expression');
+});
+
+it('migrates title tag rules without overwriting an invalid saved list', () => {
+  expect(migrateState({ ...defaultState(), schemaVersion: 13 }).titleTagRules).toEqual([]);
+  const rule = { pattern: '^\\[([^\\]]+)\\]' };
+  const migrated = migrateState({ ...defaultState(), titleTagRules: [rule, { ...rule }] });
+  expect(migrated.titleTagRules).toEqual([rule]);
+  expect(migrateState(migrated)).toEqual(migrated);
+  for (const titleTagRules of [undefined, 'x', [{ pattern: '(' }], [{}], [null]])
+    expect(() => migrateState({ ...defaultState(), titleTagRules })).toThrow('left intact');
+});
+
+it('detects title tag rule edits in the draft', () => {
+  const state = defaultState();
+  const draft = preferenceDraft(state);
+  draft.titleTagRules.push({ pattern: 'BACK-\\d+' });
+  expect(draftDiffers(draft, state)).toBe(true);
+  expect(draftDiffers(draft, { ...state, titleTagRules: [...draft.titleTagRules] })).toBe(false);
+});
+
 it('defaults the dock badge to both, for new and pre-v7 preferences', () => {
   expect(defaultState().settings.dockBadge).toBe('both');
   const { dockBadge: _, ...settings } = defaultState().settings;
@@ -383,7 +413,7 @@ it('loads pre-v8 preferences without labels', () => {
       labels: [label('x', 'Ignored')],
       labeledPullRequests: { 'acme/api#1': ['x'] },
     });
-    expect(migrated).toMatchObject({ schemaVersion: 13, labels: [], labeledPullRequests: {} });
+    expect(migrated).toMatchObject({ schemaVersion: 14, labels: [], labeledPullRequests: {} });
   }
 });
 it('round-trips v8 labels and canonicalizes their assignments', () => {
@@ -544,6 +574,7 @@ const configured = () => ({
   watchedPullRequests: ['acme/api#7'],
   ignoreRules: [{ kind: 'author' as const, value: 'octocat' }],
   checkRules: [{ repository: 'acme/*', check: 'policy-bot' }],
+  titleTagRules: [{ pattern: '\\b([A-Z]+-\\d+)\\b' }],
   labels: [label('a', 'Backend')],
   ignoredPullRequests: { 'acme/api#1': { ignoredAt: '2026-01-01T00:00:00.000Z' } },
   snoozedPullRequests: { 'acme/api#2': { until: '2099-01-01T00:00:00.000Z' } },
@@ -569,6 +600,7 @@ it('exports configuration without per-PR state and imports it back', () => {
     knownBots: config.knownBots,
     ignoreRules: config.ignoreRules,
     checkRules: config.checkRules,
+    titleTagRules: config.titleTagRules,
     labels: config.labels,
     settings: config.settings,
   });
@@ -577,12 +609,13 @@ it('rejects settings imports that are not valid exports', () => {
   expect(() => parseSettingsImport('nope')).toThrow("That isn't valid JSON.");
   for (const text of ['null', '5', '{}', exported({ app: 'other' }), exported({ kind: 'debug' })])
     expect(() => parseSettingsImport(text)).toThrow("This isn't a PR Desk settings export.");
-  expect(() => parseSettingsImport(exported({ schemaVersion: 14 }))).toThrow('newer PR Desk');
+  expect(() => parseSettingsImport(exported({ schemaVersion: 15 }))).toThrow('newer PR Desk');
   const invalid: Record<string, unknown>[] = [
     { trackedRepositories: ['no-owner'] },
     { trackedRepositories: [5] },
     { watchedPullRequests: ['acme/api'] },
     { ignoreRules: [{ kind: 'author', value: '@bad name' }] },
+    { titleTagRules: [{ pattern: '(' }] },
     { settings: { ...defaultState().settings, snoozeOptions: [{ kind: 'duration' }] } },
     { labels: [label('a', 'Same'), label('b', 'same')] },
     { schemaVersion: 'x' },
@@ -594,6 +627,10 @@ it('rejects settings imports that are not valid exports', () => {
   expect(() =>
     parseSettingsImport(exported({ labels: [label('a', 'Same'), label('b', 'same')] })),
   ).not.toThrow('left intact');
+});
+it('imports a v13 export without title tag rules', () => {
+  const config = parseSettingsImport(exported({ schemaVersion: 13, titleTagRules: undefined }));
+  expect(config.titleTagRules).toEqual([]);
 });
 it('dedupes imported repositories and watched PRs', () => {
   const config = parseSettingsImport(

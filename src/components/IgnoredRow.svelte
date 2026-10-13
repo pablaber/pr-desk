@@ -1,9 +1,11 @@
 <script lang="ts">
   import RowSummary from './RowSummary.svelte';
+  import type { TitleTagRule } from '../lib/store/app-state';
   import type { ignoredPullRequests } from '../lib/pr/ignored';
   let {
     row,
     now,
+    titleTagRules,
     busy,
     stale,
     onopen,
@@ -11,6 +13,7 @@
   }: {
     row: ReturnType<typeof ignoredPullRequests>[number];
     now: number;
+    titleTagRules: TitleTagRule[];
     busy: boolean;
     stale: boolean;
     onopen: (url: string) => void;
@@ -25,7 +28,7 @@
     aria-label={`Open ${row.item?.pr.title ?? row.id} on GitHub`}
     onclick={() => onopen(row.url)}
   >
-    <RowSummary item={row.item} {now} {stale} labels={row.labels}>
+    <RowSummary item={row.item} {now} {stale} {titleTagRules} labels={row.labels}>
       {#snippet unavailable()}
         <span class="repo">{row.repository} <span class="number">#{row.number}</span></span><strong
           >Pull request details unavailable</strong

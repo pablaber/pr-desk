@@ -78,6 +78,10 @@ PR Desk has no in-app updater.
   open one to see its pull requests, and rename, recolor, or delete labels there. A refresh
   automatically drops the label from PRs that were merged, closed, or are no longer tracked,
   and stops watching PRs that were merged or closed.
+- Shows title tags: regular expressions in Settings → Title tags pull text such as a ticket key
+  out of each PR title (`fix: BACK-1234 …` → `BACK-1234`) and show it as a coloured badge, each
+  tag keeping one colour derived from its text. Nothing is stored per PR; suggested rules cover
+  ticket keys, conventional-commit types and bracketed prefixes.
 - Manages known bots (Settings → Known bots, prefilled with Dependabot and Renovate): their PRs in
   tracked repositories sit in Needs attention as "Waiting for your review" like any other PR that
   is not yours, with in-app Approve and merge… once their checks pass; once approved, they and

@@ -965,6 +965,7 @@ test('settings opens as an overlay with a section sidebar and confirms unsaved e
     ['Ignore rules', 'funnel-x'],
     ['Ignored pull requests', 'eye-off'],
     ['Non-blocking checks', 'list-checks'],
+    ['Title tags', 'regex'],
     ['Import & export', 'arrow-down-up'],
     ['Troubleshooting', 'bug'],
   ]) {
@@ -1385,7 +1386,7 @@ test('copies settings, then imports edited JSON from the textarea or a file', as
   await page.getByRole('button', { name: 'Copy settings' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Settings copied' })).toBeVisible();
   const exported = await copied();
-  expect(exported).toMatchObject({ app: 'pr-desk', kind: 'settings', schemaVersion: 13 });
+  expect(exported).toMatchObject({ app: 'pr-desk', kind: 'settings', schemaVersion: 14 });
   expect(exported).not.toHaveProperty('snoozedPullRequests');
 
   const json = page.getByRole('textbox', { name: 'Settings JSON' });
@@ -1884,7 +1885,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
     .click();
   await saveSettings(page);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
-  expect(saved.schemaVersion).toBe(13);
+  expect(saved.schemaVersion).toBe(14);
   expect(saved.ignoreRules).toEqual([]);
   expect(saved.ignoredPullRequests).toHaveProperty('acme/platform#2');
   expect(saved.settings.snoozeOptions).toEqual([]);
@@ -2053,6 +2054,47 @@ test('non-blocking check rules move an approved PR to Ready without a Merge butt
   await expect(page.locator('.column').nth(0).locator('.pr-card')).toHaveCount(1);
   await expect(card).toContainText('Ready · policy-bot pending');
   await expect(card.getByRole('button', { name: /^Merge / })).toHaveCount(0);
+});
+
+test('title tag rules badge cards with tags extracted from their titles', async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as any,
+      invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      const result = await invoke(command, args);
+      for (const pr of result?.search?.nodes ?? [])
+        if (pr.number === 1) pr.title = 'fix: BACK-1234 reduce cache lookup latency';
+      return result;
+    };
+  });
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const card = page.locator('.pr-card').filter({ hasText: 'reduce cache lookup latency' });
+  await expect(card.locator('.badge.title-tag')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSettingsSection(page, 'Title tags');
+  const section = page.locator('#settings-section-title-tags');
+  // An invalid regex stays beside the field and joins nothing.
+  await page.getByRole('textbox', { name: 'Title tag pattern' }).fill('([A-Z]+');
+  await page.getByRole('button', { name: 'Add rule', exact: true }).click();
+  await expect(section.locator('.field-error')).toContainText('Invalid regular expression');
+  await expect(section.getByText('No title tag rules.')).toBeVisible();
+  const suggestion = section.getByRole('button', {
+    name: 'Add rule: Ticket key after a conventional-commit prefix',
+  });
+  await suggestion.click();
+  await expect(section.locator('.field-error')).toHaveCount(0);
+  await expect(section.locator('.setting-row').first()).toContainText('BACK-1234 · 1 PR');
+  await expect(section.getByRole('button', { name: 'Added', exact: true })).toBeDisabled();
+  await page.screenshot({ path: '.context/title-tags-settings.png' });
+  await saveSettings(page);
+  await closeSettings(page);
+  await expect(card.locator('.badge.title-tag')).toHaveText('BACK-1234');
+  await expect(page.locator('.board .badge.title-tag')).toHaveCount(1);
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!).titleTagRules),
+  ).toHaveLength(1);
+  await card.screenshot({ path: '.context/title-tags-card.png' });
 });
 
 test('a queued approved PR waits with its queue position and no Merge button', async ({ page }) => {
