@@ -102,6 +102,7 @@ label; other matching rules (except the `waiting` catch-all) show as secondary s
 |       54 | `auto-merge`           | **Waiting**         | auto-merge enabled and not queued (anyone's PR)               | Auto-merge enabled            |
 |       50 | `ready`                | **Ready to merge**  | ready                                                         | Ready to merge                |
 |       50 | `ready-pending-checks` | **Ready to merge**  | ready, pending checks                                         | Ready · _check names_ pending |
+|       50 | `approvable`           | **Ready to merge**  | approvable                                                    | Ready to approve and merge    |
 |       10 | `tracked-repository`   | **Needs attention** | from a tracked repository, not owned, not draft, not approved | Waiting for your review       |
 |        0 | `waiting`\*            | **Waiting**         | always (fallback)                                             | see below                     |
 
@@ -127,8 +128,9 @@ The Waiting fallback picks its label from the first that applies:
   review request still needs attention, even when the aggregate review decision is approved.
 - A known bot's PR is only treated as managed when it comes from a tracked repository or is
   watched. In a tracked repository it needs attention as "Waiting for your review", like any
-  other PR that is not yours; once approved it is Ready to merge or, if GitHub still blocks it,
-  Waiting. A watched bot PR outside your tracked repositories waits for review in Waiting.
+  other PR that is not yours, unless it is approvable: then it is Ready to merge as "Ready to
+  approve and merge". Once approved it is Ready to merge or, if GitHub still blocks it, Waiting. A watched bot PR outside your tracked repositories waits for review in Waiting, unless it
+  is approvable.
 - A known bot is a GitHub App, entered as `name[bot]`, or a machine user account, entered as its
   bare login. The author's account type must match, so a user account never counts as an App
   with the same name.
@@ -140,7 +142,8 @@ The Waiting fallback picks its label from the first that applies:
 - `BEHIND`, `DIRTY`, `UNKNOWN`, and `DRAFT` merge states keep a PR out of Ready to merge.
   `BLOCKED` is tolerated only while a non-blocking check is pending, because GitHub does not say
   which rule is blocking.
-- An approvable bot PR accepts `BLOCKED`, since the missing review is what blocks it.
+- An approvable bot PR accepts `BLOCKED`, since the missing review is what blocks it. An explicit
+  personal review request outranks it, so such a PR stays in Needs attention.
 - GitHub reports `BEHIND` ahead of `BLOCKED`, so a bot PR behind its base is not approvable even
   when its review is the other thing missing. Updating the branch re-runs its checks; once they
   pass it becomes approvable.
@@ -158,6 +161,7 @@ The common situations, from your point of view:
 | Someone else's unapproved open PR in a repository you track, including bot PRs     | Needs attention |
 | Your PR or tracked bot PR is approved, green, and mergeable                        | Ready to merge  |
 | Same, but a non-blocking check is still pending                                    | Ready to merge  |
+| A tracked bot PR waiting for review with passing checks that GitHub can merge      | Ready to merge  |
 | Any PR in a merge queue or with auto-merge on                                      | Waiting         |
 | Your draft                                                                         | Waiting         |
 | Your PR waiting on review or still running checks                                  | Waiting         |
@@ -166,12 +170,12 @@ The common situations, from your point of view:
 
 ## In-app actions
 
-| Action                 | Offered when                                                                                                                                                                                                                                                                                                                                      |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Merge…**             | the `ready` rule placed the card in Ready to merge and its data is fresh. Never for "Ready · … pending" cards. Re-validated before merging.                                                                                                                                                                                                       |
-| **Approve and merge…** | approvable and its data is fresh; the card stays where its rules put it, usually Needs attention as "Waiting for your review". Re-validated before approving; the approval is pinned to the confirmed commit, and the merge waits until GitHub reports the PR ready. If GitHub still blocks the merge, the approval stays and the dialog says so. |
-| **Update branch…**     | updatable and its data is fresh. Re-validated before updating; GitHub merges the base branch into the PR, pinned to the confirmed head commit, and the dashboard refreshes. The card stays on the desk while checks re-run.                                                                                                                       |
-| **Close as stale…**    | red staleness: not updated for more than 28 days                                                                                                                                                                                                                                                                                                  |
+| Action                 | Offered when                                                                                                                                                                                                                                                                                                                |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Merge…**             | the `ready` rule placed the card in Ready to merge and its data is fresh. Never for "Ready · … pending" cards. Re-validated before merging.                                                                                                                                                                                 |
+| **Approve and merge…** | approvable and its data is fresh; the card is usually in Ready to merge as "Ready to approve and merge". Re-validated before approving; the approval is pinned to the confirmed commit, and the merge waits until GitHub reports the PR ready. If GitHub still blocks the merge, the approval stays and the dialog says so. |
+| **Update branch…**     | updatable and its data is fresh. Re-validated before updating; GitHub merges the base branch into the PR, pinned to the confirmed head commit, and the dashboard refreshes. The card stays on the desk while checks re-run.                                                                                                 |
+| **Close as stale…**    | red staleness: not updated for more than 28 days                                                                                                                                                                                                                                                                            |
 
 ## Sorting
 

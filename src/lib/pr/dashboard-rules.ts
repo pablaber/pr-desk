@@ -82,6 +82,13 @@ export const dashboardRules: DashboardRule[] = [
     getLabel: (s) => `Ready · ${s.waitingOn.join(', ')} pending`,
   },
   {
+    id: 'approvable',
+    state: 'ready-to-merge',
+    priority: 50,
+    matches: (s) => s.approvable,
+    getLabel: () => 'Ready to approve and merge',
+  },
+  {
     id: 'tracked-repository',
     state: 'needs-attention',
     priority: 10,

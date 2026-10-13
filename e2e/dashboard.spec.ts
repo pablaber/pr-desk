@@ -55,14 +55,21 @@ test.beforeEach(async ({ page }) => {
           ? 'Document the retry policy'
           : number === 7
             ? 'Bump lodash'
-            : 'A watched pull request'),
+            : number === 8
+              ? 'Update dependency vite to v7.1.5'
+              : 'A watched pull request'),
       repository: { nameWithOwner: 'acme/platform' },
       author:
         number === 7
           ? localStorage.getItem('machineUserPr')
             ? { __typename: 'User', login: 'release-user' }
             : { __typename: 'Bot', login: 'dependabot' }
-          : { __typename: 'User', login: number === 4 ? 'sam' : number === 6 ? 'jordan' : 'alex' },
+          : number === 8
+            ? { __typename: 'Bot', login: 'renovate' }
+            : {
+                __typename: 'User',
+                login: number === 4 ? 'sam' : number === 6 ? 'jordan' : 'alex',
+              },
       state: (JSON.parse(localStorage.getItem('mergedPrs') ?? '[]') as number[]).includes(number)
         ? 'MERGED'
         : 'OPEN',
@@ -85,9 +92,10 @@ test.beforeEach(async ({ page }) => {
             ? 'CHANGES_REQUESTED'
             : null,
       mergeable: 'MERGEABLE',
-      // A PR listed in behindPrs is up to date once its branch has been updated.
+      // A PR listed in behindPrs, or #8, is up to date once its branch has been updated.
       mergeStateStatus:
-        (JSON.parse(localStorage.getItem('behindPrs') ?? '[]') as number[]).includes(number) &&
+        (number === 8 ||
+          (JSON.parse(localStorage.getItem('behindPrs') ?? '[]') as number[]).includes(number)) &&
         !localStorage.getItem('updateCalls')
           ? 'BEHIND'
           : 'CLEAN',
@@ -234,7 +242,7 @@ test.beforeEach(async ({ page }) => {
             repository: {
               nameWithOwner: 'acme/platform',
               pullRequests: connection(
-                [1, 2, 3, 4, 6, ...(localStorage.getItem('botPr') ? [7] : [])].map(raw),
+                [1, 2, 3, 4, 6, ...(localStorage.getItem('botPr') ? [7, 8] : [])].map(raw),
               ),
             },
           };
@@ -270,6 +278,16 @@ test('dashboard classification, source filters, browser action, and screenshot',
   await expect(summaryCounts).toHaveText(['0', '1', '0']);
   await page.getByRole('button', { name: 'All', exact: true }).click();
   await expect(summaryCounts).toHaveText(['1', '2', '1']);
+
+  // Tracking the repository adds its known-bot PRs: one ready to approve and merge, one behind.
+  await trackBotPr(page);
+  await expect(summaryCounts).toHaveText(['2', '4', '1']);
+  await expect(
+    page.locator('.column').nth(0).locator('.pr-card', { hasText: 'Bump lodash' }),
+  ).toContainText('Ready to approve and merge');
+  await expect(
+    page.locator('.column').nth(1).locator('.pr-card', { hasText: 'Update dependency vite' }),
+  ).toContainText('Behind main');
   await page.screenshot({ path: '.context/dashboard.png', fullPage: true });
 });
 
@@ -2406,6 +2424,8 @@ test('a refresh unwatches and unlabels merged PRs and unlabels ones no longer di
 test('known bot PRs need attention until approved, then merge with the bot declared', async ({
   page,
 }) => {
+  // A pending check keeps the PR from being approvable, which would put it in Ready to merge.
+  await page.addInitScript(() => localStorage.setItem('pendingChecks', '[7]'));
   await trackBotPr(page);
   const card = page.locator('.pr-card', { hasText: 'Bump lodash' });
   await expect(card).toContainText('Bot');
@@ -2414,7 +2434,10 @@ test('known bot PRs need attention until approved, then merge with the bot decla
     page.locator('.column').nth(1).locator('.pr-card', { hasText: 'Bump lodash' }),
   ).toHaveCount(1);
 
-  await page.evaluate(() => localStorage.setItem('botApproved', '1'));
+  await page.evaluate(() => {
+    localStorage.setItem('pendingChecks', '[]');
+    localStorage.setItem('botApproved', '1');
+  });
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
   await page.getByRole('button', { name: 'Merge Bump lodash', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Merge pull request?' });
@@ -2471,7 +2494,10 @@ async function trackPlatformRepository(page: Page) {
 test('bot PRs waiting for review approve and merge after confirmation', async ({ page }) => {
   await trackBotPr(page);
   const card = page.locator('.pr-card', { hasText: 'Bump lodash' });
-  await expect(card).toContainText('Waiting for your review');
+  await expect(card).toContainText('Ready to approve and merge');
+  await expect(
+    page.locator('.column').nth(0).locator('.pr-card', { hasText: 'Bump lodash' }),
+  ).toHaveCount(1);
   await expect(
     page.getByRole('button', { name: 'Merge Reduce cache lookup latency', exact: true }),
   ).toHaveCount(1);

@@ -303,8 +303,8 @@ describe('non-blocking check rules', () => {
 describe('known bots', () => {
   const bot = (overrides: Partial<PullRequest> = {}) =>
     run({ author: 'dependabot', authorIsBot: true, reasons: ['tracked-repository'], ...overrides });
-  it('needs attention until approved', () => {
-    expect(bot()).toMatchObject({
+  it('needs attention until approved or approvable', () => {
+    expect(bot({ checks: [{ name: 'CI', state: 'pending' }] })).toMatchObject({
       state: 'needs-attention',
       primary: 'Waiting for your review',
       bot: true,
@@ -351,7 +351,10 @@ describe('known bots', () => {
     expect(user('dependabot')).toMatchObject({ bot: false });
   });
   it('treats a watched bot PR as a bot PR', () => {
-    expect(bot({ reasons: ['watched'] })).toMatchObject({ bot: true, state: 'waiting' });
+    expect(bot({ reasons: ['watched'] })).toMatchObject({ bot: true, canApproveAndMerge: true });
+    expect(bot({ reasons: ['watched'], checks: [{ name: 'CI', state: 'pending' }] })).toMatchObject(
+      { bot: true, state: 'waiting' },
+    );
   });
 });
 describe('approve and merge', () => {
@@ -367,8 +370,9 @@ describe('approve and merge', () => {
     });
   it('is offered on a waiting bot PR with passing checks that GitHub can merge', () => {
     expect(classify(waiting(), 'me', local)).toMatchObject({
-      state: 'needs-attention',
-      primary: 'Waiting for your review',
+      state: 'ready-to-merge',
+      primary: 'Ready to approve and merge',
+      statuses: ['Ready to approve and merge', 'Waiting for your review'],
       canApproveAndMerge: true,
       canMerge: false,
     });
@@ -397,6 +401,12 @@ describe('approve and merge', () => {
   ] as [string, Partial<PullRequest>][])('is not offered for %s', (_, overrides) => {
     expect(classify(waiting(overrides), 'me', local)?.canApproveAndMerge ?? false).toBe(false);
   });
+  it('leaves a bot PR that also requests your review in Needs attention', () =>
+    expect(classify(waiting({ directReviewers: ['me'] }), 'me', local)).toMatchObject({
+      state: 'needs-attention',
+      primary: 'Review requested',
+      canApproveAndMerge: true,
+    }));
   it('is not offered while a non-blocking check is pending', () => {
     const prefs = { ...local, checkRules: [{ repository: '*', check: 'policy-bot' }] };
     const item = classify(
