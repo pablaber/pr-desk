@@ -34,6 +34,10 @@ known-bot PRs (see **bot** below) also carry a Bot badge. Only individual (`User
 requests count; team review requests never do. A PR stays on the desk only while some source
 still finds it.
 
+The repository filter narrows the board to one repository on top of the source filter. Its menu
+counts every PR the source filter shows, so each layer of a stack counts. The choice lasts for the
+session and clears once no PR from that repository is on the desk.
+
 ## Step 1: hidden PRs
 
 These are checked in order before any column rule runs. A hidden PR appears in no column and is

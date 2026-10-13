@@ -64,7 +64,8 @@ PR Desk has no in-app updater.
   newest layer first down to the base branch, in the column of its most urgent layer.
 - Acts on the hovered card from the keyboard: O opens the PR on GitHub, S snoozes, L labels
   and I ignores it.
-- Filters by source and supports snoozing or individually ignoring PRs. Individually ignored
+- Filters by source and by repository — the repository menu shows how many cards each
+  repository has on the board — and supports snoozing or individually ignoring PRs. Individually ignored
   PRs are listed under Settings → Ignored pull requests, where each can be unignored.
   Settings → Ignore rules hides PRs by repository, exact author login (including bots), or title. Repository and
   title rules use case-insensitive whole-value globs: `*` matches zero or more characters and
