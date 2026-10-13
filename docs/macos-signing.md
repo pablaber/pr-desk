@@ -148,14 +148,13 @@ Inspect a published release without trusting the workflow:
 ```sh
 tag=v1.18.0
 curl -fsSL "https://github.com/pablaber/pr-desk/releases/download/$tag/latest.json"
-gh release view "$tag" --repo pablaber/pr-desk --json assets \
-  -q '.assets[] | [.name, .digest] | @tsv'
+gh release view "$tag" --repo pablaber/pr-desk --json assets -q '.assets[] | [.name, .digest] | @tsv'
 ```
 
 `latest.json` must name `darwin-aarch64`, a URL under `/releases/download/$tag/`, and a
-`signature` equal to the contents of `PR.Desk_aarch64.app.tar.gz.sig`. To re-run the full
-script verification against downloaded assets, use the recovery procedure, which runs the same
-scripts.
+`signature` equal to the contents of `PR.Desk_aarch64.app.tar.gz.sig`. To re-run the script
+verification, use the recovery procedure in
+[Release maintenance](development.md#recovering-a-release-without-latestjson).
 
 ### Validating a real signed upgrade
 
@@ -174,11 +173,12 @@ installed PR Desk. Quit the installed app first, and back up its data if it matt
 tag=updater-test-1
 test_dir="$(mktemp -d)"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD='choose-a-throwaway-password'
-export TAURI_SIGNING_PRIVATE_KEY_PATH="$test_dir/updater-test.key"
+key_path="$test_dir/updater-test.key"
+export TAURI_SIGNING_PRIVATE_KEY="$key_path" # `tauri build` accepts a path or the key contents
 bundle="src-tauri/target/release/bundle/macos"
 
 # 1. A throwaway key; never the production one.
-npx tauri signer generate --ci -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" -w "$TAURI_SIGNING_PRIVATE_KEY_PATH"
+npx tauri signer generate --ci -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" -w "$key_path"
 
 # 2. One overlay per version: a higher version, the test public key and the prerelease endpoint.
 write_overlay() {
@@ -188,7 +188,7 @@ write_overlay() {
   "bundle": { "createUpdaterArtifacts": true },
   "plugins": {
     "updater": {
-      "pubkey": "$(cat "$TAURI_SIGNING_PRIVATE_KEY_PATH.pub")",
+      "pubkey": "$(cat "$key_path.pub")",
       "endpoints": ["https://github.com/pablaber/pr-desk/releases/download/$tag/latest.json"]
     }
   }

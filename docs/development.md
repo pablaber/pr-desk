@@ -331,11 +331,14 @@ exists. Look at the failed **Release Please** run first.
    version=1.18.0 # the release to repair, without the v
    git worktree add "/tmp/pr-desk-v$version" "v$version" && cd "/tmp/pr-desk-v$version"
    dir="$(mktemp -d)"; mkdir "$dir/macos"
-   gh release download "v$version" --repo pablaber/pr-desk      --pattern 'PR.Desk_aarch64.app.tar.gz' --output "$dir/macos/PR Desk.app.tar.gz"
-   gh release download "v$version" --repo pablaber/pr-desk      --pattern 'PR.Desk_aarch64.app.tar.gz.sig' --output "$dir/macos/PR Desk.app.tar.gz.sig"
+   gh release download "v$version" --repo pablaber/pr-desk \
+     --pattern 'PR.Desk_aarch64.app.tar.gz' --output "$dir/macos/PR Desk.app.tar.gz"
+   gh release download "v$version" --repo pablaber/pr-desk \
+     --pattern 'PR.Desk_aarch64.app.tar.gz.sig' --output "$dir/macos/PR Desk.app.tar.gz.sig"
    gh api "repos/pablaber/pr-desk/releases/tags/v$version" > "$dir/release.json"
    ./scripts/verify-updater-archive.sh "$dir" "$version"
-   node scripts/updater-release.mjs latest "$dir/release.json" "$dir"      src-tauri/tauri.conf.json "$dir/latest.json"
+   node scripts/updater-release.mjs latest "$dir/release.json" "$dir" \
+     src-tauri/tauri.conf.json "$dir/latest.json"
    gh release upload "v$version" "$dir/latest.json" --repo pablaber/pr-desk --clobber
    ```
 
