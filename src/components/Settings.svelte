@@ -13,6 +13,7 @@
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import Plug from '@lucide/svelte/icons/plug';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
+  import Regex from '@lucide/svelte/icons/regex';
   import X from '@lucide/svelte/icons/x';
   import ZoomIn from '@lucide/svelte/icons/zoom-in';
   import { githubErrorMessage } from '../lib/github/errors';
@@ -23,6 +24,7 @@
   import SessionErrors from './SessionErrors.svelte';
   import SettingsTransfer from './SettingsTransfer.svelte';
   import SnoozeOptions from './SnoozeOptions.svelte';
+  import TitleTagRules from './TitleTagRules.svelte';
   import Toaster from './Toaster.svelte';
   import type {
     AppState,
@@ -32,6 +34,7 @@
     SettingsConfig,
     SnoozeOption,
     IgnoreRuleKind,
+    TitleTagRule,
   } from '../lib/store/app-state';
   import type { DashboardSnapshot } from '../lib/github/refresh';
   import type { GhCliInfo } from '../lib/github/types';
@@ -55,6 +58,8 @@
     onremove,
     onaddcheckrule,
     onremovecheckrule,
+    onaddtitletagrule,
+    onremovetitletagrule,
     onsave,
     ondiscard,
     onrefreshinterval,
@@ -89,6 +94,8 @@
     onremove: (kind: 'repo' | 'pr' | 'bot' | IgnoreRuleKind, value: string) => void;
     onaddcheckrule: (repository: string, check: string) => boolean;
     onremovecheckrule: (rule: CheckRule) => void;
+    onaddtitletagrule: (pattern: string) => boolean;
+    onremovetitletagrule: (rule: TitleTagRule) => void;
     onsave: () => Promise<boolean>;
     ondiscard: () => void;
     onrefreshinterval: (minutes: number) => Promise<void>;
@@ -115,6 +122,7 @@
     | 'ignore-rules'
     | 'ignored'
     | 'check-rules'
+    | 'title-tags'
     | 'transfer'
     | 'troubleshooting';
   const groups: { label: string; items: { id: Section; title: string; icon: typeof Plug }[] }[] = [
@@ -137,6 +145,7 @@
         { id: 'ignore-rules', title: 'Ignore rules', icon: FunnelX },
         { id: 'ignored', title: 'Ignored pull requests', icon: EyeOff },
         { id: 'check-rules', title: 'Non-blocking checks', icon: ListChecks },
+        { id: 'title-tags', title: 'Title tags', icon: Regex },
       ],
     },
   ];
@@ -610,6 +619,28 @@
                 onclick={() => onremovecheckrule(rule)}>Remove</button
               >
             </div>{:else}<p class="empty-setting">No check rules.</p>{/each}
+        </section>
+      {:else if section === 'title-tags'}
+        <section
+          class="settings-section"
+          id="settings-section-title-tags"
+          aria-labelledby="settings-section-heading"
+        >
+          <h2 id="settings-section-heading">
+            {heading('Title tags', preferences.titleTagRules.length)}
+          </h2>
+          <p>
+            Show text matching these regular expressions as tags on each pull request, such as the
+            ticket key in fix: BACK-1234. The first capture group becomes the tag, or the whole
+            match without one. Matching is case-sensitive; use [A-Za-z] to match either case.
+          </p>
+          <TitleTagRules
+            rules={preferences.titleTagRules}
+            prs={snapshot.prs}
+            {busy}
+            onadd={onaddtitletagrule}
+            onremove={onremovetitletagrule}
+          />
         </section>
       {:else if section === 'transfer'}
         <section

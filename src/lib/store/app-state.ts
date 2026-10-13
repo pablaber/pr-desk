@@ -14,6 +14,9 @@ export interface CheckRule {
   repository: string;
   check: string;
 }
+export interface TitleTagRule {
+  pattern: string;
+}
 // A lowercase #rrggbb hex value.
 export type LabelColor = string;
 export const SUGGESTED_LABEL_COLORS: LabelColor[] = [
@@ -36,10 +39,11 @@ export interface PRLabel {
 export type DockBadgeMode = 'off' | 'ready-to-merge' | 'needs-attention' | 'both';
 export type InterfaceScale = 90 | 100 | 115 | 130;
 export interface AppState {
-  schemaVersion: 13;
+  schemaVersion: 14;
   trackedRepositories: string[];
   ignoreRules: IgnoreRule[];
   checkRules: CheckRule[];
+  titleTagRules: TitleTagRule[];
   watchedPullRequests: string[];
   knownBots: string[];
   ignoredPullRequests: Record<string, { ignoredAt: string }>;
@@ -63,10 +67,11 @@ export const defaultSnoozeOptions = (): SnoozeOption[] => [
 ];
 const defaultKnownBots = (): string[] => ['dependabot[bot]', 'renovate[bot]'];
 export const defaultState = (): AppState => ({
-  schemaVersion: 13,
+  schemaVersion: 14,
   trackedRepositories: [],
   ignoreRules: [],
   checkRules: [],
+  titleTagRules: [],
   watchedPullRequests: [],
   knownBots: defaultKnownBots(),
   ignoredPullRequests: {},
@@ -93,11 +98,12 @@ export function migrateState(value: unknown): AppState {
     schemaVersion: number;
     ignoredRepositories?: string[];
     checkRules?: unknown;
+    titleTagRules?: unknown;
     labels?: unknown;
     labeledPullRequests?: unknown;
     knownBots?: unknown;
   };
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].includes(stored.schemaVersion))
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].includes(stored.schemaVersion))
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
@@ -123,10 +129,11 @@ export function migrateState(value: unknown): AppState {
     watchedPullRequests: stored.watchedPullRequests,
     ignoredPullRequests: stored.ignoredPullRequests,
     snoozedPullRequests: stored.snoozedPullRequests,
-    schemaVersion: 13,
+    schemaVersion: 14,
     knownBots: readStoredKnownBots(stored),
     ignoreRules: readStoredIgnoreRules(stored),
     checkRules: readStoredCheckRules(stored),
+    titleTagRules: readStoredTitleTagRules(stored),
     ...readStoredLabels(stored),
     settings: {
       automaticRefreshMinutes:
@@ -391,6 +398,35 @@ function readStoredCheckRules(stored: {
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
   }
 }
+// Case-sensitive on purpose: ticket keys such as BACK-1234 are uppercase.
+export function parseTitleTagRule(input: string): TitleTagRule {
+  if (typeof input !== 'string') throw new Error('Enter a regular expression.');
+  const pattern = input.trim();
+  if (!pattern || /[\u0000-\u001f\u007f\u2028\u2029]/.test(pattern) || pattern.length > 200)
+    throw new Error('Enter a single-line regular expression of 1 to 200 characters.');
+  try {
+    new RegExp(pattern, 'g');
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'Invalid regular expression.');
+  }
+  return { pattern };
+}
+export function titleTagRuleKey(rule: TitleTagRule): string {
+  return rule.pattern;
+}
+function readStoredTitleTagRules(stored: {
+  schemaVersion: number;
+  titleTagRules?: unknown;
+}): TitleTagRule[] {
+  if (stored.schemaVersion < 14) return [];
+  try {
+    if (!Array.isArray(stored.titleTagRules)) throw new Error('Invalid rules');
+    const parsed = stored.titleTagRules.map((rule) => parseTitleTagRule(rule?.pattern));
+    return [...new Map(parsed.map((rule) => [titleTagRuleKey(rule), rule])).values()];
+  } catch {
+    throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
+  }
+}
 
 export function parseLabelName(input: string): string {
   if (typeof input !== 'string') throw new Error('Enter a label name.');
@@ -484,13 +520,19 @@ function readStoredLabels(stored: {
 // stays free to change underneath an unsaved draft.
 export type PreferenceDraft = Pick<
   AppState,
-  'trackedRepositories' | 'ignoreRules' | 'checkRules' | 'watchedPullRequests' | 'knownBots'
+  | 'trackedRepositories'
+  | 'ignoreRules'
+  | 'checkRules'
+  | 'titleTagRules'
+  | 'watchedPullRequests'
+  | 'knownBots'
 >;
 export function preferenceDraft(state: AppState): PreferenceDraft {
   return {
     trackedRepositories: [...state.trackedRepositories],
     ignoreRules: state.ignoreRules.map((rule) => ({ ...rule })),
     checkRules: state.checkRules.map((rule) => ({ ...rule })),
+    titleTagRules: state.titleTagRules.map((rule) => ({ ...rule })),
     watchedPullRequests: [...state.watchedPullRequests],
     knownBots: [...state.knownBots],
   };
@@ -503,7 +545,8 @@ export function draftDiffers(draft: PreferenceDraft, state: AppState): boolean {
     same(draft.watchedPullRequests, state.watchedPullRequests) &&
     same(draft.knownBots, state.knownBots) &&
     same(draft.ignoreRules.map(ignoreRuleKey), state.ignoreRules.map(ignoreRuleKey)) &&
-    same(draft.checkRules.map(checkRuleKey), state.checkRules.map(checkRuleKey))
+    same(draft.checkRules.map(checkRuleKey), state.checkRules.map(checkRuleKey)) &&
+    same(draft.titleTagRules.map(titleTagRuleKey), state.titleTagRules.map(titleTagRuleKey))
   );
 }
 
@@ -515,6 +558,7 @@ export type SettingsConfig = Pick<
   | 'knownBots'
   | 'ignoreRules'
   | 'checkRules'
+  | 'titleTagRules'
   | 'labels'
   | 'settings'
 >;
@@ -529,6 +573,7 @@ export function exportSettings(state: AppState, now: Date) {
     knownBots: state.knownBots,
     ignoreRules: state.ignoreRules,
     checkRules: state.checkRules,
+    titleTagRules: state.titleTagRules,
     labels: state.labels,
     settings: state.settings,
   };
@@ -565,6 +610,7 @@ export function parseSettingsImport(text: string): SettingsConfig {
       knownBots: value.knownBots,
       ignoreRules: value.ignoreRules,
       checkRules: value.checkRules,
+      titleTagRules: value.titleTagRules,
       labels: value.labels,
       settings: value.settings,
       ignoredPullRequests: {},
@@ -577,6 +623,7 @@ export function parseSettingsImport(text: string): SettingsConfig {
       knownBots: state.knownBots,
       ignoreRules: state.ignoreRules,
       checkRules: state.checkRules,
+      titleTagRules: state.titleTagRules,
       labels: state.labels,
       settings: state.settings,
     };

@@ -52,6 +52,7 @@
       {row}
       {label}
       {now}
+      titleTagRules={preferences.titleTagRules}
       {busy}
       stale={snapshot.staleIds.includes(row.id)}
       {onopen}

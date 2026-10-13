@@ -1,11 +1,12 @@
 <script lang="ts">
   import RowSummary from './RowSummary.svelte';
   import type { labeledPullRequests, LabelOp } from '../lib/pr/labels';
-  import type { PRLabel } from '../lib/store/app-state';
+  import type { PRLabel, TitleTagRule } from '../lib/store/app-state';
   let {
     row,
     label,
     now,
+    titleTagRules,
     busy,
     stale,
     onopen,
@@ -14,6 +15,7 @@
     row: ReturnType<typeof labeledPullRequests>[number];
     label: PRLabel;
     now: number;
+    titleTagRules: TitleTagRule[];
     busy: boolean;
     stale: boolean;
     onopen: (url: string) => void;
@@ -27,7 +29,7 @@
     aria-label={`Open ${row.item?.pr.title ?? row.id} on GitHub`}
     onclick={() => onopen(row.url)}
   >
-    <RowSummary item={row.item} {now} {stale}>
+    <RowSummary item={row.item} {now} {stale} {titleTagRules}>
       {#snippet unavailable()}
         <span class="repo">{row.id}</span><strong>Pull request details unavailable</strong><span
           class="secondary">You can still open this pull request or remove its label.</span

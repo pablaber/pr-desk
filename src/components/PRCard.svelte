@@ -17,7 +17,7 @@
   import type { ClassifiedPR } from '../lib/pr/classify';
   import type { LabelOp } from '../lib/pr/labels';
   import type { PullRequest } from '../lib/pr/types';
-  import type { PRLabel, SnoozeOption } from '../lib/store/app-state';
+  import type { PRLabel, SnoozeOption, TitleTagRule } from '../lib/store/app-state';
   let {
     item,
     compact = false,
@@ -26,6 +26,7 @@
     stale,
     watching,
     labels,
+    titleTagRules,
     allLabels,
     busy,
     onopen,
@@ -42,6 +43,7 @@
     stale: boolean;
     watching: boolean;
     labels: PRLabel[];
+    titleTagRules: TitleTagRule[];
     allLabels: PRLabel[];
     busy: boolean;
     onopen: (url: string) => void;
@@ -126,7 +128,7 @@
     onclick={() => onopen(card.pr.url)}
     aria-label={`Open ${card.pr.title} on GitHub`}
   >
-    <PRDetails {item} {now} {stale} {labels} {compact} />
+    <PRDetails {item} {now} {stale} {labels} {titleTagRules} {compact} />
   </button>
   <button
     disabled={busy}

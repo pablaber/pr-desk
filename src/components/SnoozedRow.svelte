@@ -3,10 +3,11 @@
   import RowSummary from './RowSummary.svelte';
   import SnoozeChoices from './SnoozeChoices.svelte';
   import type { snoozedPullRequests } from '../lib/pr/snoozed';
-  import type { SnoozeOption } from '../lib/store/app-state';
+  import type { SnoozeOption, TitleTagRule } from '../lib/store/app-state';
   let {
     row,
     now,
+    titleTagRules,
     busy,
     stale,
     snoozeOptions,
@@ -16,6 +17,7 @@
   }: {
     row: ReturnType<typeof snoozedPullRequests>[number];
     now: number;
+    titleTagRules: TitleTagRule[];
     busy: boolean;
     stale: boolean;
     snoozeOptions: SnoozeOption[];
@@ -50,7 +52,7 @@
     onclick={() =>
       onopen(row.item?.pr.url ?? `https://github.com/${row.id.replace('#', '/pull/')}`)}
   >
-    <RowSummary item={row.item} {now} {stale} labels={row.labels}>
+    <RowSummary item={row.item} {now} {stale} {titleTagRules} labels={row.labels}>
       {#snippet unavailable()}
         <span class="repo">{row.id}</span><strong>Pull request details unavailable</strong><span
           class="secondary">You can still open, reschedule, or restore this pull request.</span

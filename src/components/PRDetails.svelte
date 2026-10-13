@@ -14,22 +14,26 @@
   import X from '@lucide/svelte/icons/x';
   import { cardViewModel, type SourceBadge } from '../lib/pr/card-view-model';
   import type { ClassifiedPR } from '../lib/pr/classify';
-  import type { PRLabel } from '../lib/store/app-state';
+  import { titleTags } from '../lib/pr/title-tags';
+  import type { PRLabel, TitleTagRule } from '../lib/store/app-state';
   let {
     item,
     now,
     stale,
     labels = [],
+    titleTagRules = [],
     compact = false,
   }: {
     item: ClassifiedPR;
     now: number;
     stale: boolean;
     labels?: PRLabel[];
+    titleTagRules?: TitleTagRule[];
     // A stack names the repository once and drops each layer's source badges.
     compact?: boolean;
   } = $props();
   let card = $derived(cardViewModel(item, now));
+  let tags = $derived(titleTags(card.pr.title, titleTagRules));
   // Tracked, watched and bot icons match their Settings sections, tying each badge to its setting.
   const sourceIcons: Record<SourceBadge, typeof Bot> = {
     owned: UserRound,
@@ -51,7 +55,9 @@
 >
 <strong>{card.pr.title}</strong>
 <span class="badges"
-  >{#each compact ? [] : card.badges as badge (badge.kind)}{@const Icon =
+  >{#each tags as tag (tag.name)}<span class="badge title-tag" style:--tag-color={tag.color}
+      >{tag.name}</span
+    >{/each}{#each compact ? [] : card.badges as badge (badge.kind)}{@const Icon =
       sourceIcons[badge.kind]}<span class="badge"><Icon size={10} /> {badge.label}</span
     >{/each}{#if card.reviewBadge}<span class="badge review {card.reviewBadge.tone}"
       >{#if card.reviewBadge.tone === 'approved'}<ThumbsUp size={10} />{:else}<FileDiff

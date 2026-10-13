@@ -59,6 +59,9 @@
     parseCheckRule,
     checkRuleKey,
     type CheckRule,
+    parseTitleTagRule,
+    titleTagRuleKey,
+    type TitleTagRule,
     ignoreRuleKey,
     type IgnoreRuleKind,
     parsePullRequest,
@@ -479,6 +482,26 @@
       next.checkRules = next.checkRules.filter((e) => checkRuleKey(e) !== checkRuleKey(rule));
     });
   }
+  // Throws instead of showing the app error, so Settings can show the regex error under the field.
+  function addTitleTagRule(pattern: string): boolean {
+    if (saving) return false;
+    error = '';
+    const rule = parseTitleTagRule(pattern);
+    if (settingsView.titleTagRules.some((e) => titleTagRuleKey(e) === titleTagRuleKey(rule)))
+      throw new Error('That title tag rule is already configured.');
+    editDraft((next) => {
+      next.titleTagRules = [...next.titleTagRules, rule];
+    });
+    return true;
+  }
+  function removeTitleTagRule(rule: TitleTagRule) {
+    error = '';
+    editDraft((next) => {
+      next.titleTagRules = next.titleTagRules.filter(
+        (e) => titleTagRuleKey(e) !== titleTagRuleKey(rule),
+      );
+    });
+  }
   function remove(kind: 'repo' | 'pr' | 'bot' | IgnoreRuleKind, value: string) {
     error = '';
     editDraft((next) => {
@@ -499,6 +522,7 @@
       next.trackedRepositories = draft.trackedRepositories;
       next.ignoreRules = draft.ignoreRules;
       next.checkRules = draft.checkRules;
+      next.titleTagRules = draft.titleTagRules;
       next.watchedPullRequests = draft.watchedPullRequests;
       next.knownBots = draft.knownBots;
     });
@@ -1001,6 +1025,7 @@
           stale={snapshot.staleIds.includes(item.pr.id)}
           watching={preferences.watchedPullRequests.includes(item.pr.id)}
           labels={labelsFor(preferences, item.pr.id)}
+          titleTagRules={preferences.titleTagRules}
           allLabels={preferences.labels}
           onopen={open}
           oncopy={copyUrl}
@@ -1089,6 +1114,8 @@
     onremove={remove}
     onaddcheckrule={addCheckRule}
     onremovecheckrule={removeCheckRule}
+    onaddtitletagrule={addTitleTagRule}
+    onremovetitletagrule={removeTitleTagRule}
     onsave={saveSettings}
     ondiscard={discardSettings}
     onrefreshinterval={setRefreshInterval}
