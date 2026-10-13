@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.0](https://github.com/pablaber/pr-desk/compare/v1.16.0...v1.17.0) (2026-10-13)
+
+
+### Features
+
+* show tags extracted from pull request titles ([#129](https://github.com/pablaber/pr-desk/issues/129)) ([10ab5b6](https://github.com/pablaber/pr-desk/commit/10ab5b62990ac5e5bf378240b1714a937b50fb21))
+
 ## [1.16.0](https://github.com/pablaber/pr-desk/compare/v1.15.0...v1.16.0) (2026-10-13)
 
 
