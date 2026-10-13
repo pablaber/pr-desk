@@ -28,6 +28,7 @@
   // The app's CSP blocks data URLs, so keep the logo as a bundled file.
   import appIcon from '../src-tauri/icons/source.svg?no-inline';
   import PRConfirmation from './components/PRConfirmation.svelte';
+  import MergeCelebration from './components/MergeCelebration.svelte';
   import { sourceReasons, stalenessLevel } from './lib/pr/card-view-model';
   import type { PullRequest } from './lib/pr/types';
   import PRCard from './components/PRCard.svelte';
@@ -116,6 +117,7 @@
   let settingsView = $derived(settingsDraft ? { ...preferences, ...settingsDraft } : preferences);
   let actionPR = $state<PullRequest | null>(null);
   let actionError = $state('');
+  let mergedPR = $state<PullRequest | null>(null);
   let actionStatus = $state('');
   let pendingAction = $state<'close-stale' | 'merge' | 'approve-merge' | 'update-branch'>(
     'close-stale',
@@ -610,6 +612,7 @@
       }
       // An updated PR stays open while its checks re-run, so refresh rather than drop it.
       if (!updating) snapshot.prs = snapshot.prs.filter((item) => item.id !== pr.id);
+      if (pendingAction === 'merge' || pendingAction === 'approve-merge') mergedPR = pr;
       actionPR = null;
     } catch (e) {
       actionError = String(e);
@@ -1108,3 +1111,8 @@
     if (!saving) actionPR = null;
   }}
 />
+{#if mergedPR}
+  {#key mergedPR.id}
+    <MergeCelebration pr={mergedPR} ondone={() => (mergedPR = null)} />
+  {/key}
+{/if}

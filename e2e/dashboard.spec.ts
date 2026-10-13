@@ -2182,6 +2182,9 @@ test('ready PRs merge only after confirmation with the selected method', async (
   await expect(dialog.getByRole('button', { name: 'Merging…' })).toBeDisabled();
   await expect(dialog.getByRole('status')).toHaveText('Merging…');
   await expect(dialog).toBeHidden();
+  const celebration = page.getByRole('status').filter({ hasText: 'Merged' });
+  await expect(celebration).toContainText('acme/platform #1');
+  await expect(celebration).toHaveCount(0);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mergeCalls') ?? '[]'))).toEqual(
     [{ url: 'https://github.com/acme/platform/pull/1', headOid: 'a'.repeat(40), method: 'rebase' }],
   );
@@ -2199,6 +2202,7 @@ test('merge failures keep the dialog and card available', async ({ page }) => {
   await dialog.getByRole('button', { name: 'Confirm merge', exact: true }).click();
   await expect(dialog.getByRole('alert')).toContainText('Merge rejected by repository rules');
   await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect(page.getByRole('status').filter({ hasText: 'Merged' })).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeEnabled();
 });
 
@@ -2485,6 +2489,9 @@ test('bot PRs waiting for review approve and merge after confirmation', async ({
   await expect(dialog.getByRole('button', { name: 'Approving and merging…' })).toBeDisabled();
   await expect(dialog.getByRole('status')).toHaveText('Approving and merging…');
   await expect(dialog).toBeHidden();
+  await expect(page.getByRole('status').filter({ hasText: 'Merged' })).toContainText(
+    'acme/platform #7',
+  );
   expect(
     await page.evaluate(() => JSON.parse(localStorage.getItem('approveMergeCalls') ?? '[]')),
   ).toEqual([
