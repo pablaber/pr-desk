@@ -34,6 +34,7 @@
   import PRCard from './components/PRCard.svelte';
   import PRStack from './components/PRStack.svelte';
   import RefreshOverlay from './components/RefreshOverlay.svelte';
+  import RepositoryFilter from './components/RepositoryFilter.svelte';
   import AllClear from './components/AllClear.svelte';
   import Snoozed from './components/Snoozed.svelte';
   import Completed from './components/Completed.svelte';
@@ -124,6 +125,7 @@
   );
   let showHotkeys = $state(false);
   let sidebarCollapsed = $derived(preferences.settings.sidebarCollapsed);
+  let repository = $state<string | null>(null);
   let filter = $state<TrackingReason | 'all'>('all'),
     loading = $state(false),
     saving = $state(false),
@@ -172,8 +174,11 @@
       .filter((p) => p !== null)
       .sort(sortPullRequests),
   );
-  let visible = $derived(
+  let sourceVisible = $derived(
     classified.filter((p) => filter === 'all' || sourceReasons(p.pr.reasons).includes(filter)),
+  );
+  let visible = $derived(
+    repository ? sourceVisible.filter((p) => p.pr.repository === repository) : sourceVisible,
   );
   let entries = $derived(boardEntries(visible, snapshot.prs));
   // A stack sits in its most urgent layer's column, so columns count the PRs they show.
@@ -205,6 +210,10 @@
   });
   $effect(() => {
     if (screen === 'label' && !selectedLabel) screen = 'labels';
+  });
+  // A repository with nothing left on the board, under any source filter, stops filtering it.
+  $effect(() => {
+    if (repository && !classified.some((p) => p.pr.repository === repository)) repository = null;
   });
   let cliInfo = $state<GhCliInfo | null>(null);
   let cliInfoError = $state(false);
@@ -964,7 +973,11 @@
             class:selected={filter === f.value}
             aria-pressed={filter === f.value}
             onclick={() => (filter = f.value)}>{f.label}</button
-          >{/each}<span class="result-count"
+          >{/each}<RepositoryFilter
+          items={sourceVisible}
+          selected={repository}
+          onselect={(r) => (repository = r)}
+        /><span class="result-count"
           >{visible.length} pull request{visible.length === 1 ? '' : 's'}</span
         >
       </div>
@@ -1032,11 +1045,13 @@
                           : 'Nothing here yet'}
                     </p>
                     <small
-                      >{filter !== 'all'
-                        ? 'Try another source filter.'
-                        : col.state === 'waiting'
-                          ? 'Track a repository or watch a PR in Settings.'
-                          : 'PRs will appear as their status changes.'}</small
+                      >{repository
+                        ? 'Try another repository filter.'
+                        : filter !== 'all'
+                          ? 'Try another source filter.'
+                          : col.state === 'waiting'
+                            ? 'Track a repository or watch a PR in Settings.'
+                            : 'PRs will appear as their status changes.'}</small
                     >
                   </div>{/each}
               </div>

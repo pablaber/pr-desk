@@ -41,9 +41,12 @@ test.beforeEach(async ({ page }) => {
       nodes,
       pageInfo: { hasNextPage: false, endCursor: null },
     });
+    // With multiRepo set, #3 lives in a second repository.
+    const repo = (number: number) =>
+      localStorage.getItem('multiRepo') && number === 3 ? 'acme/web' : 'acme/platform';
     const raw = (number: number) => ({
       number,
-      url: `https://github.com/acme/platform/pull/${number}`,
+      url: `https://github.com/${repo(number)}/pull/${number}`,
       title:
         [
           'Reduce cache lookup latency',
@@ -58,7 +61,7 @@ test.beforeEach(async ({ page }) => {
             : number === 8
               ? 'Update dependency vite to v7.1.5'
               : 'A watched pull request'),
-      repository: { nameWithOwner: 'acme/platform' },
+      repository: { nameWithOwner: repo(number) },
       author:
         number === 7
           ? localStorage.getItem('machineUserPr')
@@ -289,6 +292,53 @@ test('dashboard classification, source filters, browser action, and screenshot',
     page.locator('.column').nth(1).locator('.pr-card', { hasText: 'Update dependency vite' }),
   ).toContainText('Behind main');
   await page.screenshot({ path: '.context/dashboard.png', fullPage: true });
+});
+
+test('the repository filter counts and narrows the board', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('multiRepo', '1'));
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const trigger = page.getByRole('button', { name: 'All repositories 4', exact: true });
+  const menu = page.getByRole('group', { name: 'Repositories' });
+  await trigger.click();
+  await expect(menu.getByRole('button')).toHaveText([
+    'All repositories4',
+    'acme/platform3',
+    'acme/web1',
+  ]);
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await trigger.click();
+  await menu.getByRole('button', { name: 'acme/web 1', exact: true }).click();
+  await expect(menu).toBeHidden();
+  await expect(page.locator('.pr-card')).toHaveText(/Add audit event retention/);
+  await expect(page.locator('.summary b')).toHaveText(['0', '0', '1']);
+  await expect(page.locator('.result-count')).toHaveText('1 pull request');
+  // Counts follow the source filter; the selected repository stays listed even at zero.
+  await page.getByRole('button', { name: 'Review requests', exact: true }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(0);
+  await expect(page.locator('.empty-column small').first()).toHaveText(
+    'Try another repository filter.',
+  );
+  await page.getByRole('button', { name: 'acme/web 0', exact: true }).click();
+  await expect(menu.getByRole('button')).toHaveText([
+    'All repositories1',
+    'acme/platform1',
+    'acme/web0',
+  ]);
+  await menu.getByRole('button', { name: 'acme/platform 1', exact: true }).click();
+  await expect(page.locator('.pr-card')).toHaveText(/Simplify deployment configuration/);
+  await page.getByRole('button', { name: 'All', exact: true }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Clear repository filter', exact: true }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  // A repository that leaves the board stops filtering it.
+  await trigger.click();
+  await menu.getByRole('button', { name: 'acme/web 1', exact: true }).click();
+  await page.evaluate(() => localStorage.setItem('hiddenPrs', '[3]'));
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'All repositories 3', exact: true })).toBeVisible();
+  await expect(page.locator('.pr-card')).toHaveCount(3);
 });
 
 test('stacked PRs share one card in the column of their most urgent layer', async ({ page }) => {
