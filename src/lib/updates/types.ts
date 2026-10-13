@@ -16,6 +16,10 @@ export interface UpdaterDeps {
   onError?: (message: string) => void;
   /** False in development, where nothing is checked, downloaded or installed. */
   enabled: boolean;
+  /** Wall-clock time; defaults to Date.now. */
+  now?: () => number;
+  /** Calls back when the app may have woken or been reactivated; returns an unsubscribe. */
+  onWake?: (callback: () => void) => () => void;
 }
 
 export type UpdatePhase =

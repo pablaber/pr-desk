@@ -2,6 +2,9 @@ import type { DownloadEvent } from '@tauri-apps/plugin-updater';
 import type { UpdateHandle, UpdatePhase, UpdateProgress, UpdaterDeps, UpdateState } from './types';
 
 export const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+// Timers run on a monotonic clock that stops while the Mac sleeps, so the due time is wall-clock
+// and re-evaluated at least this often.
+const RECHECK_MS = 60 * 60 * 1000;
 const IDLE_POLL_MS = 250;
 const INSTALLING: UpdatePhase[] = ['downloading', 'waiting', 'restarting'];
 
@@ -29,10 +32,14 @@ export class UpdateService {
   #inFlight: Promise<void> | null = null;
   #manual = false;
   #timer: ReturnType<typeof setTimeout> | null = null;
+  #nextCheckAt: number | null = null;
+  #now: () => number;
+  #unsubscribeWake: (() => void) | null = null;
   #disposed = false;
 
   constructor(deps: UpdaterDeps) {
     this.#deps = deps;
+    this.#now = deps.now ?? Date.now;
     this.#state = {
       phase: deps.enabled ? 'idle' : 'disabled',
       dialogOpen: false,
@@ -54,7 +61,9 @@ export class UpdateService {
 
   /** Checks once now; each finished check schedules the next automatic one. */
   start() {
-    if (this.#deps.enabled) void this.#check(false);
+    if (!this.#deps.enabled) return;
+    this.#unsubscribeWake = this.#deps.onWake?.(() => this.#schedule()) ?? null;
+    void this.#check(false);
   }
 
   /** The user asked: the dialog opens and reports the result, including failures. */
@@ -110,6 +119,8 @@ export class UpdateService {
   dispose() {
     this.#disposed = true;
     this.#clearTimer();
+    this.#unsubscribeWake?.();
+    this.#unsubscribeWake = null;
     this.#listeners.clear();
     const handle = this.#handle;
     this.#handle = null;
@@ -129,6 +140,7 @@ export class UpdateService {
     }
     this.#manual = manual;
     this.#clearTimer();
+    this.#nextCheckAt = null;
     // An automatic check runs quietly, leaving whatever the sidebar and dialog show in place.
     if (manual && !this.#handle) this.#set({ phase: 'checking', error: '' });
     this.#inFlight = this.#runCheck().finally(() => {
@@ -211,14 +223,28 @@ export class UpdateService {
     else this.#set({ progress: { ...progress, finished: true } });
   }
 
-  // A single timer re-armed after each check, so waking from sleep runs at most one late check.
+  // The next check is due 24 hours of wall-clock time after the last one finished.
   #arm() {
+    this.#nextCheckAt = this.#now() + CHECK_INTERVAL_MS;
+    this.#schedule();
+  }
+
+  // A single timer, so however long the Mac slept, an overdue check runs once and re-arms.
+  #schedule() {
     this.#clearTimer();
-    if (this.#disposed) return;
-    this.#timer = setTimeout(() => {
-      this.#timer = null;
+    if (this.#disposed || this.#nextCheckAt === null) return;
+    const remaining = this.#nextCheckAt - this.#now();
+    if (remaining <= 0) {
       void this.#check(false);
-    }, CHECK_INTERVAL_MS);
+      return;
+    }
+    this.#timer = setTimeout(
+      () => {
+        this.#timer = null;
+        this.#schedule();
+      },
+      Math.min(remaining, RECHECK_MS),
+    );
   }
 
   #clearTimer() {

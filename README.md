@@ -59,14 +59,14 @@ Update checks and downloads fetch public assets from
 own network client, so they work even when `gh` is signed out. This is the only network
 access that does not go through `gh`; pull request access still uses only your GitHub CLI.
 
-Homebrew keeps working alongside in-app updates. Because the cask is marked
-`auto_updates`, `brew upgrade` skips PR Desk unless asked explicitly; to upgrade through
-Homebrew, quit PR Desk and run:
+Homebrew can still upgrade PR Desk. Quit it and run:
 
 ```sh
-brew update
-brew upgrade --cask --greedy pablaber/tap/pr-desk
+brew update && brew upgrade --cask --greedy pablaber/tap/pr-desk
 ```
+
+`--greedy` makes Homebrew upgrade casks that update themselves, which plain `brew upgrade`
+may skip.
 
 ## Key features
 

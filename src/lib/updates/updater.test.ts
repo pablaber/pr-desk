@@ -87,6 +87,71 @@ describe('UpdateService', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it('runs exactly one check once the Mac wakes from a sleep past the due time', async () => {
+    // Fake timers stand in for WebKit's monotonic clock; the injected wall clock keeps going.
+    let wallClock = Date.now();
+    let wake = () => {};
+    const { deps, service } = setup({
+      now: () => wallClock,
+      onWake: (callback) => {
+        wake = callback;
+        return () => (wake = () => {});
+      },
+    });
+    service.start();
+    await flush();
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    wallClock += 60 * 60 * 1000;
+    // Asleep for three days: wall-clock time jumps while no timer advances.
+    wallClock += 3 * CHECK_INTERVAL_MS;
+    wake();
+    wake();
+    await flush();
+    expect(deps.check).toHaveBeenCalledTimes(2);
+    // The next re-evaluation, without a wake event, finds nothing due.
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    wallClock += 60 * 60 * 1000;
+    expect(deps.check).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(1);
+    service.dispose();
+    wake();
+    expect(deps.check).toHaveBeenCalledTimes(2);
+  });
+
+  it('catches up through hourly re-evaluation even without a wake event', async () => {
+    let wallClock = Date.now();
+    const { deps, service } = setup({ now: () => wallClock });
+    service.start();
+    await flush();
+    wallClock += 2 * CHECK_INTERVAL_MS;
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    expect(deps.check).toHaveBeenCalledTimes(2);
+    service.dispose();
+  });
+
+  it('re-evaluations and wake events before the due time never check', async () => {
+    let wallClock = Date.now();
+    let wake = () => {};
+    const { deps, service } = setup({
+      now: () => wallClock,
+      onWake: (callback) => {
+        wake = callback;
+        return () => {};
+      },
+    });
+    service.start();
+    await flush();
+    for (let hour = 1; hour < 24; hour++) {
+      wallClock += 60 * 60 * 1000;
+      await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+      wake();
+    }
+    await flush();
+    expect(deps.check).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(1);
+    service.dispose();
+  });
+
   it('does nothing in development builds', async () => {
     const { deps, service } = setup({ enabled: false });
     service.start();

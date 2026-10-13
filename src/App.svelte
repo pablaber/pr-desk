@@ -147,6 +147,15 @@
     onError: (message) => recordError('updates', message),
     // npm run dev has no Tauri at all, and npm run tauri dev serves from Vite's dev server.
     enabled: isTauri() && !import.meta.env.DEV,
+    onWake: (callback) => {
+      const visible = () => document.visibilityState === 'visible' && callback();
+      document.addEventListener('visibilitychange', visible);
+      window.addEventListener('focus', callback);
+      return () => {
+        document.removeEventListener('visibilitychange', visible);
+        window.removeEventListener('focus', callback);
+      };
+    },
   });
   let update = $state.raw(updates.state);
   let updateOffered = $derived(update.version !== null);
