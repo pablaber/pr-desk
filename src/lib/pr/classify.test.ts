@@ -464,6 +464,31 @@ describe('approve and merge', () => {
   ] as [string, Partial<PullRequest>][])('is not offered for %s', (_, overrides) => {
     expect(classify(waiting(overrides), 'me', local)?.canApproveAndMerge ?? false).toBe(false);
   });
+  it('waits for another reviewer once your commit is the latest on a bot PR', () => {
+    expect(classify(waiting({ headAuthor: 'Me' }), 'me', local)).toMatchObject({
+      state: 'waiting',
+      primary: 'Waiting for another reviewer',
+      canApproveAndMerge: false,
+    });
+    expect(classify(waiting({ headAuthor: 'renovate' }), 'me', local)?.canApproveAndMerge).toBe(
+      true,
+    );
+    expect(
+      classify(
+        waiting({ headAuthor: 'me', reviewDecision: 'APPROVED', mergeStateStatus: 'CLEAN' }),
+        'me',
+        local,
+      ),
+    ).toMatchObject({ state: 'ready-to-merge', canMerge: true });
+  });
+  it('stops asking for your review on a tracked PR whose latest commit is yours', () =>
+    expect(
+      classify(
+        pr({ author: 'someone', reasons: ['tracked-repository'], headAuthor: 'me' }),
+        'me',
+        local,
+      ),
+    ).toMatchObject({ state: 'waiting', primary: 'No action needed' }));
   it('leaves a bot PR that also requests your review in Needs attention', () =>
     expect(classify(waiting({ directReviewers: ['me'] }), 'me', local)).toMatchObject({
       state: 'needs-attention',

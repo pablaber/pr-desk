@@ -479,3 +479,23 @@ it('preserves the displayed commit for merge confirmation and leaves missing hea
   input.commits.nodes = [{ commit: { oid: 'a'.repeat(40), statusCheckRollup: null } }];
   expect(normalize(input).headOid).toBe('a'.repeat(40));
 });
+
+it('records the head commit author, but not for merge commits', () => {
+  const input = raw();
+  const head = (login: string | null, parents: number) => {
+    input.commits.nodes = [
+      {
+        commit: {
+          oid: 'a'.repeat(40),
+          author: { user: login ? { login } : null },
+          parents: { totalCount: parents },
+          statusCheckRollup: null,
+        },
+      },
+    ];
+    return normalize(input).headAuthor;
+  };
+  expect(head('me', 1)).toBe('me');
+  expect(head('me', 2)).toBe('');
+  expect(head(null, 1)).toBe('');
+});

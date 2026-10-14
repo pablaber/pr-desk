@@ -13,6 +13,9 @@ export function deriveSignals(
     isKnownBot(pr, prefs.knownBots) &&
     (pr.reasons.includes('tracked-repository') || pr.reasons.includes('watched'));
   const managed = owned || bot;
+  // Branch protection can require the latest push to be approved by someone else, and GitHub
+  // hides whether it does. The pusher is not exposed either; the head commit author stands in.
+  const lastPushedByYou = !owned && pr.headAuthor.toLowerCase() === login.toLowerCase();
   const matchingRules = (name: string) =>
     prefs.checkRules.filter(
       (rule) => matchesGlob(pr.repository, rule.repository) && matchesGlob(name, rule.check),
@@ -49,6 +52,7 @@ export function deriveSignals(
     owned,
     bot,
     managed,
+    lastPushedByYou,
     directReviewRequested: pr.directReviewers.some((r) => r.toLowerCase() === login.toLowerCase()),
     trackedRepository: pr.reasons.includes('tracked-repository'),
     activeThreads: pr.activeUnresolvedThreads,
@@ -82,6 +86,7 @@ export function deriveSignals(
     // pass, so a non-blocking pending or allowed failed check still disqualifies the PR.
     approvable:
       bot &&
+      !lastPushedByYou &&
       !pr.draft &&
       pr.reviewDecision !== 'APPROVED' &&
       pr.reviewDecision !== 'CHANGES_REQUESTED' &&

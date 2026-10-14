@@ -7,6 +7,8 @@ export interface PullRequest {
   number: number;
   title: string;
   headOid: string;
+  // The GitHub user who authored the head commit; empty for merge commits or when unknown.
+  headAuthor: string;
   author: string;
   // A GitHub App rather than a user account; GraphQL reports both by bare login.
   authorIsBot: boolean;

@@ -10,7 +10,7 @@ function connections(cursors: (string | null | undefined)[] = [null, null, null]
       : `reviewThreads(first: 100, after: ${q(cursors[1])}) { ${page} nodes { isResolved isOutdated } }`,
     cursors[2] === undefined
       ? ''
-      : `commits(last: 1) { nodes { commit { oid statusCheckRollup { contexts(first: 100, after: ${q(cursors[2])}) { ${page} nodes {
+      : `commits(last: 1) { nodes { commit { oid author { user { login } } parents { totalCount } statusCheckRollup { contexts(first: 100, after: ${q(cursors[2])}) { ${page} nodes {
       __typename ... on CheckRun { name status conclusion }
       ... on StatusContext { context state }
     } } } } } }`,
