@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.0](https://github.com/pablaber/pr-desk/compare/v1.17.0...v1.18.0) (2026-10-14)
+
+
+### Features
+
+* add in-app updates ([#132](https://github.com/pablaber/pr-desk/issues/132)) ([0b3d624](https://github.com/pablaber/pr-desk/commit/0b3d624d173ce22a385703a9aa4f50414c85342d))
+
 ## [1.17.0](https://github.com/pablaber/pr-desk/compare/v1.16.0...v1.17.0) (2026-10-13)
 
 
