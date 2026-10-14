@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod errors;
+#[cfg(target_os = "macos")]
+mod menu;
 mod merge;
 
 use std::{path::PathBuf, time::Duration};
@@ -264,6 +266,10 @@ fn main() {
     let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init());
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .menu(menu::app_menu)
+        .on_menu_event(menu::on_menu_event);
     builder
         .invoke_handler(tauri::generate_handler![
             github,

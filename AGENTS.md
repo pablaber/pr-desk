@@ -62,6 +62,7 @@ Inspect the generated screenshot and include the updated image in the change.
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `src-tauri/src/main.rs`             | the Rust bridge: `gh auth status`, allowlisted read-only GraphQL (`QUERY_NAMES`), close as stale                      |
 | `src-tauri/src/merge.rs`            | merge_pr, approve_and_merge_pr, update_pr_branch: revalidate, then mutate pinned to the confirmed commit              |
+| `src-tauri/src/menu.rs`             | macOS menu: Tauri's default plus Check for Updates…, which only emits an event to the frontend                        |
 | `src/lib/github/`                   | `queries.ts` GraphQL text, `normalize.ts` raw → domain, `refresh.ts` orchestration/concurrency, `client.ts` transport |
 | `src/lib/pr/`                       | `signals.ts` → `dashboard-rules.ts` → `classify.ts` → `card-view-model.ts`                                            |
 | `src/lib/store/app-state.ts`        | versioned preferences and all input validation                                                                        |

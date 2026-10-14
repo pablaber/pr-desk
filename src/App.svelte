@@ -2,6 +2,7 @@
   import { onMount, untrack } from 'svelte';
   import { getVersion } from '@tauri-apps/api/app';
   import { isTauri } from '@tauri-apps/api/core';
+  import { listen } from '@tauri-apps/api/event';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { openUrl } from '@tauri-apps/plugin-opener';
@@ -278,6 +279,13 @@
     // Independent of gh, so updates stay reachable when GitHub sign-in fails.
     const unsubscribe = updates.subscribe((state) => (update = state));
     updates.start();
+    // PR Desk → Check for Updates… in the app menu takes the same path as the sidebar button.
+    const unlisten = isTauri()
+      ? listen('check-for-updates', openUpdates).catch((e) => {
+          recordError('updates', `Could not listen for the app menu: ${String(e)}`);
+          return null;
+        })
+      : null;
     const timer = setInterval(() => (now = Date.now()), 15000);
     const uncaught = (event: ErrorEvent) =>
       recordError('uncaught', String(event.error ?? event.message));
@@ -288,6 +296,7 @@
     return () => {
       unsubscribe();
       updates.dispose();
+      void unlisten?.then((stop) => stop?.());
       clearInterval(timer);
       window.removeEventListener('error', uncaught);
       window.removeEventListener('unhandledrejection', unhandled);
@@ -300,6 +309,10 @@
     const timer = setTimeout(() => void refresh(true), minutes * 60_000);
     return () => clearTimeout(timer);
   });
+  function openUpdates() {
+    if (updateOffered) updates.openDialog();
+    else void updates.checkNow();
+  }
   async function setRefreshInterval(minutes: number) {
     if (!isRefreshInterval(minutes)) return;
     await change((next) => {
@@ -944,7 +957,7 @@
         <button
           class="update-button"
           class:offered={updateOffered}
-          onclick={() => (updateOffered ? updates.openDialog() : void updates.checkNow())}
+          onclick={openUpdates}
           aria-label={sidebarCollapsed ? updateLabel : null}
           data-tip={sidebarCollapsed ? updateLabel : null}
           ><CircleArrowDown size={12} /><span class="nav-text">{updateLabel}</span></button

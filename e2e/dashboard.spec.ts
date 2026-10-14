@@ -40,11 +40,23 @@ test.beforeEach(async ({ page }) => {
       closedResources: number[];
       restarts: number;
       finishDownload: () => void;
+      callbacks: Record<number, (message: unknown) => void>;
+      eventListeners: { event: string; handler: number }[];
+      emitTauriEvent: (event: string) => void;
+      __TAURI_EVENT_PLUGIN_INTERNALS__: unknown;
     };
     w.opened = [];
     w.updateChecks = 0;
     w.closedResources = [];
     w.restarts = 0;
+    w.callbacks = {};
+    let callbackCount = 0;
+    w.eventListeners = [];
+    w.emitTauriEvent = (event) => {
+      for (const listener of w.eventListeners.filter((l) => l.event === event))
+        w.callbacks[listener.handler]?.({ event, id: listener.handler, payload: null });
+    };
+    w.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
     w.badges = [];
     w.zooms = [];
     w.refreshCount = 0;
@@ -158,9 +170,14 @@ test.beforeEach(async ({ page }) => {
         currentWindow: { label: 'main' },
         currentWebview: { windowLabel: 'main', label: 'main' },
       },
-      // Channels register their handler here; the mock calls a channel's onmessage directly.
-      transformCallback: () => Math.floor(Math.random() * 1e9),
-      unregisterCallback: () => {},
+      // Channels and event listeners register callbacks here. Channels are driven through their
+      // onmessage directly; emitTauriEvent() delivers an app event to its listeners.
+      transformCallback: (callback: (message: unknown) => void) => {
+        const id = ++callbackCount;
+        w.callbacks[id] = callback;
+        return id;
+      },
+      unregisterCallback: (id: number) => delete w.callbacks[id],
       invoke: async (command: string, args: Record<string, any>) => {
         // The updater: updateVersion offers that version, updateCheckFailures fails that many
         // checks first, and a download waits for finishDownload() when holdDownload is set.
@@ -189,6 +206,11 @@ test.beforeEach(async ({ page }) => {
           send({ event: 'Finished' });
           return;
         }
+        if (command === 'plugin:event|listen') {
+          w.eventListeners.push({ event: args.event, handler: args.handler });
+          return w.eventListeners.length;
+        }
+        if (command === 'plugin:event|unlisten') return;
         if (command === 'plugin:app|version')
           return localStorage.getItem('appVersion') ?? (w as any).packageVersion;
         if (command === 'plugin:resources|close') {
@@ -2962,4 +2984,23 @@ test('the sidebar and update dialog show the version the running bundle reports'
     'v99.0.1',
     'v99.0.2',
   ]);
+});
+
+test('PR Desk → Check for Updates… in the app menu checks and opens the dialog', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect.poll(() => page.evaluate(() => (window as any).updateChecks)).toBe(1);
+  await page.evaluate(() => (window as any).emitTauriEvent('check-for-updates'));
+  await expect(page.getByRole('dialog', { name: 'PR Desk is up to date' })).toBeVisible();
+  expect(await page.evaluate(() => (window as any).updateChecks)).toBe(2);
+  await page.keyboard.press('Escape');
+  // With an update on offer, the menu reopens it rather than checking again.
+  await page.evaluate(() => localStorage.setItem('updateVersion', '99.0.0'));
+  await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => (window as any).emitTauriEvent('check-for-updates'));
+  await expect(page.getByRole('dialog', { name: 'Update available' })).toBeVisible();
+  expect(await page.evaluate(() => (window as any).updateChecks)).toBe(3);
 });

@@ -47,7 +47,8 @@ notarized by Apple.
 ### Updates
 
 PR Desk checks for a new release at launch and every 24 hours while it is open; **Check
-for updates** beside the version in the sidebar checks on demand. A newer release turns
+for updates** beside the version in the sidebar, or **PR Desk → Check for Updates…** in the
+menu bar, checks on demand. A newer release turns
 that button into **Update available** without interrupting you. Nothing downloads until
 you choose **Update and restart**: PR Desk downloads the release, verifies its signature,
 installs it, and restarts once any preference save or confirmed GitHub action has
