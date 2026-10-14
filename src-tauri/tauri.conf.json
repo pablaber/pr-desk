@@ -34,7 +34,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "REPLACE_WITH_UPDATER_PUBLIC_KEY",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENBMDk1MjdFMUY2NTlCOEUKUldTT20yVWZmbElKeXBZYWo2MGxHd2RHQjR3dzdiV3dZUkU0N0IvQUFmeVN1b2VwK1ZHcUxiemQK",
       "endpoints": ["https://github.com/pablaber/pr-desk/releases/latest/download/latest.json"]
     }
   }
