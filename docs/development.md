@@ -242,7 +242,8 @@ a patch, and a breaking change releases a major version, including before 1.0.
 
 Every push to `main` runs frontend, browser, and Rust checks before Release Please.
 Merging a release PR creates the tag and GitHub Release. The macOS job then builds,
-signs, notarizes, and uploads Apple Silicon artifacts before updating
+signs, notarizes, and uploads Apple Silicon artifacts, verifies and uploads the signed
+updater archive, publishes `latest.json` as the last asset, and then updates
 `pablaber/homebrew-tap`.
 
 Release Please and the tap update authenticate through a GitHub App:
@@ -262,11 +263,102 @@ Release builds also require:
 - Repository secret `APPLE_API_KEY`: the App Store Connect API key ID.
 - Repository secret `APPLE_API_ISSUER`: the App Store Connect issuer ID.
 - Repository secret `APPLE_API_KEY_BASE64`: the base64-encoded `.p8` private key.
+- Repository secret `TAURI_SIGNING_PRIVATE_KEY`: the updater signing private key (see
+  below), as the contents of the key file.
+- Repository secret `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: that key's password.
+
+The release job stops before building when either updater secret is missing, so add both
+before merging a release PR.
 
 Read [macOS signing and notarization](macos-signing.md) before changing signing config,
 the release workflow, or `scripts/notarize-macos.sh`. It documents credential setup,
 artifact verification, and non-obvious failure modes. Contributors and automated
 agents should also follow [AGENTS.md](../AGENTS.md).
+
+### Updater signing key
+
+In-app updates are verified with a Tauri updater key pair that is separate from the Apple
+credentials. The private key signs each release's updater archive; the public key is
+compiled into every build as `plugins.updater.pubkey` in `src-tauri/tauri.conf.json`.
+It is public and is committed there.
+
+Generate the pair outside the repository and keep the private key out of the working tree:
+
+```sh
+npx tauri signer generate -w ~/pr-desk-updater.key
+# Writes ~/pr-desk-updater.key (private) and ~/pr-desk-updater.key.pub (public).
+```
+
+Then:
+
+1. Back up the private key file, its password, and the public key in 1Password. The
+   GitHub secrets are write-only and are not backups.
+2. Add the key file's contents as `TAURI_SIGNING_PRIVATE_KEY` and the password as
+   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`:
+
+   ```sh
+   gh secret set TAURI_SIGNING_PRIVATE_KEY --repo pablaber/pr-desk < ~/pr-desk-updater.key
+   gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --repo pablaber/pr-desk
+   ```
+
+3. Put the contents of `~/pr-desk-updater.key.pub` in `plugins.updater.pubkey`.
+
+The release job checks that the private key's signature verifies under the committed public
+key, so a mismatched pair fails the release instead of publishing updates no installed app
+accepts.
+
+Do not rotate the key casually. Installed apps trust only the public key they shipped with,
+so after a rotation they cannot verify updates signed with the new key. Rotating requires
+a release signed with the old key that carries the new public key, followed by releases
+signed with the new key; losing the private key means users must reinstall manually.
+
+### Recovering a release without latest.json
+
+`releases/latest/download/latest.json` is missing while a release builds and stays missing if
+the build fails before the last step. Release Please has already published the release, so
+the app reports a retryable update-check failure (never "up to date") until `latest.json`
+exists. Look at the failed **Release Please** run first.
+
+1. Re-run the job. Rebuilding replaces the release assets and runs every check again; the
+   Homebrew job runs once the release job succeeds:
+
+   ```sh
+   gh run list --repo pablaber/pr-desk --workflow release-please.yml --limit 5
+   gh run rerun <run-id> --repo pablaber/pr-desk --failed
+   ```
+
+2. If the build and archive are good and only the final upload failed, regenerate and
+   upload `latest.json` by hand from a checkout of the release tag (the scripts read the
+   version from `package.json`). On a Mac, verify the archive first:
+
+   ```sh
+   version=1.18.0 # the release to repair, without the v
+   git worktree add "/tmp/pr-desk-v$version" "v$version" && cd "/tmp/pr-desk-v$version"
+   dir="$(mktemp -d)"; mkdir "$dir/macos"
+   gh release download "v$version" --repo pablaber/pr-desk \
+     --pattern 'PR.Desk_aarch64.app.tar.gz' --output "$dir/macos/PR Desk.app.tar.gz"
+   gh release download "v$version" --repo pablaber/pr-desk \
+     --pattern 'PR.Desk_aarch64.app.tar.gz.sig' --output "$dir/macos/PR Desk.app.tar.gz.sig"
+   gh api "repos/pablaber/pr-desk/releases/tags/v$version" > "$dir/release.json"
+   ./scripts/verify-updater-archive.sh "$dir" "$version"
+   node scripts/updater-release.mjs latest "$dir/release.json" "$dir" \
+     src-tauri/tauri.conf.json "$dir/latest.json"
+   gh release upload "v$version" "$dir/latest.json" --repo pablaber/pr-desk --clobber
+   ```
+
+3. To stop advertising a bad `latest.json`, delete it; clients then see the retryable
+   failure instead of installing it:
+
+   ```sh
+   gh release delete-asset "v$version" latest.json --repo pablaber/pr-desk --yes
+   ```
+
+   If a release's archive itself is bad and cannot be rebuilt, ship a `fix:` release;
+   `releases/latest` moves to it.
+
+[macOS signing and notarization](macos-signing.md#validating-a-real-signed-upgrade) also has
+the procedure for validating a real signed upgrade between two versions with a test-only key
+and a prerelease, without touching Release Please-managed files.
 
 Discovery returns raw PR records with the initial pages of every card connection.
 Refresh unions source reasons and chooses the newest seed, preferring complete seeds

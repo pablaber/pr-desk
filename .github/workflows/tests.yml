@@ -50,6 +50,9 @@ jobs:
       - name: Test Homebrew release automation
         run: node --test scripts/update-homebrew.test.mjs
 
+      - name: Test updater release automation
+        run: node --test scripts/updater-release.test.mjs
+
       - name: Build frontend
         run: npm run build
 
