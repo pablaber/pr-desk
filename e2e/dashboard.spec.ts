@@ -2734,6 +2734,51 @@ test('approve and merge failures keep the dialog and card available', async ({ p
   await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeEnabled();
 });
 
+test('approve and merge waits while GitHub recomputes mergeability', async ({ page }) => {
+  await trackBotPr(page);
+  // After a sibling PR merges, GitHub reports UNKNOWN until it has rechecked against the new base.
+  await page.evaluate(() => {
+    const w = window as any;
+    const original = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      const result = await original(command, args);
+      if (command === 'github' && args.query?.includes('DeskPullRequest')) {
+        const unknown = Number(localStorage.getItem('unknownLookups') ?? 0);
+        if (unknown > 0) {
+          localStorage.setItem('unknownLookups', String(unknown - 1));
+          result.repository.pullRequest.mergeable = 'UNKNOWN';
+          result.repository.pullRequest.mergeStateStatus = 'UNKNOWN';
+        } else if (localStorage.getItem('settlesBehind'))
+          result.repository.pullRequest.mergeStateStatus = 'BEHIND';
+      }
+      return result;
+    };
+  });
+  for (const behind of [false, true]) {
+    await page.evaluate((behind) => {
+      localStorage.setItem('unknownLookups', '2');
+      if (behind) localStorage.setItem('settlesBehind', '1');
+    }, behind);
+    await page.getByRole('button', { name: 'Approve and merge Bump lodash', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Approve and merge pull request?' });
+    await dialog.getByRole('button', { name: 'Approve and merge', exact: true }).click();
+    if (!behind) {
+      await expect(dialog.getByRole('status')).toHaveText('Waiting for GitHub to recheck the PR…');
+      await expect(dialog).toBeHidden();
+      expect(
+        await page.evaluate(() => JSON.parse(localStorage.getItem('approveMergeCalls') ?? '[]')),
+      ).toHaveLength(1);
+      // The merged card leaves the board; bring it back to try the PR that falls behind.
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    } else {
+      await expect(dialog.getByRole('alert')).toContainText('now behind its base branch');
+      expect(
+        await page.evaluate(() => JSON.parse(localStorage.getItem('approveMergeCalls') ?? '[]')),
+      ).toHaveLength(1);
+    }
+  }
+});
+
 test('bot PRs behind their base update the branch after confirmation', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('behindPrs', '[7]'));
   await trackBotPr(page);
