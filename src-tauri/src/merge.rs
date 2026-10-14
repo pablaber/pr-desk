@@ -132,6 +132,24 @@ async fn view(url: &str) -> Result<Value, String> {
     Ok(with_stack(pr, &pull))
 }
 
+// Once its base branch moves, for example after merging a sibling PR, GitHub reports UNKNOWN
+// until a background job recomputes mergeability; reading the PR is what starts that job.
+fn unsettled(pr: &Value) -> bool {
+    pr["mergeable"] == "UNKNOWN" || pr["mergeStateStatus"] == "UNKNOWN"
+}
+
+async fn view_settled(url: &str) -> Result<Value, String> {
+    let mut pr = view(url).await?;
+    for _ in 0..3 {
+        if !unsettled(&pr) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        pr = view(url).await?;
+    }
+    Ok(pr)
+}
+
 fn validate_ready(
     pr: &Value,
     head_oid: &str,
@@ -262,7 +280,7 @@ pub async fn merge_pr(
     validate_input(&url, &head_oid, &method)?;
     tokio::time::timeout(Duration::from_secs(45), async {
         let user = gh(&["api", "--hostname", "github.com", "user"]).await?;
-        let pr = view(&url).await?;
+        let pr = view_settled(&url).await?;
         validate_ready(
             &pr,
             &head_oid,
@@ -289,7 +307,7 @@ pub async fn approve_and_merge_pr(
     tokio::time::timeout(Duration::from_secs(45), async {
         let user = gh(&["api", "--hostname", "github.com", "user"]).await?;
         let login = user["login"].as_str().unwrap_or("");
-        let pr = view(&url).await?;
+        let pr = view_settled(&url).await?;
         validate_approvable(&pr, &head_oid, login, &bot)?;
         // The approval is pinned to the confirmed commit, like the merge that follows it.
         let reviews = format!("{}/reviews", pull_endpoint(&url));
@@ -537,6 +555,17 @@ mod tests {
                 validate_ready(&pr, &"a".repeat(40), "me", None).is_ok(),
                 passing
             );
+        }
+    }
+
+    #[test]
+    fn unknown_mergeability_is_unsettled() {
+        assert!(!unsettled(&ready()));
+        for (key, value) in [("mergeable", "UNKNOWN"), ("mergeStateStatus", "UNKNOWN")] {
+            let mut pr = ready();
+            pr[key] = json!(value);
+            assert!(unsettled(&pr), "{key}");
+            assert!(validate_ready(&pr, &"a".repeat(40), "me", None).is_err());
         }
     }
 

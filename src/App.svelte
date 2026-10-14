@@ -55,6 +55,7 @@
   import { GhGitHubService } from './lib/github/client';
   import { refreshDashboard, type DashboardSnapshot } from './lib/github/refresh';
   import { fetchCompleted, type CompletedSnapshot } from './lib/github/completed';
+  import { settledPullRequest } from './lib/github/mergeability';
   import {
     defaultState,
     loadState,
@@ -657,7 +658,10 @@
         actionStatus = updating
           ? 'Checking the PR still needs updating…'
           : 'Checking the PR is still ready…';
-        const fresh = await service.getPullRequest(pr.id);
+        const fresh = await settledPullRequest(
+          () => service.getPullRequest(pr.id),
+          () => (actionStatus = 'Waiting for GitHub to recheck the PR…'),
+        );
         // A single-PR lookup carries no tracking reasons; the card's own reasons decide bot status.
         const freshResult = classify(
           { ...fresh, reasons: pr.reasons },
@@ -669,7 +673,9 @@
           throw new Error(
             updating
               ? 'This PR changed or no longer needs a branch update. Cancel and refresh before trying again.'
-              : 'This PR changed or is no longer ready to merge. Cancel and refresh before trying again.',
+              : fresh.headOid === pr.headOid && freshResult?.canUpdateBranch
+                ? 'This PR is now behind its base branch. Cancel and update the branch before merging.'
+                : 'This PR changed or is no longer ready to merge. Cancel and refresh before trying again.',
           );
         actionStatus = updating
           ? 'Updating branch…'
