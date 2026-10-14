@@ -46,14 +46,13 @@ notarized by Apple.
 
 ### Updates
 
-PR Desk checks for a new release at launch and every 24 hours while it is open; **Check
-for updates** beside the version in the sidebar, or **PR Desk → Check for Updates…** in the
-menu bar, checks on demand. A newer release turns
-that button into **Update available** without interrupting you. Nothing downloads until
-you choose **Update and restart**: PR Desk downloads the release, verifies its signature,
-installs it, and restarts once any preference save or confirmed GitHub action has
-finished. **Later** keeps the offer for the session. If an install fails, the running
-version is left in place.
+PR Desk checks for a new release at launch and every 24 hours while it is open; choose
+**PR Desk → Check for Updates…** in the menu bar to check now. When a release is available,
+an **Update available** card appears in the sidebar above Settings, without interrupting
+you. Nothing downloads until you choose **Update and restart**: PR Desk downloads the
+release, verifies its signature, installs it, and restarts once any preference save or
+confirmed GitHub action has finished. **Later** keeps the offer for the session. If an
+install fails, the running version is left in place.
 
 Update checks and downloads fetch public assets from
 [GitHub Releases](https://github.com/pablaber/pr-desk/releases) over HTTPS with the app's

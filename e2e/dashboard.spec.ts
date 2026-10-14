@@ -2809,6 +2809,11 @@ test('known bots can be added and removed in Settings', async ({ page }) => {
   expect(saved.knownBots).toEqual(['dependabot[bot]', 'mend[bot]', 'release-user']);
 });
 
+// PR Desk → Check for Updates… in the app menu reaches the frontend as this Tauri event.
+async function checkFromMenu(page: Page) {
+  await page.evaluate(() => (window as any).emitTauriEvent('check-for-updates'));
+}
+
 test('an automatic check offers an update in the sidebar and installs it only on request', async ({
   page,
 }) => {
@@ -2818,16 +2823,24 @@ test('an automatic check offers an update in the sidebar and installs it only on
   });
   await page.goto('/');
   await expect(page.locator('.pr-card')).toHaveCount(4);
-  const offer = page.getByRole('button', { name: 'Update available', exact: true });
+  const offer = page.getByRole('button', { name: 'Update available, v99.0.0', exact: true });
   await expect(offer).toBeVisible();
-  // The label fits beside the version inside the expanded sidebar.
-  const { right } = await offer.evaluate((el) => el.getBoundingClientRect());
-  expect(right).toBeLessThanOrEqual(190 - 14);
+  // Two lines, since the title and the version do not fit one line of the sidebar.
+  await expect(offer.locator('.update-card-title')).toHaveText('Update available');
+  await expect(offer.locator('.update-card-version')).toHaveText('v99.0.0');
+  await expect(offer.locator('svg.lucide-download')).toBeVisible();
+  // The card sits directly above Settings and fits the expanded sidebar.
+  const settings = page.getByRole('button', { name: 'Settings', exact: true });
+  const card = await offer.evaluate((el) => el.getBoundingClientRect());
+  const below = await settings.evaluate((el) => el.getBoundingClientRect());
+  expect(card.bottom).toBeLessThanOrEqual(below.top);
+  expect(card.right).toBeLessThanOrEqual(190 - 14);
   const dialog = page.getByRole('dialog', { name: 'Update available' });
   // Finding an update never interrupts with a modal.
   await expect(dialog).toBeHidden();
   expect(await page.evaluate(() => (window as any).updateChecks)).toBe(1);
   const installed = (await page.locator('.version').textContent())!;
+  await page.locator('aside').screenshot({ path: '.context/update-card.png' });
   await offer.click();
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('dd')).toHaveText([installed, 'v99.0.0']);
@@ -2857,9 +2870,9 @@ test('an automatic check offers an update in the sidebar and installs it only on
 test('the update dialog works from the keyboard and Later keeps the offer', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('.pr-card')).toHaveCount(4);
-  const checkButton = page.getByRole('button', { name: 'Check for updates', exact: true });
-  await checkButton.focus();
-  await page.keyboard.press('Enter');
+  // With nothing on offer the sidebar shows only the version; manual checks use the app menu.
+  await expect(page.locator('aside').getByRole('button', { name: /update/i })).toHaveCount(0);
+  await checkFromMenu(page);
   const current = page.getByRole('dialog', { name: 'PR Desk is up to date' });
   await expect(current).toBeVisible();
   await expect(current.getByRole('button', { name: 'Close', exact: true })).toBeFocused();
@@ -2868,23 +2881,23 @@ test('the update dialog works from the keyboard and Later keeps the offer', asyn
   await expect(page.getByRole('heading', { name: 'Snoozed', exact: true })).toBeHidden();
   await page.keyboard.press('Escape');
   await expect(current).toBeHidden();
-  await expect(checkButton).toBeFocused();
 
   await page.evaluate(() => localStorage.setItem('updateVersion', '99.0.0'));
-  await page.keyboard.press('Enter');
+  await checkFromMenu(page);
   const available = page.getByRole('dialog', { name: 'Update available' });
   await expect(available.getByRole('button', { name: 'Update and restart' })).toBeFocused();
   await page.keyboard.press('Shift+Tab');
   await expect(available.getByRole('button', { name: 'Later', exact: true })).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(available).toBeHidden();
-  const offer = page.getByRole('button', { name: 'Update available', exact: true });
-  await expect(offer).toBeFocused();
+  const offer = page.getByRole('button', { name: 'Update available, v99.0.0', exact: true });
+  await offer.focus();
   await page.keyboard.press('Enter');
   await expect(available).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(available).toBeHidden();
-  // Launch, then one check per Check for updates; reopening the offer does not check again.
+  await expect(offer).toBeFocused();
+  // Launch, then one check per menu request; reopening the offer does not check again.
   expect(await page.evaluate(() => (window as any).updateChecks)).toBe(3);
   expect(await page.evaluate(() => (window as any).restarts)).toBe(0);
 });
@@ -2902,7 +2915,7 @@ test('update check failures stay quiet automatically and offer a retry when aske
   await expect.poll(() => page.evaluate(() => (window as any).updateChecks)).toBe(1);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('alert')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
+  await checkFromMenu(page);
   const failed = page.getByRole('dialog', { name: 'Could not check for updates' });
   await expect(failed.getByRole('alert')).toContainText('Try again in a few minutes');
   // Missing metadata is never reported as being up to date.
@@ -2921,7 +2934,7 @@ test('a failed install never restarts and can be retried', async ({ page }) => {
     localStorage.setItem('updateInstallFailure', '1');
   });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Update available', exact: true }).click();
+  await page.getByRole('button', { name: 'Update available, v99.0.0', exact: true }).click();
   await page.getByRole('button', { name: 'Update and restart', exact: true }).click();
   // Without a reported size the bar is indeterminate and shows the bytes so far.
   const downloading = page.getByRole('dialog', { name: 'Downloading update…' });
@@ -2941,30 +2954,37 @@ test('a failed install never restarts and can be retried', async ({ page }) => {
 });
 
 test('updates stay available when GitHub authentication fails', async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem('authFailure', '1');
-    localStorage.setItem('updateVersion', '99.0.0');
-  });
+  await page.addInitScript(() => localStorage.setItem('authFailure', '1'));
   await page.goto('/');
   await expect(page.locator('.setup [role="alert"]')).toContainText('not logged into');
   await expect(page.locator('.version')).toHaveText(`v${version}`);
-  const offer = page.getByRole('button', { name: 'Update available', exact: true });
-  await offer.click();
+  await expect.poll(() => page.evaluate(() => (window as any).updateChecks)).toBe(1);
+  await checkFromMenu(page);
+  const current = page.getByRole('dialog', { name: 'PR Desk is up to date' });
+  await expect(current).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => localStorage.setItem('updateVersion', '99.0.0'));
+  await checkFromMenu(page);
+  await expect(page.getByRole('dialog', { name: 'Update available' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Update available, v99.0.0', exact: true }).click();
   await page.getByRole('button', { name: 'Update and restart', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).restarts)).toBe(1);
 });
 
-test('the collapsed sidebar names the update action in its tooltip', async ({ page }) => {
+test('the collapsed sidebar shows the update as a named icon tile', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('updateVersion', '99.0.0'));
   await page.goto('/');
   await expect(page.locator('.pr-card')).toHaveCount(4);
   await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
-  const offer = page.getByRole('button', { name: 'Update available', exact: true });
-  await expect(offer).toHaveAttribute('data-tip', 'Update available');
-  await expect(offer.locator('svg.lucide-circle-arrow-down')).toBeVisible();
+  const offer = page.getByRole('button', { name: 'Update available, v99.0.0', exact: true });
+  await expect(offer).toHaveAttribute('data-tip', 'Update available, v99.0.0');
+  await expect(offer.locator('svg.lucide-download')).toBeVisible();
+  await expect(offer.getByText('Update available', { exact: true })).toBeHidden();
   await expect
     .poll(() => offer.evaluate((el) => el.getBoundingClientRect().right))
     .toBeLessThanOrEqual(60);
+  await page.locator('aside').screenshot({ path: '.context/update-card-collapsed.png' });
   await offer.click();
   await expect(page.getByRole('dialog', { name: 'Update available' })).toBeVisible();
 });
@@ -2979,7 +2999,7 @@ test('the sidebar and update dialog show the version the running bundle reports'
   });
   await page.goto('/');
   await expect(page.locator('.version')).toHaveText('v99.0.1');
-  await page.getByRole('button', { name: 'Update available', exact: true }).click();
+  await page.getByRole('button', { name: 'Update available, v99.0.2', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Update available' }).locator('dd')).toHaveText([
     'v99.0.1',
     'v99.0.2',
@@ -2992,15 +3012,16 @@ test('PR Desk → Check for Updates… in the app menu checks and opens the dial
   await page.goto('/');
   await expect(page.locator('.pr-card')).toHaveCount(4);
   await expect.poll(() => page.evaluate(() => (window as any).updateChecks)).toBe(1);
-  await page.evaluate(() => (window as any).emitTauriEvent('check-for-updates'));
+  await checkFromMenu(page);
   await expect(page.getByRole('dialog', { name: 'PR Desk is up to date' })).toBeVisible();
   expect(await page.evaluate(() => (window as any).updateChecks)).toBe(2);
   await page.keyboard.press('Escape');
   // With an update on offer, the menu reopens it rather than checking again.
   await page.evaluate(() => localStorage.setItem('updateVersion', '99.0.0'));
-  await page.getByRole('button', { name: 'Check for updates', exact: true }).click();
+  await checkFromMenu(page);
+  await expect(page.getByRole('dialog', { name: 'Update available' })).toBeVisible();
   await page.keyboard.press('Escape');
-  await page.evaluate(() => (window as any).emitTauriEvent('check-for-updates'));
+  await checkFromMenu(page);
   await expect(page.getByRole('dialog', { name: 'Update available' })).toBeVisible();
   expect(await page.evaluate(() => (window as any).updateChecks)).toBe(3);
 });

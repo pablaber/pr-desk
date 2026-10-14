@@ -11,7 +11,6 @@
   import { version as buildVersion } from '../package.json';
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
   import Bug from '@lucide/svelte/icons/bug';
-  import CircleArrowDown from '@lucide/svelte/icons/circle-arrow-down';
   import Copy from '@lucide/svelte/icons/copy';
   import Download from '@lucide/svelte/icons/download';
   import ClipboardCheck from '@lucide/svelte/icons/clipboard-check';
@@ -164,7 +163,7 @@
   });
   let update = $state.raw(updates.state);
   let updateOffered = $derived(update.version !== null);
-  let updateLabel = $derived(updateOffered ? 'Update available' : 'Check for updates');
+  let offerLabel = $derived(`Update available, v${update.version}`);
   let refreshQueued = false;
   let completed = $state<CompletedSnapshot | null>(null),
     completedLoading = $state(false);
@@ -924,6 +923,20 @@
       )}
     </nav>
     <div class="sidebar-utilities">
+      <!-- Manual checks live in the app menu; the sidebar only speaks up once there is an update. -->
+      {#if updateOffered}
+        <button
+          class="update-card"
+          onclick={() => updates.openDialog()}
+          aria-label={offerLabel}
+          data-tip={sidebarCollapsed ? offerLabel : null}
+          ><Download size={14} /><span class="nav-text update-card-text" aria-hidden="true"
+            ><span class="update-card-title">Update available</span><span
+              class="update-card-version">v{update.version}</span
+            ></span
+          ></button
+        >
+      {/if}
       <nav aria-label="Preferences">
         {@render navButton(
           'Settings',
@@ -952,17 +965,7 @@
           >
         </div>
       {/if}
-      <div class="version-row">
-        <span class="version">v{version}</span>
-        <button
-          class="update-button"
-          class:offered={updateOffered}
-          onclick={openUpdates}
-          aria-label={sidebarCollapsed ? updateLabel : null}
-          data-tip={sidebarCollapsed ? updateLabel : null}
-          ><CircleArrowDown size={12} /><span class="nav-text">{updateLabel}</span></button
-        >
-      </div>
+      <span class="version">v{version}</span>
     </div>
   </aside>
   <main inert={refreshOverlay}>
