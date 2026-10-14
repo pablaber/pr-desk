@@ -13,21 +13,29 @@ export function deriveSignals(
     isKnownBot(pr, prefs.knownBots) &&
     (pr.reasons.includes('tracked-repository') || pr.reasons.includes('watched'));
   const managed = owned || bot;
-  const waitingOn = [
+  const matchingRules = (name: string) =>
+    prefs.checkRules.filter(
+      (rule) => matchesGlob(pr.repository, rule.repository) && matchesGlob(name, rule.check),
+    );
+  const exempt = (state: 'pending' | 'failed') => [
     ...new Set(
       pr.checks
         .filter(
           (c) =>
-            c.state === 'pending' &&
-            prefs.checkRules.some(
-              (rule) =>
-                matchesGlob(pr.repository, rule.repository) && matchesGlob(c.name, rule.check),
-            ),
+            c.state === state &&
+            matchingRules(c.name).some((rule) => state === 'pending' || rule.allowFailures),
         )
         .map((c) => c.name),
     ),
   ];
-  const checks = pr.checks.filter((c) => !(c.state === 'pending' && waitingOn.includes(c.name)));
+  const waitingOn = exempt('pending');
+  const allowedFailures = exempt('failed');
+  const checks = pr.checks.filter(
+    (c) =>
+      !(c.state === 'pending' && waitingOn.includes(c.name)) &&
+      !(c.state === 'failed' && allowedFailures.includes(c.name)),
+  );
+  const nonBlocking = waitingOn.length + allowedFailures.length > 0;
   const approved =
     managed &&
     !pr.draft &&
@@ -45,10 +53,11 @@ export function deriveSignals(
     trackedRepository: pr.reasons.includes('tracked-repository'),
     activeThreads: pr.activeUnresolvedThreads,
     changesRequested: pr.reviewDecision === 'CHANGES_REQUESTED',
-    failedChecks: pr.checks.filter((c) => c.state === 'failed').length,
+    failedChecks: checks.filter((c) => c.state === 'failed').length,
     checksRunning: checks.some((c) => c.state === 'pending'),
     checksPassing: checks.every((c) => c.state === 'passing'),
     waitingOn,
+    allowedFailures,
     conflict: pr.mergeable === 'CONFLICTING',
     // GitHub only reports BEHIND when branch protection requires an up-to-date branch.
     behind: pr.mergeStateStatus === 'BEHIND',
@@ -58,18 +67,19 @@ export function deriveSignals(
     ready:
       approved &&
       notQueued &&
-      waitingOn.length === 0 &&
+      !nonBlocking &&
       ['CLEAN', 'HAS_HOOKS', 'UNSTABLE'].includes(pr.mergeStateStatus),
     // GitHub reports a required pending check as BLOCKED and does not say which rule blocks,
-    // so BLOCKED is tolerated only while a check the user marked non-blocking is pending.
-    readyPendingChecks:
+    // so BLOCKED is tolerated only while a check the user marked non-blocking is pending, or
+    // has failed under a rule that allows failures.
+    readyNonBlockingChecks:
       approved &&
       notQueued &&
-      waitingOn.length > 0 &&
+      nonBlocking &&
       ['BLOCKED', 'CLEAN', 'HAS_HOOKS', 'UNSTABLE'].includes(pr.mergeStateStatus),
     // The missing review is what makes GitHub report BLOCKED, so it is expected here; the
     // in-app approve and merge revalidates readiness after approving. Every raw check must
-    // pass, so a pending check the user marked non-blocking still disqualifies the PR.
+    // pass, so a non-blocking pending or allowed failed check still disqualifies the PR.
     approvable:
       bot &&
       !pr.draft &&

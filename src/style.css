@@ -1094,6 +1094,17 @@ footer {
 .setting-row button {
   font-size: 11px;
 }
+.setting-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+.checkbox-option {
+  flex: none;
+  font-size: 12px;
+  white-space: nowrap;
+}
 .session-error code {
   white-space: pre-wrap;
 }
@@ -1230,13 +1241,16 @@ footer {
   justify-content: space-between;
   margin-bottom: 16px;
 }
-.never-option {
+.never-option,
+.checkbox-option {
   display: flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
 }
-.never-option input {
+.never-option input,
+.checkbox-option input {
+  flex: none;
   margin: 0;
   accent-color: #3f6746;
 }

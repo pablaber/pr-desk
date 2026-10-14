@@ -307,5 +307,5 @@ All checks count, including optional checks GitHub permits merging without. Fail
 create attention for owned PRs; pending or unknown checks prevent readiness. Success,
 neutral, skipped, and no checks pass. Failures on others’ PRs are secondary information
 unless another attention rule applies. Do not restore a required/optional distinction. User-configured non-blocking check
-rules let matching _pending_ checks stop blocking readiness; failures still count. Such PRs never
-offer in-app merge.
+rules let matching _pending_ checks stop blocking readiness; failures still count unless the
+rule has Allow failures on, which is off by default. Such PRs never offer in-app merge.

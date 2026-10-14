@@ -118,7 +118,7 @@ it('defaults to five minutes and migrates reserved v1 settings without losing pr
     settings: { automaticRefreshMinutes: 0 },
   };
   expect(migrateState(legacy)).toMatchObject({
-    schemaVersion: 14,
+    schemaVersion: 15,
     watchedPullRequests: ['acme/api#1'],
     settings: { automaticRefreshMinutes: 5, snoozeOptions: defaultSnoozeOptions() },
   });
@@ -137,7 +137,7 @@ it('preserves Never and all valid intervals, and repairs invalid stored interval
         .automaticRefreshMinutes,
     ).toBe(5);
   }
-  expect(() => migrateState({ ...defaultState(), schemaVersion: 15 })).toThrow('Unsupported');
+  expect(() => migrateState({ ...defaultState(), schemaVersion: 16 })).toThrow('Unsupported');
 });
 
 it('migrates older preferences and validates ignored repositories', () => {
@@ -151,7 +151,7 @@ it('migrates older preferences and validates ignored repositories', () => {
         settings: { automaticRefreshMinutes: 0 },
       }),
     ).toMatchObject({
-      schemaVersion: 14,
+      schemaVersion: 15,
       ignoreRules: [],
       trackedRepositories: ['acme/api'],
       settings: { automaticRefreshMinutes: schemaVersion === 1 ? 5 : 0 },
@@ -215,7 +215,7 @@ it('migrates all supported versions without losing independently saved preferenc
       settings: { automaticRefreshMinutes: 12, snoozeOptions: [] },
     };
     const migrated = migrateState(legacy);
-    expect(migrated.schemaVersion).toBe(14);
+    expect(migrated.schemaVersion).toBe(15);
     expect(migrated.checkRules).toEqual([]);
     expect(migrated.titleTagRules).toEqual([]);
     expect(migrated.ignoreRules).toEqual(
@@ -319,33 +319,56 @@ it('drafts only the Settings lists and reports whether they differ from the save
 });
 
 it('validates check rules and canonicalizes them', () => {
-  expect(parseCheckRule(' ACME/Terraform-* ', ' Policy-Bot ')).toEqual({
+  expect(parseCheckRule(' ACME/Terraform-* ', ' Policy-Bot ', false)).toEqual({
     repository: 'acme/terraform-*',
     check: 'policy-bot',
+    allowFailures: false,
   });
-  expect(parseCheckRule('acme/api', 'atlantis/*').check).toBe('atlantis/*');
-  expect(() => parseCheckRule('acme', 'policy-bot')).toThrow('owner/repository');
-  expect(() => parseCheckRule('acme/api', '  ')).toThrow('check name');
-  expect(() => parseCheckRule('acme/api', 'bad\nname')).toThrow('check name');
+  expect(parseCheckRule('acme/api', 'opencode*', true).allowFailures).toBe(true);
+  expect(parseCheckRule('acme/api', 'atlantis/*', false).check).toBe('atlantis/*');
+  expect(() => parseCheckRule('acme', 'policy-bot', false)).toThrow('owner/repository');
+  expect(() => parseCheckRule('acme/api', '  ', false)).toThrow('check name');
+  expect(() => parseCheckRule('acme/api', 'bad\nname', false)).toThrow('check name');
 });
 
 it('migrates check rules without overwriting an invalid saved list', () => {
   expect(migrateState({ ...defaultState(), schemaVersion: 5 }).checkRules).toEqual([]);
-  const rule = { repository: 'acme/*', check: 'policy-bot' };
+  const rule = { repository: 'acme/*', check: 'policy-bot', allowFailures: true };
   const stored = { ...defaultState(), checkRules: [rule, { ...rule, check: 'POLICY-BOT' }] };
   const migrated = migrateState(stored);
   expect(migrated.checkRules).toEqual([rule]);
   expect(migrateState(migrated)).toEqual(migrated);
-  for (const checkRules of [undefined, 'x', [{ repository: 'nope', check: 'a' }], [{}]])
+  for (const checkRules of [
+    undefined,
+    'x',
+    [{ repository: 'nope', check: 'a', allowFailures: false }],
+    [{}],
+    [{ repository: 'acme/*', check: 'a' }],
+    [{ repository: 'acme/*', check: 'a', allowFailures: 'yes' }],
+  ])
     expect(() => migrateState({ ...defaultState(), checkRules })).toThrow('left intact');
+});
+
+it('migrates pre-v15 check rules to disallow failures', () => {
+  const legacy = {
+    ...defaultState(),
+    schemaVersion: 14,
+    checkRules: [{ repository: 'acme/*', check: 'ci' }],
+  };
+  expect(migrateState(legacy).checkRules).toEqual([
+    { repository: 'acme/*', check: 'ci', allowFailures: false },
+  ]);
 });
 
 it('detects check rule edits in the draft', () => {
   const state = defaultState();
   const draft = preferenceDraft(state);
-  draft.checkRules.push({ repository: 'acme/*', check: 'policy-bot' });
+  draft.checkRules.push({ repository: 'acme/*', check: 'policy-bot', allowFailures: false });
   expect(draftDiffers(draft, state)).toBe(true);
-  expect(draftDiffers(draft, { ...state, checkRules: [...draft.checkRules] })).toBe(false);
+  const saved = { ...state, checkRules: draft.checkRules.map((rule) => ({ ...rule })) };
+  expect(draftDiffers(draft, saved)).toBe(false);
+  draft.checkRules[0].allowFailures = true;
+  expect(draftDiffers(draft, saved)).toBe(true);
 });
 
 it('validates title tag rules and surfaces regex errors', () => {
@@ -413,7 +436,7 @@ it('loads pre-v8 preferences without labels', () => {
       labels: [label('x', 'Ignored')],
       labeledPullRequests: { 'acme/api#1': ['x'] },
     });
-    expect(migrated).toMatchObject({ schemaVersion: 14, labels: [], labeledPullRequests: {} });
+    expect(migrated).toMatchObject({ schemaVersion: 15, labels: [], labeledPullRequests: {} });
   }
 });
 it('round-trips v8 labels and canonicalizes their assignments', () => {
@@ -573,7 +596,7 @@ const configured = () => ({
   trackedRepositories: ['acme/api', 'acme/web'],
   watchedPullRequests: ['acme/api#7'],
   ignoreRules: [{ kind: 'author' as const, value: 'octocat' }],
-  checkRules: [{ repository: 'acme/*', check: 'policy-bot' }],
+  checkRules: [{ repository: 'acme/*', check: 'policy-bot', allowFailures: true }],
   titleTagRules: [{ pattern: '\\b([A-Z]+-\\d+)\\b' }],
   labels: [label('a', 'Backend')],
   ignoredPullRequests: { 'acme/api#1': { ignoredAt: '2026-01-01T00:00:00.000Z' } },
@@ -609,7 +632,7 @@ it('rejects settings imports that are not valid exports', () => {
   expect(() => parseSettingsImport('nope')).toThrow("That isn't valid JSON.");
   for (const text of ['null', '5', '{}', exported({ app: 'other' }), exported({ kind: 'debug' })])
     expect(() => parseSettingsImport(text)).toThrow("This isn't a PR Desk settings export.");
-  expect(() => parseSettingsImport(exported({ schemaVersion: 15 }))).toThrow('newer PR Desk');
+  expect(() => parseSettingsImport(exported({ schemaVersion: 16 }))).toThrow('newer PR Desk');
   const invalid: Record<string, unknown>[] = [
     { trackedRepositories: ['no-owner'] },
     { trackedRepositories: [5] },
