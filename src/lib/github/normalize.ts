@@ -24,6 +24,12 @@ export function normalizeCheck(check: RawCheck): PullRequest['checks'][number] {
         : 'pending',
   };
 }
+// Updating the branch from the base creates a merge commit authored by whoever clicked it,
+// which says nothing about who changed the PR, so merge commits leave the author unknown.
+function headAuthor(raw: RawPR) {
+  const commit = raw.commits.nodes[0]?.commit;
+  return commit?.parents?.totalCount === 1 ? (commit.author?.user?.login ?? '') : '';
+}
 export function normalize(raw: RawPR): PullRequest {
   return {
     id: `${raw.repository.nameWithOwner.toLowerCase()}#${raw.number}`,
@@ -32,6 +38,7 @@ export function normalize(raw: RawPR): PullRequest {
     number: raw.number,
     title: raw.title,
     headOid: raw.commits.nodes[0]?.commit.oid ?? '',
+    headAuthor: headAuthor(raw),
     author: raw.author?.login ?? '',
     authorIsBot: raw.author?.__typename === 'Bot',
     state: raw.state,

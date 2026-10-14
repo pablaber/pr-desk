@@ -98,8 +98,13 @@ export const dashboardRules: DashboardRule[] = [
     state: 'needs-attention',
     priority: 10,
     // Approval satisfies the tracked-repository review prompt; direct requests still apply.
+    // After you push to the PR, someone else's review is the one that counts.
     matches: (s) =>
-      s.trackedRepository && !s.owned && !s.pr.draft && s.pr.reviewDecision !== 'APPROVED',
+      s.trackedRepository &&
+      !s.owned &&
+      !s.lastPushedByYou &&
+      !s.pr.draft &&
+      s.pr.reviewDecision !== 'APPROVED',
     getLabel: () => 'Waiting for your review',
   },
   {
@@ -116,7 +121,9 @@ export const dashboardRules: DashboardRule[] = [
           : s.managed
             ? s.pr.reviewDecision === 'APPROVED'
               ? 'Waiting on merge requirements'
-              : 'Waiting for review'
+              : s.lastPushedByYou
+                ? 'Waiting for another reviewer'
+                : 'Waiting for review'
             : 'No action needed',
   },
 ];

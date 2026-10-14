@@ -32,7 +32,12 @@ export interface RawPR {
   reviewThreads: Connection<{ isResolved: boolean; isOutdated: boolean }>;
   commits: {
     nodes: {
-      commit: { oid: string; statusCheckRollup: { contexts: Connection<RawCheck> } | null };
+      commit: {
+        oid: string;
+        author?: { user: { login: string } | null } | null;
+        parents?: { totalCount: number };
+        statusCheckRollup: { contexts: Connection<RawCheck> } | null;
+      };
     }[];
   };
 }

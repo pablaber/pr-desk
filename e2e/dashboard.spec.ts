@@ -139,6 +139,17 @@ test.beforeEach(async ({ page }) => {
           {
             commit: {
               oid: 'a'.repeat(40),
+              // A PR listed in myCommitPrs has your commit as its latest.
+              author: {
+                user: {
+                  login: (
+                    JSON.parse(localStorage.getItem('myCommitPrs') ?? '[]') as number[]
+                  ).includes(number)
+                    ? 'alex'
+                    : 'someone',
+                },
+              },
+              parents: { totalCount: 1 },
               statusCheckRollup: {
                 contexts: connection([
                   {
@@ -2749,6 +2760,17 @@ test('bot PRs waiting for review approve and merge after confirmation', async ({
   ]);
   expect(await page.evaluate(() => localStorage.getItem('mergeCalls'))).toBeNull();
   await expect(card).toHaveCount(0);
+});
+
+test('bot PRs whose latest commit is yours wait for another reviewer', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('myCommitPrs', '[7]'));
+  await trackBotPr(page);
+  const card = page.locator('.column').nth(2).locator('.pr-card', { hasText: 'Bump lodash' });
+  await expect(card).toContainText('Waiting for another reviewer');
+  await expect(card).not.toContainText('Waiting for your review');
+  await expect(
+    card.getByRole('button', { name: 'Approve and merge Bump lodash', exact: true }),
+  ).toHaveCount(0);
 });
 
 test('machine-user known bots approve and merge with their login declared', async ({ page }) => {
