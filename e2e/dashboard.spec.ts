@@ -1464,7 +1464,7 @@ test('copies settings, then imports edited JSON from the textarea or a file', as
   await page.getByRole('button', { name: 'Copy settings' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Settings copied' })).toBeVisible();
   const exported = await copied();
-  expect(exported).toMatchObject({ app: 'pr-desk', kind: 'settings', schemaVersion: 14 });
+  expect(exported).toMatchObject({ app: 'pr-desk', kind: 'settings', schemaVersion: 15 });
   expect(exported).not.toHaveProperty('snoozedPullRequests');
 
   const json = page.getByRole('textbox', { name: 'Settings JSON' });
@@ -1963,7 +1963,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
     .click();
   await saveSettings(page);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
-  expect(saved.schemaVersion).toBe(14);
+  expect(saved.schemaVersion).toBe(15);
   expect(saved.ignoreRules).toEqual([]);
   expect(saved.ignoredPullRequests).toHaveProperty('acme/platform#2');
   expect(saved.settings.snoozeOptions).toEqual([]);
@@ -2131,6 +2131,55 @@ test('non-blocking check rules move an approved PR to Ready without a Merge butt
   await closeSettings(page);
   await expect(page.locator('.column').nth(0).locator('.pr-card')).toHaveCount(1);
   await expect(card).toContainText('Ready · policy-bot pending');
+  await expect(card.getByRole('button', { name: /^Merge / })).toHaveCount(0);
+});
+
+test('check rules that allow failures move an approved PR with a failed check to Ready', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const w = window as any,
+      invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      const result = await invoke(command, args);
+      for (const pr of result?.search?.nodes ?? []) {
+        if (pr.number !== 1) continue;
+        pr.mergeStateStatus = 'BLOCKED';
+        pr.commits.nodes[0].commit.statusCheckRollup.contexts.nodes.push({
+          __typename: 'CheckRun',
+          name: 'opencode-review / Risk gate',
+          status: 'COMPLETED',
+          conclusion: 'FAILURE',
+        });
+      }
+      return result;
+    };
+  });
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const card = page.locator('.pr-card').filter({ hasText: 'Reduce cache lookup latency' });
+  await expect(card).toContainText('Checks failed');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSettingsSection(page, 'Non-blocking checks');
+  await page.getByRole('textbox', { name: 'Check rule repository' }).fill('acme/*');
+  await page.getByRole('textbox', { name: 'Check rule check name' }).fill('opencode*');
+  await page.getByRole('button', { name: 'Add check rule', exact: true }).click();
+  const allow = page.getByRole('checkbox', { name: 'Allow failures for acme/* · opencode*' });
+  await expect(allow).not.toBeChecked();
+  await saveSettings(page);
+  await closeSettings(page);
+  await expect(card).toContainText('Checks failed');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSettingsSection(page, 'Non-blocking checks');
+  await allow.check();
+  await saveSettings(page);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
+  expect(saved.checkRules).toEqual([
+    { repository: 'acme/*', check: 'opencode*', allowFailures: true },
+  ]);
+  await closeSettings(page);
+  await expect(page.locator('.column').nth(0).locator('.pr-card')).toHaveCount(1);
+  await expect(card).toContainText('Ready · opencode-review / Risk gate failed');
   await expect(card.getByRole('button', { name: /^Merge / })).toHaveCount(0);
 });
 

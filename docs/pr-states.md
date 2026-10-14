@@ -58,25 +58,26 @@ Your own drafts are **not** hidden; they fall through to Waiting.
 
 Each visible PR is reduced to a handful of booleans. The terms used in the rule table:
 
-| Signal                    | True when                                                                                                                                                                                                                                                                 |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **owned**                 | the PR author is you                                                                                                                                                                                                                                                      |
-| **bot**                   | not owned, the author is in Settings → Known bots, **and** the PR comes from a tracked repository or is watched                                                                                                                                                           |
-| **managed**               | owned **or** bot — the PRs you are responsible for landing                                                                                                                                                                                                                |
-| **review requested**      | you personally are in the PR's requested reviewers                                                                                                                                                                                                                        |
-| **active threads**        | unresolved review threads that are not outdated (outdated unresolved threads only show as secondary text)                                                                                                                                                                 |
-| **changes requested**     | GitHub's aggregate `reviewDecision` is `CHANGES_REQUESTED`                                                                                                                                                                                                                |
-| **failed checks**         | any check on the latest commit failed — including optional and non-blocking checks                                                                                                                                                                                        |
-| **conflict**              | `mergeable` is `CONFLICTING`                                                                                                                                                                                                                                              |
-| **behind**                | `mergeStateStatus` is `BEHIND` — GitHub only reports this when branch protection requires an up-to-date branch                                                                                                                                                            |
-| **queued**                | the PR is in a merge queue                                                                                                                                                                                                                                                |
-| **auto-merge**            | auto-merge is enabled                                                                                                                                                                                                                                                     |
-| **non-blocking pending**  | a check matching a Settings → Non-blocking checks rule for this repository is still pending                                                                                                                                                                               |
-| **approved**              | managed, not a draft, `reviewDecision` is `APPROVED`, every check passes (ignoring non-blocking pending ones), and `mergeable` is `MERGEABLE`                                                                                                                             |
-| **ready**                 | approved, not queued, no auto-merge, **no** non-blocking pending checks, and `mergeStateStatus` is `CLEAN`, `HAS_HOOKS` or `UNSTABLE`                                                                                                                                     |
-| **ready, pending checks** | approved, not queued, no auto-merge, **some** non-blocking pending checks, and `mergeStateStatus` is `BLOCKED`, `CLEAN`, `HAS_HOOKS` or `UNSTABLE`                                                                                                                        |
-| **updatable**             | managed, not a draft, behind, `mergeable` is `MERGEABLE`, not queued, no auto-merge; checks may be in any state                                                                                                                                                           |
-| **approvable**            | bot, not a draft, `reviewDecision` is neither `APPROVED` nor `CHANGES_REQUESTED`, every check passes (non-blocking pending ones included), `mergeable` is `MERGEABLE`, not queued, no auto-merge, and `mergeStateStatus` is `BLOCKED`, `CLEAN`, `HAS_HOOKS` or `UNSTABLE` |
+| Signal                         | True when                                                                                                                                                                                                                                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **owned**                      | the PR author is you                                                                                                                                                                                                                                                                             |
+| **bot**                        | not owned, the author is in Settings → Known bots, **and** the PR comes from a tracked repository or is watched                                                                                                                                                                                  |
+| **managed**                    | owned **or** bot — the PRs you are responsible for landing                                                                                                                                                                                                                                       |
+| **review requested**           | you personally are in the PR's requested reviewers                                                                                                                                                                                                                                               |
+| **active threads**             | unresolved review threads that are not outdated (outdated unresolved threads only show as secondary text)                                                                                                                                                                                        |
+| **changes requested**          | GitHub's aggregate `reviewDecision` is `CHANGES_REQUESTED`                                                                                                                                                                                                                                       |
+| **failed checks**              | any check on the latest commit failed — including optional and non-blocking checks, except those matching a rule that allows failures                                                                                                                                                            |
+| **conflict**                   | `mergeable` is `CONFLICTING`                                                                                                                                                                                                                                                                     |
+| **behind**                     | `mergeStateStatus` is `BEHIND` — GitHub only reports this when branch protection requires an up-to-date branch                                                                                                                                                                                   |
+| **queued**                     | the PR is in a merge queue                                                                                                                                                                                                                                                                       |
+| **auto-merge**                 | auto-merge is enabled                                                                                                                                                                                                                                                                            |
+| **non-blocking pending**       | a check matching a Settings → Non-blocking checks rule for this repository is still pending                                                                                                                                                                                                      |
+| **allowed failures**           | a check matching a Non-blocking checks rule with Allow failures on for this repository has failed                                                                                                                                                                                                |
+| **approved**                   | managed, not a draft, `reviewDecision` is `APPROVED`, every check passes (ignoring non-blocking pending ones and allowed failures), and `mergeable` is `MERGEABLE`                                                                                                                               |
+| **ready**                      | approved, not queued, no auto-merge, **no** non-blocking pending checks or allowed failures, and `mergeStateStatus` is `CLEAN`, `HAS_HOOKS` or `UNSTABLE`                                                                                                                                        |
+| **ready, non-blocking checks** | approved, not queued, no auto-merge, **some** non-blocking pending checks or allowed failures, and `mergeStateStatus` is `BLOCKED`, `CLEAN`, `HAS_HOOKS` or `UNSTABLE`                                                                                                                           |
+| **updatable**                  | managed, not a draft, behind, `mergeable` is `MERGEABLE`, not queued, no auto-merge; checks may be in any state                                                                                                                                                                                  |
+| **approvable**                 | bot, not a draft, `reviewDecision` is neither `APPROVED` nor `CHANGES_REQUESTED`, every check passes (non-blocking pending checks and allowed failures included), `mergeable` is `MERGEABLE`, not queued, no auto-merge, and `mergeStateStatus` is `BLOCKED`, `CLEAN`, `HAS_HOOKS` or `UNSTABLE` |
 
 ### Check states
 
@@ -87,28 +88,29 @@ Each visible PR is reduced to a handful of booleans. The terms used in the rule 
 | anything else, including in-progress and unknown                                            | pending   |
 
 Every check counts, required or not. A PR with no checks passes. Pending checks block readiness
-unless a non-blocking check rule matches them; failures always count.
+unless a non-blocking check rule matches them. Failures count unless a matching rule has Allow
+failures on; any matching rule with it on is enough.
 
 ## Step 3: rules and columns
 
 Every rule is evaluated. The **highest-priority match** decides the column and the card's primary
 label; other matching rules (except the `waiting` catch-all) show as secondary status text.
 
-| Priority | Rule                   | Column              | Condition                                                     | Primary label                 |
-| -------: | ---------------------- | ------------------- | ------------------------------------------------------------- | ----------------------------- |
-|      100 | `review`               | **Needs attention** | review requested from you                                     | Review requested              |
-|       90 | `threads`              | **Needs attention** | owned and has active threads                                  | _N_ unresolved thread(s)      |
-|       80 | `changes`              | **Needs attention** | owned and changes requested                                   | Changes requested             |
-|       70 | `checks`               | **Needs attention** | managed and any failed check                                  | Checks failed                 |
-|       60 | `conflict`             | **Needs attention** | managed and conflict                                          | Merge conflict                |
-|       58 | `behind`               | **Needs attention** | managed and behind                                            | Behind _base branch_          |
-|       55 | `queued`               | **Waiting**         | queued (anyone's PR)                                          | Queued to merge · #_position_ |
-|       54 | `auto-merge`           | **Waiting**         | auto-merge enabled and not queued (anyone's PR)               | Auto-merge enabled            |
-|       50 | `ready`                | **Ready to merge**  | ready                                                         | Ready to merge                |
-|       50 | `ready-pending-checks` | **Ready to merge**  | ready, pending checks                                         | Ready · _check names_ pending |
-|       50 | `approvable`           | **Ready to merge**  | approvable                                                    | Ready to approve and merge    |
-|       10 | `tracked-repository`   | **Needs attention** | from a tracked repository, not owned, not draft, not approved | Waiting for your review       |
-|        0 | `waiting`\*            | **Waiting**         | always (fallback)                                             | see below                     |
+| Priority | Rule                        | Column              | Condition                                                     | Primary label                                        |
+| -------: | --------------------------- | ------------------- | ------------------------------------------------------------- | ---------------------------------------------------- |
+|      100 | `review`                    | **Needs attention** | review requested from you                                     | Review requested                                     |
+|       90 | `threads`                   | **Needs attention** | owned and has active threads                                  | _N_ unresolved thread(s)                             |
+|       80 | `changes`                   | **Needs attention** | owned and changes requested                                   | Changes requested                                    |
+|       70 | `checks`                    | **Needs attention** | managed and any failed check                                  | Checks failed                                        |
+|       60 | `conflict`                  | **Needs attention** | managed and conflict                                          | Merge conflict                                       |
+|       58 | `behind`                    | **Needs attention** | managed and behind                                            | Behind _base branch_                                 |
+|       55 | `queued`                    | **Waiting**         | queued (anyone's PR)                                          | Queued to merge · #_position_                        |
+|       54 | `auto-merge`                | **Waiting**         | auto-merge enabled and not queued (anyone's PR)               | Auto-merge enabled                                   |
+|       50 | `ready`                     | **Ready to merge**  | ready                                                         | Ready to merge                                       |
+|       50 | `ready-non-blocking-checks` | **Ready to merge**  | ready, non-blocking checks                                    | Ready · _check names_ pending · _check names_ failed |
+|       50 | `approvable`                | **Ready to merge**  | approvable                                                    | Ready to approve and merge                           |
+|       10 | `tracked-repository`        | **Needs attention** | from a tracked repository, not owned, not draft, not approved | Waiting for your review                              |
+|        0 | `waiting`\*                 | **Waiting**         | always (fallback)                                             | see below                                            |
 
 \* Catch-all rule: it explains why the PR is on the desk and never appears in secondary status.
 
@@ -144,8 +146,8 @@ The Waiting fallback picks its label from the first that applies:
 - An owned draft can still need attention (for example, a review thread or a failed check), but
   it never becomes Ready to merge.
 - `BEHIND`, `DIRTY`, `UNKNOWN`, and `DRAFT` merge states keep a PR out of Ready to merge.
-  `BLOCKED` is tolerated only while a non-blocking check is pending, because GitHub does not say
-  which rule is blocking.
+  `BLOCKED` is tolerated only while a non-blocking check is pending or an allowed failure is
+  present, because GitHub does not say which rule is blocking.
 - An approvable bot PR accepts `BLOCKED`, since the missing review is what blocks it. An explicit
   personal review request outranks it, so such a PR stays in Needs attention.
 - GitHub reports `BEHIND` ahead of `BLOCKED`, so a bot PR behind its base is not approvable even
@@ -164,7 +166,7 @@ The common situations, from your point of view:
 | Your PR or a tracked bot PR is behind a base branch that must be up to date        | Needs attention |
 | Someone else's unapproved open PR in a repository you track, including bot PRs     | Needs attention |
 | Your PR or tracked bot PR is approved, green, and mergeable                        | Ready to merge  |
-| Same, but a non-blocking check is still pending                                    | Ready to merge  |
+| Same, but a non-blocking check is still pending, or failed under Allow failures    | Ready to merge  |
 | A tracked bot PR waiting for review with passing checks that GitHub can merge      | Ready to merge  |
 | Any PR in a merge queue or with auto-merge on                                      | Waiting         |
 | Your draft                                                                         | Waiting         |

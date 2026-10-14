@@ -232,9 +232,13 @@ describe('non-blocking check rules', () => {
       ],
       ...overrides,
     });
-  const withRule = (repository = 'acme/terraform-*', check = 'policy-bot') => ({
+  const withRule = (
+    repository = 'acme/terraform-*',
+    check = 'policy-bot',
+    allowFailures = false,
+  ) => ({
     ...local,
-    checkRules: [{ repository, check }],
+    checkRules: [{ repository, check, allowFailures }],
   });
   it('moves the PR to Ready without in-app merge', () =>
     expect(classify(blocked(), 'me', withRule())).toMatchObject({
@@ -264,6 +268,65 @@ describe('non-blocking check rules', () => {
     expect(
       classify(blocked({ checks: [{ name: 'policy-bot', state: 'failed' }] }), 'me', withRule()),
     ).toMatchObject({ state: 'needs-attention', primary: 'Checks failed' }));
+  describe('with failures allowed', () => {
+    const failing = (overrides: Partial<PullRequest> = {}) =>
+      blocked({
+        checks: [
+          { name: 'CI', state: 'passing' },
+          { name: 'policy-bot', state: 'failed' },
+        ],
+        ...overrides,
+      });
+    const allowing = withRule('acme/*', 'policy-*', true);
+    it('moves an approved PR to Ready without in-app merge', () =>
+      expect(classify(failing(), 'me', allowing)).toMatchObject({
+        state: 'ready-to-merge',
+        primary: 'Ready · policy-bot failed',
+        canMerge: false,
+      }));
+    it('does not offer merge even when GitHub reports UNSTABLE', () =>
+      expect(classify(failing({ mergeStateStatus: 'UNSTABLE' }), 'me', allowing)).toMatchObject({
+        state: 'ready-to-merge',
+        canMerge: false,
+      }));
+    it('lists pending and failed non-blocking checks together', () =>
+      expect(
+        classify(
+          failing({
+            checks: [
+              { name: 'policy-bot', state: 'failed' },
+              { name: 'policy-gate', state: 'pending' },
+            ],
+          }),
+          'me',
+          allowing,
+        )!.primary,
+      ).toBe('Ready · policy-gate pending · policy-bot failed'));
+    it('waits for review instead of reporting the failure', () =>
+      expect(
+        classify(failing({ reviewDecision: 'REVIEW_REQUIRED' }), 'me', allowing),
+      ).toMatchObject({ state: 'waiting', primary: 'Waiting for review' }));
+    it('still reports failures of checks the rule does not match', () =>
+      expect(
+        classify(
+          failing({
+            checks: [
+              { name: 'policy-bot', state: 'failed' },
+              { name: 'build', state: 'failed' },
+            ],
+          }),
+          'me',
+          allowing,
+        ),
+      ).toMatchObject({ state: 'needs-attention', primary: 'Checks failed' }));
+    it('allows a failure when any matching rule allows it', () =>
+      expect(
+        classify(failing(), 'me', {
+          ...local,
+          checkRules: [...withRule().checkRules, ...allowing.checkRules],
+        })!.state,
+      ).toBe('ready-to-merge'));
+  });
   it('does not exempt other pending checks', () =>
     expect(
       classify(
@@ -407,8 +470,23 @@ describe('approve and merge', () => {
       primary: 'Review requested',
       canApproveAndMerge: true,
     }));
+  it('is not offered while an allowed failure is present', () => {
+    const prefs = {
+      ...local,
+      checkRules: [{ repository: '*', check: 'policy-bot', allowFailures: true }],
+    };
+    const item = classify(
+      waiting({ checks: [{ name: 'policy-bot', state: 'failed' }] }),
+      'me',
+      prefs,
+    );
+    expect(item?.canApproveAndMerge).toBe(false);
+  });
   it('is not offered while a non-blocking check is pending', () => {
-    const prefs = { ...local, checkRules: [{ repository: '*', check: 'policy-bot' }] };
+    const prefs = {
+      ...local,
+      checkRules: [{ repository: '*', check: 'policy-bot', allowFailures: false }],
+    };
     const item = classify(
       waiting({ checks: [{ name: 'policy-bot', state: 'pending' }] }),
       'me',

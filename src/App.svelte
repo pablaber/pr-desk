@@ -513,11 +513,11 @@
       return false;
     }
   }
-  function addCheckRule(repository: string, check: string): boolean {
+  function addCheckRule(repository: string, check: string, allowFailures: boolean): boolean {
     if (saving) return false;
     error = '';
     try {
-      const rule = parseCheckRule(repository, check);
+      const rule = parseCheckRule(repository, check, allowFailures);
       if (settingsView.checkRules.some((e) => checkRuleKey(e) === checkRuleKey(rule)))
         throw new Error('That check rule is already configured.');
       editDraft((next) => {
@@ -528,6 +528,14 @@
       showError('settings', String(e));
       return false;
     }
+  }
+  function allowCheckRuleFailures(rule: CheckRule, allowFailures: boolean) {
+    error = '';
+    editDraft((next) => {
+      next.checkRules = next.checkRules.map((e) =>
+        checkRuleKey(e) === checkRuleKey(rule) ? { ...e, allowFailures } : e,
+      );
+    });
   }
   function removeCheckRule(rule: CheckRule) {
     error = '';
@@ -1185,6 +1193,7 @@
     onadd={add}
     onremove={remove}
     onaddcheckrule={addCheckRule}
+    onallowcheckrulefailures={allowCheckRuleFailures}
     onremovecheckrule={removeCheckRule}
     onaddtitletagrule={addTitleTagRule}
     onremovetitletagrule={removeTitleTagRule}

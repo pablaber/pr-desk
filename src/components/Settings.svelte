@@ -57,6 +57,7 @@
     onadd,
     onremove,
     onaddcheckrule,
+    onallowcheckrulefailures,
     onremovecheckrule,
     onaddtitletagrule,
     onremovetitletagrule,
@@ -92,7 +93,8 @@
     onclose: () => void;
     onadd: (kind: 'repo' | 'pr' | 'bot' | IgnoreRuleKind, value: string) => Promise<boolean>;
     onremove: (kind: 'repo' | 'pr' | 'bot' | IgnoreRuleKind, value: string) => void;
-    onaddcheckrule: (repository: string, check: string) => boolean;
+    onaddcheckrule: (repository: string, check: string, allowFailures: boolean) => boolean;
+    onallowcheckrulefailures: (rule: CheckRule, allowFailures: boolean) => void;
     onremovecheckrule: (rule: CheckRule) => void;
     onaddtitletagrule: (pattern: string) => boolean;
     onremovetitletagrule: (rule: TitleTagRule) => void;
@@ -174,7 +176,8 @@
     repository = $state(''),
     pr = $state('');
   let checkRepository = $state(''),
-    checkName = $state('');
+    checkName = $state(''),
+    checkAllowFailures = $state(false);
   let bot = $state('');
   let repositoryError = $state('');
   // Adding a repository or a watched PR asks GitHub whether it exists before the value joins the
@@ -576,13 +579,16 @@
           </h2>
           <p>
             A pending check matching a rule no longer keeps an approved PR out of Ready to merge.
-            Failed checks still need attention. These PRs have no Merge button here, so open them on
-            GitHub to finish, for example with atlantis apply.
+            Failed checks still need attention unless the rule allows failures. These PRs have no
+            Merge button here, so open them on GitHub to finish, for example with atlantis apply.
           </p>
           <form
             onsubmit={(e) => {
               e.preventDefault();
-              if (onaddcheckrule(checkRepository, checkName)) checkRepository = checkName = '';
+              if (onaddcheckrule(checkRepository, checkName, checkAllowFailures)) {
+                checkRepository = checkName = '';
+                checkAllowFailures = false;
+              }
             }}
           >
             <input
@@ -607,6 +613,9 @@
               required
               disabled={busy}
             />
+            <label class="checkbox-option"
+              ><input type="checkbox" bind:checked={checkAllowFailures} disabled={busy} /> Allow failures</label
+            >
             <button class="primary-button" disabled={busy}>Add check rule</button>
           </form>
           <p>
@@ -614,9 +623,19 @@
             the check name.
           </p>
           {#each preferences.checkRules as rule}<div class="setting-row">
-              <span><code>{rule.repository}</code> · <code>{rule.check}</code></span><button
-                disabled={busy}
-                onclick={() => onremovecheckrule(rule)}>Remove</button
+              <span><code>{rule.repository}</code> · <code>{rule.check}</code></span>
+              <span class="setting-row-actions"
+                ><label class="checkbox-option"
+                  ><input
+                    type="checkbox"
+                    aria-label={`Allow failures for ${rule.repository} · ${rule.check}`}
+                    checked={rule.allowFailures}
+                    disabled={busy}
+                    onchange={(event) =>
+                      onallowcheckrulefailures(rule, event.currentTarget.checked)}
+                  /> Allow failures</label
+                ><button disabled={busy} onclick={() => onremovecheckrule(rule)}>Remove</button
+                ></span
               >
             </div>{:else}<p class="empty-setting">No check rules.</p>{/each}
         </section>

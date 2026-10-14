@@ -13,6 +13,8 @@ export interface IgnoreRule {
 export interface CheckRule {
   repository: string;
   check: string;
+  // Off by default: failed checks need attention unless the user opts in per rule.
+  allowFailures: boolean;
 }
 export interface TitleTagRule {
   pattern: string;
@@ -39,7 +41,7 @@ export interface PRLabel {
 export type DockBadgeMode = 'off' | 'ready-to-merge' | 'needs-attention' | 'both';
 export type InterfaceScale = 90 | 100 | 115 | 130;
 export interface AppState {
-  schemaVersion: 14;
+  schemaVersion: 15;
   trackedRepositories: string[];
   ignoreRules: IgnoreRule[];
   checkRules: CheckRule[];
@@ -67,7 +69,7 @@ export const defaultSnoozeOptions = (): SnoozeOption[] => [
 ];
 const defaultKnownBots = (): string[] => ['dependabot[bot]', 'renovate[bot]'];
 export const defaultState = (): AppState => ({
-  schemaVersion: 14,
+  schemaVersion: 15,
   trackedRepositories: [],
   ignoreRules: [],
   checkRules: [],
@@ -103,7 +105,7 @@ export function migrateState(value: unknown): AppState {
     labeledPullRequests?: unknown;
     knownBots?: unknown;
   };
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].includes(stored.schemaVersion))
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].includes(stored.schemaVersion))
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
@@ -129,7 +131,7 @@ export function migrateState(value: unknown): AppState {
     watchedPullRequests: stored.watchedPullRequests,
     ignoredPullRequests: stored.ignoredPullRequests,
     snoozedPullRequests: stored.snoozedPullRequests,
-    schemaVersion: 14,
+    schemaVersion: 15,
     knownBots: readStoredKnownBots(stored),
     ignoreRules: readStoredIgnoreRules(stored),
     checkRules: readStoredCheckRules(stored),
@@ -375,16 +377,22 @@ function readStoredKnownBots(stored: { schemaVersion: number; knownBots?: unknow
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
   }
 }
-export function parseCheckRule(repository: string, check: string): CheckRule {
+export function parseCheckRule(
+  repository: string,
+  check: string,
+  allowFailures: boolean,
+): CheckRule {
   if (typeof check !== 'string') throw new Error('Enter a check name.');
   const name = check.trim().toLowerCase();
   if (!name || /[\u0000-\u001f\u007f]/.test(name))
     throw new Error('Enter a single-line check name, such as policy-bot or atlantis/*.');
-  return { repository: parseRepositoryPattern(repository), check: name };
+  if (typeof allowFailures !== 'boolean') throw new Error('Invalid allow failures setting.');
+  return { repository: parseRepositoryPattern(repository), check: name, allowFailures };
 }
 export function checkRuleKey(rule: CheckRule): string {
   return `${rule.repository}\u0000${rule.check}`;
 }
+const checkRuleSetting = (rule: CheckRule) => `${checkRuleKey(rule)}\u0000${rule.allowFailures}`;
 function readStoredCheckRules(stored: {
   schemaVersion: number;
   checkRules?: unknown;
@@ -392,7 +400,13 @@ function readStoredCheckRules(stored: {
   if (stored.schemaVersion < 6) return [];
   try {
     if (!Array.isArray(stored.checkRules)) throw new Error('Invalid rules');
-    const parsed = stored.checkRules.map((rule) => parseCheckRule(rule?.repository, rule?.check));
+    const parsed = stored.checkRules.map((rule) =>
+      parseCheckRule(
+        rule?.repository,
+        rule?.check,
+        stored.schemaVersion < 15 ? false : rule?.allowFailures,
+      ),
+    );
     return [...new Map(parsed.map((rule) => [checkRuleKey(rule), rule])).values()];
   } catch {
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
@@ -545,7 +559,7 @@ export function draftDiffers(draft: PreferenceDraft, state: AppState): boolean {
     same(draft.watchedPullRequests, state.watchedPullRequests) &&
     same(draft.knownBots, state.knownBots) &&
     same(draft.ignoreRules.map(ignoreRuleKey), state.ignoreRules.map(ignoreRuleKey)) &&
-    same(draft.checkRules.map(checkRuleKey), state.checkRules.map(checkRuleKey)) &&
+    same(draft.checkRules.map(checkRuleSetting), state.checkRules.map(checkRuleSetting)) &&
     same(draft.titleTagRules.map(titleTagRuleKey), state.titleTagRules.map(titleTagRuleKey))
   );
 }

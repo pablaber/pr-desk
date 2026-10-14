@@ -75,11 +75,16 @@ export const dashboardRules: DashboardRule[] = [
     getLabel: () => 'Ready to merge',
   },
   {
-    id: 'ready-pending-checks',
+    id: 'ready-non-blocking-checks',
     state: 'ready-to-merge',
     priority: 50,
-    matches: (s) => s.readyPendingChecks,
-    getLabel: (s) => `Ready · ${s.waitingOn.join(', ')} pending`,
+    matches: (s) => s.readyNonBlockingChecks,
+    getLabel: (s) =>
+      [
+        'Ready',
+        ...(s.waitingOn.length ? [`${s.waitingOn.join(', ')} pending`] : []),
+        ...(s.allowedFailures.length ? [`${s.allowedFailures.join(', ')} failed`] : []),
+      ].join(' · '),
   },
   {
     id: 'approvable',
