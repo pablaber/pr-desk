@@ -62,9 +62,11 @@ Inspect the generated screenshot and include the updated image in the change.
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `src-tauri/src/main.rs`             | the Rust bridge: `gh auth status`, allowlisted read-only GraphQL (`QUERY_NAMES`), close as stale                      |
 | `src-tauri/src/merge.rs`            | merge_pr, approve_and_merge_pr, update_pr_branch: revalidate, then mutate pinned to the confirmed commit              |
+| `src-tauri/src/menu.rs`             | macOS menu: Tauri's default plus Check for Updates…, which only emits an event to the frontend                        |
 | `src/lib/github/`                   | `queries.ts` GraphQL text, `normalize.ts` raw → domain, `refresh.ts` orchestration/concurrency, `client.ts` transport |
 | `src/lib/pr/`                       | `signals.ts` → `dashboard-rules.ts` → `classify.ts` → `card-view-model.ts`                                            |
 | `src/lib/store/app-state.ts`        | versioned preferences and all input validation                                                                        |
+| `src/lib/updates/`                  | update service: scheduling, coalescing, progress, errors, Update resource cleanup, restart gating                     |
 | `src/App.svelte`, `src/components/` | rendering only                                                                                                        |
 | `src/test/fixtures.ts`              | shared unit-test fixtures (never shipped)                                                                             |
 | `.fallowrc.jsonc`                   | Fallow config; the only place for analyzer exceptions, each with its reason                                           |
@@ -99,6 +101,10 @@ Inspect the generated screenshot and include the updated image in the change.
   The update_pr_branch command only updates PRs you authored, or by a known bot, that GitHub
   reports `BEHIND`, and pins the update to the confirmed head commit.
   Keep mutations limited to these actions.
+- The Tauri updater is the one network path outside `gh`: it fetches public release
+  metadata and signed archives from GitHub Releases natively, and must keep working when
+  `gh` authentication fails. Its scheduling and state live in `src/lib/updates/`; it never
+  touches preferences, and the app restarts only once `saving` is clear.
 - The bridge only runs GraphQL operations named in `QUERY_NAMES` in
   `src-tauri/src/main.rs`. A new `query Desk…` in `src/lib/github/` must be added there
   in the same change, or every call fails at runtime with "Only named PR Desk read-only

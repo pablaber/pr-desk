@@ -54,6 +54,10 @@ access and persistence require Tauri.
 - `src/lib/pr/`: normalized model → signals → declarative dashboard rules →
   classification and sorting → card view models.
 - `src/lib/store/`: versioned local preferences and canonical input validation.
+- `src/lib/updates/`: the update service — launch and 24-hour checks, coalescing,
+  download progress, errors, releasing the updater's resource, and restarting only once
+  pending writes finish. Updates are off in `npm run dev` and `npm run tauri dev`
+  (`import.meta.env.DEV`); Playwright runs a production build, so it exercises them.
 - `src/components/` and `src/App.svelte`: dashboard, filters, cards, menus, setup and
   error states, and settings.
 

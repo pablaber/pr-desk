@@ -1,10 +1,14 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
+  import { getVersion } from '@tauri-apps/api/app';
   import { isTauri } from '@tauri-apps/api/core';
+  import { listen } from '@tauri-apps/api/event';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { openUrl } from '@tauri-apps/plugin-opener';
-  import { version } from '../package.json';
+  import { relaunch } from '@tauri-apps/plugin-process';
+  import { check } from '@tauri-apps/plugin-updater';
+  import { version as buildVersion } from '../package.json';
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
   import Bug from '@lucide/svelte/icons/bug';
   import Copy from '@lucide/svelte/icons/copy';
@@ -44,6 +48,8 @@
   import UnsavedChanges from './components/UnsavedChanges.svelte';
   import HotkeyHelp from './components/HotkeyHelp.svelte';
   import Toaster from './components/Toaster.svelte';
+  import UpdateDialog from './components/UpdateDialog.svelte';
+  import { UpdateService } from './lib/updates/updater';
   import { showToast } from './lib/toast/toasts.svelte';
   import type { GhCliInfo } from './lib/github/types';
   import { GhGitHubService } from './lib/github/client';
@@ -134,6 +140,30 @@
     saving = $state(false),
     initialized = $state(false);
   let silentRefresh = $state(false);
+  // The bundle's version is what the updater compares, and a test build can override it, so the
+  // build-time package.json value only stands in until it loads (and outside Tauri).
+  let version = $state(buildVersion);
+  const updates = new UpdateService({
+    check,
+    relaunch,
+    // Every preference write and confirmed GitHub action runs under saving; reads can be abandoned.
+    busy: () => saving,
+    onError: (message) => recordError('updates', message),
+    // npm run dev has no Tauri at all, and npm run tauri dev serves from Vite's dev server.
+    enabled: isTauri() && !import.meta.env.DEV,
+    onWake: (callback) => {
+      const visible = () => document.visibilityState === 'visible' && callback();
+      document.addEventListener('visibilitychange', visible);
+      window.addEventListener('focus', callback);
+      return () => {
+        document.removeEventListener('visibilitychange', visible);
+        window.removeEventListener('focus', callback);
+      };
+    },
+  });
+  let update = $state.raw(updates.state);
+  let updateOffered = $derived(update.version !== null);
+  let offerLabel = $derived(`Update available, v${update.version}`);
   let refreshQueued = false;
   let completed = $state<CompletedSnapshot | null>(null),
     completedLoading = $state(false);
@@ -240,6 +270,21 @@
   });
   onMount(() => {
     void start();
+    if (isTauri())
+      getVersion().then(
+        (v) => (version = v),
+        (e) => recordError('setup', `Could not read the app version: ${String(e)}`),
+      );
+    // Independent of gh, so updates stay reachable when GitHub sign-in fails.
+    const unsubscribe = updates.subscribe((state) => (update = state));
+    updates.start();
+    // PR Desk → Check for Updates… in the app menu takes the same path as the sidebar button.
+    const unlisten = isTauri()
+      ? listen('check-for-updates', openUpdates).catch((e) => {
+          recordError('updates', `Could not listen for the app menu: ${String(e)}`);
+          return null;
+        })
+      : null;
     const timer = setInterval(() => (now = Date.now()), 15000);
     const uncaught = (event: ErrorEvent) =>
       recordError('uncaught', String(event.error ?? event.message));
@@ -248,6 +293,9 @@
     window.addEventListener('error', uncaught);
     window.addEventListener('unhandledrejection', unhandled);
     return () => {
+      unsubscribe();
+      updates.dispose();
+      void unlisten?.then((stop) => stop?.());
       clearInterval(timer);
       window.removeEventListener('error', uncaught);
       window.removeEventListener('unhandledrejection', unhandled);
@@ -260,6 +308,10 @@
     const timer = setTimeout(() => void refresh(true), minutes * 60_000);
     return () => clearTimeout(timer);
   });
+  function openUpdates() {
+    if (updateOffered) updates.openDialog();
+    else void updates.checkNow();
+  }
   async function setRefreshInterval(minutes: number) {
     if (!isRefreshInterval(minutes)) return;
     await change((next) => {
@@ -664,7 +716,7 @@
     await refresh();
   }
   function handleHotkey(event: KeyboardEvent) {
-    if (actionPR || confirmClose) return;
+    if (actionPR || confirmClose || update.dialogOpen) return;
     const hotkey = resolveHotkey(event, event.target as HTMLElement | null);
     if (!hotkey) return;
     // Enter must keep activating a focused button or link rather than open the hovered PR.
@@ -871,6 +923,20 @@
       )}
     </nav>
     <div class="sidebar-utilities">
+      <!-- Manual checks live in the app menu; the sidebar only speaks up once there is an update. -->
+      {#if updateOffered}
+        <button
+          class="update-card"
+          onclick={() => updates.openDialog()}
+          aria-label={offerLabel}
+          data-tip={sidebarCollapsed ? offerLabel : null}
+          ><Download size={14} /><span class="nav-text update-card-text" aria-hidden="true"
+            ><span class="update-card-title">Update available</span><span
+              class="update-card-version">v{update.version}</span
+            ></span
+          ></button
+        >
+      {/if}
       <nav aria-label="Preferences">
         {@render navButton(
           'Settings',
@@ -1139,6 +1205,14 @@
   oncancel={() => {
     if (!saving) confirmClose = false;
   }}
+/>
+<UpdateDialog
+  {update}
+  installedVersion={version}
+  onupdate={() => void updates.install()}
+  onretry={() => void updates.retry()}
+  onlater={() => updates.dismiss()}
+  onopen={open}
 />
 <HotkeyHelp open={showHotkeys} onclose={() => (showHotkeys = false)} />
 

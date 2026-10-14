@@ -173,6 +173,38 @@ nav button.active {
   margin-top: auto;
   padding-top: 24px;
 }
+.update-card {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 7px 10px;
+  border: 1px solid #c9d9c4;
+  border-radius: 8px;
+  background: #e9f0e5;
+  color: #3f6746;
+  font-size: 11px;
+  text-align: left;
+  white-space: nowrap;
+}
+.update-card:hover {
+  background: #dfe9da;
+  color: #294d36;
+}
+/* Two lines, because "Update available" and the version do not fit one line of the column. */
+.update-card-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.update-card-title {
+  font-weight: 600;
+}
+.update-card-version {
+  font-size: 10px;
+  color: #7c9078;
+}
 .sidebar-bottom {
   padding: 12px 8px 0;
   color: #62725e;
@@ -1940,6 +1972,10 @@ aside.collapsed .sidebar-toggle {
 aside.collapsed .shortcuts-row {
   margin: 4px 0 0;
   padding: 10px 0 0;
+}
+aside.collapsed .update-card {
+  justify-content: center;
+  padding: 10px 0;
 }
 aside [data-tip] {
   position: relative;
