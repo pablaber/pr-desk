@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.19.0](https://github.com/pablaber/pr-desk/compare/v1.18.0...v1.19.0) (2026-10-14)
+
+
+### Features
+
+* allow failed checks per non-blocking check rule ([#136](https://github.com/pablaber/pr-desk/issues/136)) ([e28419a](https://github.com/pablaber/pr-desk/commit/e28419a62fb2fd05b900023e76283b153979d89a))
+
+
+### Bug Fixes
+
+* stop self-review prompts after your latest commit ([#137](https://github.com/pablaber/pr-desk/issues/137)) ([2013bf0](https://github.com/pablaber/pr-desk/commit/2013bf0928feace286c61f406e85c7019f9966cf))
+* wait for github to recheck mergeability before merging ([#134](https://github.com/pablaber/pr-desk/issues/134)) ([cea5920](https://github.com/pablaber/pr-desk/commit/cea5920f43bca5d57df9a924501017acafd51a79))
+
 ## [1.18.0](https://github.com/pablaber/pr-desk/compare/v1.17.0...v1.18.0) (2026-10-14)
 
 
