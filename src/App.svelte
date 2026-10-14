@@ -1,12 +1,13 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
+  import { getVersion } from '@tauri-apps/api/app';
   import { isTauri } from '@tauri-apps/api/core';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { relaunch } from '@tauri-apps/plugin-process';
   import { check } from '@tauri-apps/plugin-updater';
-  import { version } from '../package.json';
+  import { version as buildVersion } from '../package.json';
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
   import Bug from '@lucide/svelte/icons/bug';
   import CircleArrowDown from '@lucide/svelte/icons/circle-arrow-down';
@@ -139,6 +140,9 @@
     saving = $state(false),
     initialized = $state(false);
   let silentRefresh = $state(false);
+  // The bundle's version is what the updater compares, and a test build can override it, so the
+  // build-time package.json value only stands in until it loads (and outside Tauri).
+  let version = $state(buildVersion);
   const updates = new UpdateService({
     check,
     relaunch,
@@ -266,6 +270,11 @@
   });
   onMount(() => {
     void start();
+    if (isTauri())
+      getVersion().then(
+        (v) => (version = v),
+        (e) => recordError('setup', `Could not read the app version: ${String(e)}`),
+      );
     // Independent of gh, so updates stay reachable when GitHub sign-in fails.
     const unsubscribe = updates.subscribe((state) => (update = state));
     updates.start();

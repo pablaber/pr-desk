@@ -1,4 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
+import packageJson from '../package.json' with { type: 'json' };
+
+const { version } = packageJson;
 
 // Settings is a modal overlay: pick a section from its sidebar to reach that section's controls.
 async function openSettingsSection(page: Page, name: string) {
@@ -23,6 +26,8 @@ async function saveSettings(page: Page) {
 }
 
 test.beforeEach(async ({ page }) => {
+  // The bundle reports the package version unless a test sets appVersion.
+  await page.addInitScript((v) => ((window as any).packageVersion = v), version);
   await page.addInitScript(() => {
     const w = window as unknown as {
       __TAURI_INTERNALS__: unknown;
@@ -184,6 +189,8 @@ test.beforeEach(async ({ page }) => {
           send({ event: 'Finished' });
           return;
         }
+        if (command === 'plugin:app|version')
+          return localStorage.getItem('appVersion') ?? (w as any).packageVersion;
         if (command === 'plugin:resources|close') {
           w.closedResources.push(args.rid);
           return;
@@ -2918,6 +2925,7 @@ test('updates stay available when GitHub authentication fails', async ({ page })
   });
   await page.goto('/');
   await expect(page.locator('.setup [role="alert"]')).toContainText('not logged into');
+  await expect(page.locator('.version')).toHaveText(`v${version}`);
   const offer = page.getByRole('button', { name: 'Update available', exact: true });
   await offer.click();
   await page.getByRole('button', { name: 'Update and restart', exact: true }).click();
@@ -2937,4 +2945,21 @@ test('the collapsed sidebar names the update action in its tooltip', async ({ pa
     .toBeLessThanOrEqual(60);
   await offer.click();
   await expect(page.getByRole('dialog', { name: 'Update available' })).toBeVisible();
+});
+
+test('the sidebar and update dialog show the version the running bundle reports', async ({
+  page,
+}) => {
+  // A test build overrides the bundle version, so package.json no longer matches the app.
+  await page.addInitScript(() => {
+    localStorage.setItem('appVersion', '99.0.1');
+    localStorage.setItem('updateVersion', '99.0.2');
+  });
+  await page.goto('/');
+  await expect(page.locator('.version')).toHaveText('v99.0.1');
+  await page.getByRole('button', { name: 'Update available', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Update available' }).locator('dd')).toHaveText([
+    'v99.0.1',
+    'v99.0.2',
+  ]);
 });
