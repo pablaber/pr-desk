@@ -96,7 +96,9 @@ export class HistoryLog {
   // the achievement levels the action unlocked.
   record(action: HistoryAction): Unlock[] {
     if (!this.account) return [];
-    return this.#set(applyAction(this.account, action, this.#login, this.#now()));
+    const next = applyAction(this.account, action, this.#login, this.#now());
+    // A repeated same-day attention-clear comes back unchanged and needs no write.
+    return this.#set(next, next !== this.account);
   }
 
   get hasUnseenAchievements() {

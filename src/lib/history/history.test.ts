@@ -101,6 +101,19 @@ describe('HistoryLog', () => {
     expect(saved.at(-1)?.accounts.me.events).toHaveLength(1);
   });
 
+  it('does not rewrite the file for a repeated attention-clear on the same day', async () => {
+    const { log, deps } = setup();
+    await log.open('me');
+    log.record({ kind: 'attention-clear' });
+    await flush();
+    const writes = deps.save.mock.calls.length;
+    vi.setSystemTime(start + 60_000);
+    log.record({ kind: 'attention-clear' });
+    await flush();
+    expect(deps.save).toHaveBeenCalledTimes(writes);
+    expect(log.account?.events).toHaveLength(1);
+  });
+
   it('reports a failed write and keeps writing later changes', async () => {
     const { log, deps } = setup();
     await log.open('me');
