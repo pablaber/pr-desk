@@ -14,6 +14,8 @@ const now = new Date(2026, 9, 15, 14, 30).getTime();
 const local = (month: number, day: number, hour = 12) => new Date(2026, month, day, hour).getTime();
 const fact = (at: number): Fact => ({
   id: String(at),
+  url: '',
+  title: '',
   repository: 'acme/api',
   at,
   createdAt: null,

@@ -500,6 +500,10 @@ test('the Completed view lists recently merged pull requests and opens them', as
   await expect(page.getByRole('heading', { name: 'Completed' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible();
   await expect(page.getByText('1 merged pull request', { exact: true })).toBeVisible();
+  // The time and the person who merged it are separate words.
+  await expect(page.locator('.completed-row .secondary')).toHaveText(
+    /^Merged \d{1,2}:\d{2}\s[AP]M by sam$/,
+  );
   await page
     .getByRole('button', { name: 'Open Reduce cache lookup latency on GitHub', exact: true })
     .click();
@@ -523,10 +527,10 @@ test('history syncs in the background and Completed shows when tracking began', 
   expect(account.entries['acme/platform#1']).toMatchObject({ author: 'alex', mergedBy: 'alex' });
   expect(account.trackingSince).toBe(await page.evaluate(() => new Date().setHours(0, 0, 0, 0)));
   await page.getByRole('button', { name: /^Completed/ }).click();
-  const today = await page.evaluate(() =>
-    new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
+  await expect(page.getByRole('region', { name: 'This week' })).toContainText(
+    'Tracking since today',
   );
-  await expect(page.locator('.completed-summary')).toContainText(`Tracking since ${today}`);
+  await expect(page.locator('.completed-summary')).not.toContainText('Tracking since');
   await page.screenshot({ path: '.context/completed-tracking-since.png' });
 
   // An account saved before newer optional fields existed still loads and keeps its start.
@@ -541,7 +545,9 @@ test('history syncs in the background and Completed shows when tracking began', 
   );
   await page.reload();
   await page.keyboard.press('Shift+C');
-  await expect(page.locator('.completed-summary')).toContainText('Tracking since Sep 1, 2026');
+  await expect(page.getByRole('region', { name: 'This week' })).toContainText(
+    'Tracking since Sep 1, 2026',
+  );
   await expect.poll(async () => (await history())?.accounts.alex.syncedThrough).toBeGreaterThan(0);
 });
 
@@ -675,6 +681,221 @@ test('Activity moves between periods and stops at the first tracked one', async 
   await activity.locator('.activity-cell.flip').first().hover();
   await expect(activity.locator('.activity-tip:visible')).toContainText('approved');
   await page.screenshot({ path: '.context/activity-month.png', fullPage: true });
+});
+
+// Thursday 15 October 2026, 2 PM. History is seeded before the app loads so the week has a past.
+async function seedWeek(page: Page, trackingSince = new Date(2026, 8, 14).getTime()) {
+  await page.clock.install({ time: new Date(2026, 9, 15, 14, 0) });
+  await page.addInitScript((since) => {
+    if (localStorage.getItem('history')) return;
+    const entries: Record<string, unknown> = {};
+    const local = (day: number, hour: number, minute = 0) =>
+      new Date(2026, 9, day, hour, minute).toISOString();
+    // [day of October, PRs merged that day]: Monday to Thursday last week, then Monday to Wednesday.
+    // The one PR on Friday the 9th is added below.
+    const merged = [
+      [5, 3],
+      [6, 2],
+      [7, 1],
+      [8, 4],
+      [12, 2],
+      [13, 1],
+      [14, 2],
+    ];
+    let number = 100;
+    for (const [day, count] of merged)
+      for (let k = 0; k < count; k++, number++) {
+        const id = `acme/platform#${number}`;
+        entries[id] = {
+          id,
+          url: `https://github.com/acme/platform/pull/${number}`,
+          repository: 'acme/platform',
+          number,
+          title: `Seeded ${number}`,
+          author: 'alex',
+          authorIsApp: false,
+          createdAt: local(day - 1, 9),
+          mergedAt: local(day, 10 + k),
+          mergedBy: 'sam',
+          approvedAt: null,
+        };
+      }
+    entries['acme/web#874'] = {
+      id: 'acme/web#874',
+      url: 'https://github.com/acme/web/pull/874',
+      repository: 'acme/web',
+      number: 874,
+      title: 'Fix the flaky upload test',
+      author: 'alex',
+      authorIsApp: false,
+      createdAt: local(9, 15, 0),
+      mergedAt: local(9, 15, 6),
+      mergedBy: 'sam',
+      approvedAt: null,
+    };
+    localStorage.setItem(
+      'history',
+      JSON.stringify({
+        version: 1,
+        accounts: {
+          alex: {
+            trackingSince: since,
+            syncedThrough: new Date(2026, 9, 15, 13).getTime(),
+            entries,
+            events: [],
+          },
+        },
+      }),
+    );
+  }, trackingSince);
+}
+
+test('This week shows the goal, streak and personal records', async ({ page }) => {
+  await seedWeek(page);
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.getByRole('button', { name: /^Completed/ }).click();
+  const week = page.getByRole('region', { name: 'This week' });
+  await expect(week).toContainText('Oct 12 – 18');
+  await expect(week).toContainText('Tracking since Sep 14, 2026');
+  await expect(week.getByText('Your history starts today')).toHaveCount(0);
+
+  // Two, one and two seeded PRs, plus the three the sync finds today.
+  await expect(week.locator('.goal-count')).toHaveText('8 of 10 merged');
+  await expect(week.getByRole('meter', { name: 'Weekly goal' })).toHaveAttribute(
+    'aria-valuenow',
+    '8',
+  );
+  await expect(week.locator('.goal-day')).toHaveText(['2', '1', '2', '3', '–', '–', '–']);
+  await expect(week.locator('.goal-day.untracked')).toHaveCount(3);
+  await expect(week.locator('.goal-day.today')).toHaveText('3');
+  await expect(week.getByRole('img', { name: 'Monday, Oct 12: 2 shipped' })).toBeVisible();
+  await expect(week.getByRole('img', { name: 'Friday, Oct 16: no data' })).toBeVisible();
+  await expect(week.getByText('2 more by Sunday to hit your goal · last week 11')).toBeVisible();
+  // Friday 9 to Thursday 15 skips the weekend rather than breaking on it.
+  await expect(week.locator('.goal-streak')).toHaveText('9-day streak');
+
+  const records = week.getByRole('group', { name: 'Personal records' });
+  const record = (name: string) => records.locator('.record').filter({ hasText: name });
+  await expect(record('Most in a day')).toHaveText('Most in a day 4 Oct 8');
+  await expect(record('Most in a week')).toHaveText('Most in a week 11 Oct 5 – 11');
+  await expect(record('Longest streak')).toHaveText('Longest streak 9 days');
+  await expect(record('Fastest merge')).toHaveText('Fastest merge 6 min acme/web #874');
+  await record('Fastest merge')
+    .getByRole('button', { name: 'Open Fix the flaky upload test on GitHub' })
+    .click();
+  expect(await page.evaluate(() => (window as any).opened)).toEqual([
+    'https://github.com/acme/web/pull/874',
+  ]);
+
+  // This week sits above Activity.
+  const order = await page
+    .locator('.completed-list > .completed-panel')
+    .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+  expect(order).toEqual(['This week', 'Activity']);
+  await page.screenshot({ path: '.context/this-week.png', fullPage: true });
+});
+
+test('This week leaves out last week when it was not tracked', async ({ page }) => {
+  // Tracking began on Monday, so last week was never seen.
+  await seedWeek(page, new Date(2026, 9, 12).getTime());
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.getByRole('button', { name: /^Completed/ }).click();
+  const week = page.getByRole('region', { name: 'This week' });
+  await expect(week.locator('.goal-count')).toHaveText('8 of 10 merged');
+  await expect(week.locator('.goal-status')).toHaveText('2 more by Sunday to hit your goal');
+  await expect(week.getByText('last week')).toHaveCount(0);
+  await expect(week.locator('.goal-streak')).toHaveText('4-day streak');
+});
+
+test('the Completed settings change the goal and streak days and update the panel', async ({
+  page,
+}) => {
+  await seedWeek(page);
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.getByRole('button', { name: /^Completed/ }).click();
+  const week = page.getByRole('region', { name: 'This week' });
+  await expect(week.locator('.goal-count')).toHaveText('8 of 10 merged');
+
+  // Edit goal opens Settings on the Completed section.
+  await week.getByRole('button', { name: 'Edit goal' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await expect(dialog.getByRole('heading', { name: 'Completed', exact: true })).toBeVisible();
+  const goal = dialog.getByRole('spinbutton', { name: 'Weekly goal' });
+  await expect(goal).toHaveValue('10');
+  await expect(
+    dialog.getByText("Days you don't pick never break or extend a streak."),
+  ).toBeVisible();
+
+  // An invalid goal is refused with a message, and the saved one comes back.
+  await goal.fill('0');
+  await goal.blur();
+  await expect(dialog.getByRole('alert')).toHaveText('Enter a whole number from 1 to 999.');
+  await expect(goal).toHaveValue('10');
+  await goal.fill('8');
+  await goal.blur();
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!).settings.weeklyGoal))
+    .toBe(8);
+
+  // Thursday stops being a streak day, so today no longer matters and the streak is seven days:
+  // Wed 14, Tue 13, Mon 12, Fri 9, Wed 7, Tue 6 and Mon 5.
+  const days = dialog.getByRole('group', { name: 'Streak days' });
+  for (const name of ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'])
+    await expect(days.getByLabel(name)).toBeChecked();
+  for (const name of ['Sat', 'Sun']) await expect(days.getByLabel(name)).not.toBeChecked();
+  await days.getByLabel('Thu').uncheck();
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!).settings.streakDays))
+    .toEqual([1, 2, 3, 5]);
+
+  // At least one day stays selected.
+  for (const name of ['Mon', 'Tue', 'Wed']) await days.getByLabel(name).uncheck();
+  await days.getByLabel('Fri').click();
+  await expect(dialog.getByRole('alert')).toHaveText('Choose at least one streak day.');
+  await expect(days.getByLabel('Fri')).toBeChecked();
+  await days.getByLabel('Mon').check();
+  await days.getByLabel('Tue').check();
+  await days.getByLabel('Wed').check();
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!).settings.streakDays))
+    .toEqual([1, 2, 3, 5]);
+  await page.screenshot({ path: '.context/settings-completed.png' });
+  await closeSettings(page);
+
+  await expect(week.locator('.goal-count')).toHaveText('8 of 8 merged');
+  await expect(week.getByText('Goal reached · last week 11')).toBeVisible();
+  await expect(week.locator('.goal-streak')).toHaveText('7-day streak');
+
+  // Both settings survive a restart.
+  await page.reload();
+  await page.keyboard.press('Shift+C');
+  await expect(week.locator('.goal-count')).toHaveText('8 of 8 merged');
+  await expect(week.locator('.goal-streak')).toHaveText('7-day streak');
+});
+
+test('the first day of history explains that nothing earlier counts', async ({ page }) => {
+  await page.clock.install({ time: new Date(2026, 9, 15, 14, 0) });
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.getByRole('button', { name: /^Completed/ }).click();
+  const week = page.getByRole('region', { name: 'This week' });
+  await expect(week.getByText('Your history starts today.')).toBeVisible();
+  await expect(week).toContainText('Tracking since today');
+  await expect(week.locator('.goal-count')).toHaveText('3 of 10 merged');
+  await expect(week.getByText('7 more by Sunday to hit your goal', { exact: true })).toBeVisible();
+  await expect(week.getByText('last week')).toHaveCount(0);
+  await expect(week.locator('.goal-streak')).toHaveText('1-day streak');
+  await expect(week.locator('.goal-day.untracked')).toHaveCount(6);
+  await expect(
+    week.getByText('Records start filling in as you merge. Nothing from before today counts.'),
+  ).toBeVisible();
+  await expect(week.locator('.record')).toHaveCount(0);
+  await page.screenshot({ path: '.context/this-week-first-run.png', fullPage: true });
 });
 
 test('cards show the author and the most severe stale badge', async ({ page }) => {
@@ -1244,6 +1465,7 @@ test('settings opens as an overlay with a section sidebar and confirms unsaved e
     ['Dock badge', 'bell-dot'],
     ['Interface size', 'zoom-in'],
     ['Snooze options', 'alarm-clock'],
+    ['Completed', 'git-merge'],
     ['Tracked repositories', 'folder-git-2'],
     ['Watched pull requests', 'eye'],
     ['Known bots', 'bot'],
@@ -1671,7 +1893,7 @@ test('copies settings, then imports edited JSON from the textarea or a file', as
   await page.getByRole('button', { name: 'Copy settings' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Settings copied' })).toBeVisible();
   const exported = await copied();
-  expect(exported).toMatchObject({ app: 'pr-desk', kind: 'settings', schemaVersion: 15 });
+  expect(exported).toMatchObject({ app: 'pr-desk', kind: 'settings', schemaVersion: 16 });
   expect(exported).not.toHaveProperty('snoozedPullRequests');
 
   const json = page.getByRole('textbox', { name: 'Settings JSON' });
@@ -2175,7 +2397,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
     .click();
   await saveSettings(page);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
-  expect(saved.schemaVersion).toBe(15);
+  expect(saved.schemaVersion).toBe(16);
   expect(saved.ignoreRules).toEqual([]);
   expect(saved.ignoredPullRequests).toHaveProperty('acme/platform#2');
   expect(saved.settings.snoozeOptions).toEqual([]);

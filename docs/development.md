@@ -107,7 +107,9 @@ Tauri Store writes `preferences.json` to the app data directory (on macOS,
     "snoozeOptions": [
       { "kind": "duration", "amount": 1, "unit": "hours" },
       { "kind": "next", "day": "monday", "hour": 9 }
-    ]
+    ],
+    "weeklyGoal": 10,
+    "streakDays": [1, 2, 3, 4, 5]
   }
 }
 ```
@@ -136,6 +138,11 @@ Labels are referenced by id, so renaming one keeps its assignments. Colors are a
 lowercase `#rrggbb` hex; new labels start with a random color, and version 8's palette names
 migrate to their hex values. Names are unique case-insensitively, and label edits save immediately
 rather than going through the Settings draft.
+
+`weeklyGoal` (a whole number from 1 to 999) and `streakDays` (weekday numbers from `Date.getDay()`,
+so 0 is Sunday, stored sorted and never empty) drive the This week panel on Completed. They save
+immediately from Settings → Completed, are part of the settings export, and files from before
+schema version 16 get the defaults.
 
 Ignoring a repository overrides every source, including owned PRs, direct review
 requests, tracked repositories, and watched PRs. Removing the ignore restores normal

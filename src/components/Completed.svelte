@@ -2,31 +2,42 @@
   import GitMerge from '@lucide/svelte/icons/git-merge';
   import type { CompletedSnapshot } from '../lib/github/completed';
   import { COMPLETED_DAYS } from '../lib/github/completed';
+  import { historyFacts } from '../lib/history/facts';
   import type { AccountHistory } from '../lib/history/types';
   import { completedGroups } from '../lib/pr/completed';
   import type { AppState } from '../lib/store/app-state';
   import Activity from './Activity.svelte';
+  import ThisWeek from './ThisWeek.svelte';
   let {
     snapshot,
     loading,
     now,
-    trackingSince,
     history,
     login,
     preferences,
+    onedit,
     onopen,
   }: {
     snapshot: CompletedSnapshot | null;
     loading: boolean;
     now: number;
-    trackingSince: number | null;
     history: AccountHistory | null;
     login: string;
-    preferences: Pick<AppState, 'knownBots' | 'ignoreRules'>;
+    preferences: Pick<AppState, 'knownBots' | 'ignoreRules' | 'settings'>;
+    onedit: () => void;
     onopen: (url: string) => void;
   } = $props();
   let groups = $derived(completedGroups(snapshot?.prs ?? [], now));
   let count = $derived(snapshot?.prs.length ?? 0);
+  let facts = $derived(history ? historyFacts(history, login, preferences) : null);
+  // One string, so the time and the person who merged it cannot run together.
+  function mergedLine(pr: { mergedAt: string; mergedBy: string | null }) {
+    const time = new Date(pr.mergedAt).toLocaleTimeString([], {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    return pr.mergedBy ? `Merged ${time} by ${pr.mergedBy}` : `Merged ${time}`;
+  }
 </script>
 
 <div class="dashboard-heading">
@@ -37,21 +48,24 @@
   </div>
 </div>
 <div class="completed-list" aria-busy={loading}>
+  {#if facts}
+    <ThisWeek
+      {facts}
+      goal={preferences.settings.weeklyGoal}
+      streakDays={preferences.settings.streakDays}
+      {now}
+      {onedit}
+      {onopen}
+    />
+  {/if}
   {#if history}<Activity account={history} {login} {preferences} {now} />{/if}
   {#each snapshot?.warnings ?? [] as warning (warning)}
     <div class="alert" role="status">{warning}</div>
   {/each}
-  {#if snapshot || trackingSince !== null}
+  {#if snapshot}
     <div class="completed-summary">
-      {#if snapshot}<span>{count} merged pull request{count === 1 ? '' : 's'}</span>{/if}
-      {#if trackingSince !== null}<span
-          >Tracking since {new Date(trackingSince).toLocaleDateString([], {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-          })}</span
-        >{/if}
-      {#if snapshot}<span>Most recent first</span>{/if}
+      <span>{count} merged pull request{count === 1 ? '' : 's'}</span>
+      <span>Most recent first</span>
     </div>
   {/if}
   {#each groups as group (group.key)}
@@ -68,14 +82,7 @@
             <span class="author">{pr.author}</span></span
           >
           <strong>{pr.title}</strong>
-          <span class="secondary"
-            >Merged
-            {new Date(pr.mergedAt).toLocaleTimeString([], {
-              hour: 'numeric',
-              minute: '2-digit',
-            })}{#if pr.mergedBy}
-              by {pr.mergedBy}{/if}</span
-          >
+          <span class="secondary">{mergedLine(pr)}</span>
         </button>
       {/each}
     </section>

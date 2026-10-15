@@ -12,6 +12,8 @@ import {
   migrateState,
   isRefreshInterval,
   isDockBadgeMode,
+  isWeeklyGoal,
+  parseStreakDays,
   stepInterfaceScale,
   defaultSnoozeOptions,
   parseSnoozeOptions,
@@ -118,7 +120,7 @@ it('defaults to five minutes and migrates reserved v1 settings without losing pr
     settings: { automaticRefreshMinutes: 0 },
   };
   expect(migrateState(legacy)).toMatchObject({
-    schemaVersion: 15,
+    schemaVersion: 16,
     watchedPullRequests: ['acme/api#1'],
     settings: { automaticRefreshMinutes: 5, snoozeOptions: defaultSnoozeOptions() },
   });
@@ -137,7 +139,7 @@ it('preserves Never and all valid intervals, and repairs invalid stored interval
         .automaticRefreshMinutes,
     ).toBe(5);
   }
-  expect(() => migrateState({ ...defaultState(), schemaVersion: 16 })).toThrow('Unsupported');
+  expect(() => migrateState({ ...defaultState(), schemaVersion: 17 })).toThrow('Unsupported');
 });
 
 it('migrates older preferences and validates ignored repositories', () => {
@@ -151,7 +153,7 @@ it('migrates older preferences and validates ignored repositories', () => {
         settings: { automaticRefreshMinutes: 0 },
       }),
     ).toMatchObject({
-      schemaVersion: 15,
+      schemaVersion: 16,
       ignoreRules: [],
       trackedRepositories: ['acme/api'],
       settings: { automaticRefreshMinutes: schemaVersion === 1 ? 5 : 0 },
@@ -215,7 +217,7 @@ it('migrates all supported versions without losing independently saved preferenc
       settings: { automaticRefreshMinutes: 12, snoozeOptions: [] },
     };
     const migrated = migrateState(legacy);
-    expect(migrated.schemaVersion).toBe(15);
+    expect(migrated.schemaVersion).toBe(16);
     expect(migrated.checkRules).toEqual([]);
     expect(migrated.titleTagRules).toEqual([]);
     expect(migrated.ignoreRules).toEqual(
@@ -436,7 +438,7 @@ it('loads pre-v8 preferences without labels', () => {
       labels: [label('x', 'Ignored')],
       labeledPullRequests: { 'acme/api#1': ['x'] },
     });
-    expect(migrated).toMatchObject({ schemaVersion: 15, labels: [], labeledPullRequests: {} });
+    expect(migrated).toMatchObject({ schemaVersion: 16, labels: [], labeledPullRequests: {} });
   }
 });
 it('round-trips v8 labels and canonicalizes their assignments', () => {
@@ -632,7 +634,7 @@ it('rejects settings imports that are not valid exports', () => {
   expect(() => parseSettingsImport('nope')).toThrow("That isn't valid JSON.");
   for (const text of ['null', '5', '{}', exported({ app: 'other' }), exported({ kind: 'debug' })])
     expect(() => parseSettingsImport(text)).toThrow("This isn't a PR Desk settings export.");
-  expect(() => parseSettingsImport(exported({ schemaVersion: 16 }))).toThrow('newer PR Desk');
+  expect(() => parseSettingsImport(exported({ schemaVersion: 17 }))).toThrow('newer PR Desk');
   const invalid: Record<string, unknown>[] = [
     { trackedRepositories: ['no-owner'] },
     { trackedRepositories: [5] },
@@ -677,4 +679,76 @@ it('keeps per-PR state when applying an import and drops stale label assignments
   expect(next.ignoredPullRequests).toEqual(current.ignoredPullRequests);
   expect(next.snoozedPullRequests).toEqual(current.snoozedPullRequests);
   expect(next.labeledPullRequests).toEqual({ 'acme/api#3': ['a'] });
+});
+
+it('defaults the weekly goal to 10 and streak days to Monday to Friday', () => {
+  expect(defaultState().settings).toMatchObject({ weeklyGoal: 10, streakDays: [1, 2, 3, 4, 5] });
+  const { weeklyGoal: _, streakDays: __, ...settings } = defaultState().settings;
+  for (const schemaVersion of [15, 16])
+    expect(migrateState({ ...defaultState(), schemaVersion, settings }).settings).toMatchObject({
+      weeklyGoal: 10,
+      streakDays: [1, 2, 3, 4, 5],
+    });
+  // Fields a pre-v16 file happened to carry are not trusted.
+  expect(
+    migrateState({
+      ...defaultState(),
+      schemaVersion: 15,
+      settings: { ...settings, weeklyGoal: 3, streakDays: [0] },
+    }).settings,
+  ).toMatchObject({ weeklyGoal: 10, streakDays: [1, 2, 3, 4, 5] });
+});
+it('validates the weekly goal', () => {
+  for (const goal of [1, 10, 999]) expect(isWeeklyGoal(goal)).toBe(true);
+  for (const goal of [0, -1, 1000, 2.5, NaN, '10', null, undefined])
+    expect(isWeeklyGoal(goal)).toBe(false);
+});
+it('canonicalizes streak days and rejects invalid ones', () => {
+  expect(parseStreakDays([5, 0, 3, 3])).toEqual([0, 3, 5]);
+  for (const days of [[], [7], [-1], [1.5], ['1'], null, 'mon', undefined])
+    expect(() => parseStreakDays(days)).toThrow();
+  expect(() => parseStreakDays([])).toThrow('at least one');
+});
+it('keeps a stored goal and streak days and rejects invalid ones', () => {
+  const stored = (patch: Record<string, unknown>) => ({
+    ...defaultState(),
+    settings: { ...defaultState().settings, ...patch },
+  });
+  expect(migrateState(stored({ weeklyGoal: 25, streakDays: [6, 1, 1, 0] })).settings).toMatchObject(
+    {
+      weeklyGoal: 25,
+      streakDays: [0, 1, 6],
+    },
+  );
+  for (const patch of [
+    { weeklyGoal: 0 },
+    { weeklyGoal: 1000 },
+    { weeklyGoal: 2.5 },
+    { weeklyGoal: '10' },
+    { streakDays: [] },
+    { streakDays: [7] },
+    { streakDays: 'weekdays' },
+  ])
+    expect(() => migrateState(stored(patch))).toThrow('Invalid preferences file');
+});
+it('exports and imports the weekly goal and streak days, validating them', () => {
+  const state = {
+    ...configured(),
+    settings: { ...configured().settings, weeklyGoal: 4, streakDays: [0, 6] },
+  };
+  const data = JSON.stringify(exportSettings(state, new Date(0)));
+  expect(parseSettingsImport(data).settings).toMatchObject({ weeklyGoal: 4, streakDays: [0, 6] });
+  for (const settings of [
+    { ...state.settings, weeklyGoal: 0 },
+    { ...state.settings, streakDays: [] },
+  ])
+    expect(() => parseSettingsImport(exported({ settings }))).toThrow(
+      /^This settings export is invalid: /,
+    );
+  // A v15 export predates both settings, so it brings the defaults.
+  const v15 = exported({ schemaVersion: 15, settings: { ...state.settings, weeklyGoal: 4 } });
+  expect(parseSettingsImport(v15).settings).toMatchObject({
+    weeklyGoal: 10,
+    streakDays: [1, 2, 3, 4, 5],
+  });
 });

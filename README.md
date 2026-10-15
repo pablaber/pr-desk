@@ -129,10 +129,16 @@ may skip.
 - Opens a card's menu on right-click as well as from its ⋯ button.
 - Stores preferences locally and uses your existing GitHub CLI authentication.
 - Keeps a local history of your merged PRs, merges by you and approvals in `history.json`,
-  starting the first day you use this version; Completed shows when tracking began.
+  starting the first day you use this version; nothing before that day is counted.
 - Charts that history on Completed as an Activity panel: a Week chart or a Month calendar of your
   merged PRs, PRs you merged and PRs you approved, with totals, a comparison with the previous
   period and navigation back to the day tracking began.
+- Tracks a weekly goal on Completed in a This week panel: how many PRs you shipped this Monday to
+  Sunday (merged, merged by you or approved, each counted once), a meter and a cell per day, your
+  current streak, last week's total, and personal records for the most PRs in a day and in a week,
+  the longest streak and the fastest merge. A first-day notice explains that nothing earlier counts.
+  Settings → Completed sets the goal (1 to 999, default 10) and the streak days (default Monday to
+  Friday); days you don't pick never break or extend a streak. Edit goal on the panel opens them.
 - Closes PRs with red staleness (over 28 days) after confirmation, leaving an automated
   comment with their inactivity in days. Enter confirms; Escape cancels.
 
