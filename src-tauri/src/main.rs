@@ -78,13 +78,14 @@ async fn github(operation: String, query: Option<String>) -> Result<serde_json::
     Ok(value["data"].clone())
 }
 
-const QUERY_NAMES: [&str; 6] = [
+const QUERY_NAMES: [&str; 7] = [
     "DeskViewer",
     "DeskSearch",
     "DeskRepository",
     "DeskPullRequest",
     "DeskMergedSearch",
     "DeskMergedRepository",
+    "DeskHistorySearch",
 ];
 
 fn query_operation_name(query: &str) -> Result<&'static str, String> {
@@ -221,6 +222,7 @@ mod tests {
         for query in [
             "mutation DeskSearch { x }",
             "query DeskSearchX { x }",
+            "mutation DeskHistorySearch { x }",
             "query Other { x }",
             "{ x }",
         ] {

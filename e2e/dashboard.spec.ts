@@ -240,13 +240,15 @@ test.beforeEach(async ({ page }) => {
           w.zooms.push(args.value);
           return;
         }
-        if (command === 'plugin:store|load') return 1;
+        // preferences.json lives under the prefs key and history.json under history.
+        if (command === 'plugin:store|load') return args.path === 'history.json' ? 2 : 1;
+        const storeKey = () => (args.rid === 2 ? 'history' : 'prefs');
         if (command === 'plugin:store|get') {
-          const value = localStorage.getItem('prefs');
+          const value = localStorage.getItem(storeKey());
           return [value ? JSON.parse(value) : null, !!value];
         }
         if (command === 'plugin:store|set') {
-          localStorage.setItem('prefs', JSON.stringify(args.value));
+          localStorage.setItem(storeKey(), JSON.stringify(args.value));
           return;
         }
         if (command === 'plugin:store|save') return;
@@ -311,6 +313,23 @@ test.beforeEach(async ({ page }) => {
                   ]
                 : [],
             },
+          };
+        // History sync finds #1 merged just now; the other searches find nothing.
+        if (query.includes('DeskHistorySearch'))
+          return {
+            search: connection(
+              query.includes('author:@me')
+                ? [
+                    {
+                      ...raw(1),
+                      createdAt: new Date(Date.now() - 86400000).toISOString(),
+                      mergedAt: new Date().toISOString(),
+                      mergedBy: { login: 'alex' },
+                      reviews: { nodes: [] },
+                    },
+                  ]
+                : [],
+            ),
           };
         if (query.includes('author:@me')) w.refreshCount++;
         if (query.includes('DeskSearch'))
@@ -479,6 +498,39 @@ test('the Completed view lists recently merged pull requests and opens them', as
   await expect(page.locator('.pr-card')).toHaveCount(4);
   await page.keyboard.press('Shift+C');
   await expect(page.getByRole('heading', { name: 'Completed' })).toBeVisible();
+});
+
+test('history syncs in the background and Completed shows when tracking began', async ({
+  page,
+}) => {
+  const history = () => page.evaluate(() => JSON.parse(localStorage.getItem('history') ?? 'null'));
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect.poll(async () => (await history())?.accounts.alex.syncedThrough).toBeGreaterThan(0);
+  const account = (await history()).accounts.alex;
+  expect(account.entries['acme/platform#1']).toMatchObject({ author: 'alex', mergedBy: 'alex' });
+  expect(account.trackingSince).toBe(await page.evaluate(() => new Date().setHours(0, 0, 0, 0)));
+  await page.getByRole('button', { name: /^Completed/ }).click();
+  const today = await page.evaluate(() =>
+    new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }),
+  );
+  await expect(page.locator('.completed-summary')).toContainText(`Tracking since ${today}`);
+  await page.screenshot({ path: '.context/completed-tracking-since.png' });
+
+  // An account saved before newer optional fields existed still loads and keeps its start.
+  await page.evaluate(() =>
+    localStorage.setItem(
+      'history',
+      JSON.stringify({
+        version: 1,
+        accounts: { alex: { trackingSince: new Date(2026, 8, 1).getTime() } },
+      }),
+    ),
+  );
+  await page.reload();
+  await page.keyboard.press('Shift+C');
+  await expect(page.locator('.completed-summary')).toContainText('Tracking since Sep 1, 2026');
+  await expect.poll(async () => (await history())?.accounts.alex.syncedThrough).toBeGreaterThan(0);
 });
 
 test('cards show the author and the most severe stale badge', async ({ page }) => {
@@ -1658,6 +1710,11 @@ test('close as stale requires confirmation, supports Escape and Enter, and remov
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('closeCalls')!))).toEqual([
     'https://github.com/acme/platform/pull/4',
   ]);
+  await expect
+    .poll(() =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('history')!).accounts.alex.events),
+    )
+    .toEqual([expect.objectContaining({ kind: 'stale-closed', pr: 'acme/platform#4' })]);
 });
 
 test('close as stale keeps the PR and displays failures', async ({ page }) => {
@@ -2436,6 +2493,13 @@ test('ready PRs merge only after confirmation with the selected method', async (
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mergeCalls') ?? '[]'))).toEqual(
     [{ url: 'https://github.com/acme/platform/pull/1', headOid: 'a'.repeat(40), method: 'rebase' }],
   );
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem('history')!).accounts.alex.entries['acme/platform#1'],
+      ),
+    )
+    .toMatchObject({ mergedBy: 'alex', approvedAt: null });
   await expect(page.locator('.pr-card')).toHaveCount(3);
   expect(await page.evaluate(() => (window as any).opened)).toEqual([]);
 });
@@ -2507,6 +2571,15 @@ test('an all-clear message replaces the columns only when nothing is tracked', a
   await expect(clear).toBeVisible();
   await expect(page.locator('.column')).toHaveCount(0);
   await page.screenshot({ path: '.context/all-clear.png', fullPage: true });
+  // A board with nothing in Needs attention is noted in history once a day, however often it refreshes.
+  const events = () =>
+    page.evaluate(
+      () => JSON.parse(localStorage.getItem('history') ?? 'null')?.accounts.alex.events,
+    );
+  await expect.poll(events).toEqual([expect.objectContaining({ kind: 'attention-clear' })]);
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+  expect(await events()).toHaveLength(1);
   // A source filter that matches nothing is not "nothing to do": the columns and their
   // filter hint come back.
   await page.getByRole('button', { name: 'Watching', exact: true }).click();

@@ -67,6 +67,7 @@ Inspect the generated screenshot and include the updated image in the change.
 | `src/lib/github/`                   | `queries.ts` GraphQL text, `normalize.ts` raw → domain, `refresh.ts` orchestration/concurrency, `client.ts` transport |
 | `src/lib/pr/`                       | `signals.ts` → `dashboard-rules.ts` → `classify.ts` → `card-view-model.ts`                                            |
 | `src/lib/store/app-state.ts`        | versioned preferences and all input validation                                                                        |
+| `src/lib/history/`                  | `history.json` per-login log of merges, approvals and in-app events; ingest rules and background sync scheduling      |
 | `src/lib/updates/`                  | update service: scheduling, coalescing, progress, errors, Update resource cleanup, restart gating                     |
 | `src/App.svelte`, `src/components/` | rendering only                                                                                                        |
 | `src/test/fixtures.ts`              | shared unit-test fixtures (never shipped)                                                                             |
@@ -110,6 +111,10 @@ Inspect the generated screenshot and include the updated image in the change.
   metadata and signed archives from GitHub Releases natively, and must keep working when
   `gh` authentication fails. Its scheduling and state live in `src/lib/updates/`; it never
   touches preferences, and the app restarts only once `saving` is clear.
+- Local history lives in its own `history.json` store (never `preferences.json`, never in the
+  settings export), synced in the background through the read-only `DeskHistorySearch` query.
+  Its sync never touches `loading` or `saving` or the dashboard's own queries, and the updater
+  waits for in-flight history writes before restarting.
 - The bridge only runs GraphQL operations named in `QUERY_NAMES` in
   `src-tauri/src/main.rs`. A new `query Desk…` in `src/lib/github/` must be added there
   in the same change, or every call fails at runtime with "Only named PR Desk read-only

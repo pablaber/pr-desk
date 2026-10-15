@@ -3,6 +3,7 @@ export type ErrorSource =
   | 'refresh'
   | 'refresh-warning'
   | 'completed'
+  | 'history'
   | 'preferences'
   | 'settings'
   | 'close-stale'

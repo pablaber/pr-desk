@@ -55,6 +55,9 @@
   import { GhGitHubService } from './lib/github/client';
   import { refreshDashboard, type DashboardSnapshot } from './lib/github/refresh';
   import { fetchCompleted, type CompletedSnapshot } from './lib/github/completed';
+  import { fetchHistory } from './lib/github/history';
+  import { HistoryLog } from './lib/history/history.svelte';
+  import { loadHistoryFile, saveHistoryFile } from './lib/history/store';
   import { settledPullRequest } from './lib/github/mergeability';
   import {
     defaultState,
@@ -106,6 +109,12 @@
   import type { DashboardState, TrackingReason } from './lib/pr/types';
   const service = new GhGitHubService();
   let preferences = $state<AppState>(defaultState());
+  const history = new HistoryLog({
+    load: loadHistoryFile,
+    save: saveHistoryFile,
+    fetch: (login, since) => fetchHistory(service, login, preferences.trackedRepositories, since),
+    onWarning: (message) => recordError('history', message),
+  });
   let snapshot = $state<DashboardSnapshot>({
     prs: [],
     sources: {},
@@ -148,7 +157,7 @@
     check,
     relaunch,
     // Every preference write and confirmed GitHub action runs under saving; reads can be abandoned.
-    busy: () => saving,
+    busy: () => saving || history.busy,
     onError: (message) => recordError('updates', message),
     // npm run dev has no Tauri at all, and npm run tauri dev serves from Vite's dev server.
     enabled: isTauri() && !import.meta.env.DEV,
@@ -296,6 +305,7 @@
     return () => {
       unsubscribe();
       updates.dispose();
+      history.dispose();
       void unlisten?.then((stop) => stop?.());
       clearInterval(timer);
       window.removeEventListener('error', uncaught);
@@ -361,6 +371,7 @@
       preferences = await loadState();
       await service.authenticate();
       ({ login, avatarUrl } = await service.getCurrentUser());
+      void history.open(login);
       initialized = true;
     } catch (e) {
       setupError = String(e);
@@ -384,7 +395,11 @@
     }
   }
   $effect(() => {
-    if (initialized && screen === 'completed') untrack(() => void loadCompleted());
+    if (initialized && screen === 'completed')
+      untrack(() => {
+        void loadCompleted();
+        void history.sync();
+      });
   });
   async function refresh(silent = false) {
     if (loading || saving) {
@@ -402,6 +417,10 @@
       await prune();
       now = Date.now();
       refreshed = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      // A refresh with warnings may be missing PRs, so only a complete board counts as clear.
+      if (!snapshot.warnings.length && !badgeCount(classified, 'needs-attention'))
+        history.record({ kind: 'attention-clear' });
+      history.start();
     } catch (e) {
       showError('refresh', String(e));
     } finally {
@@ -711,6 +730,7 @@
       }
       // An updated PR stays open while its checks re-run, so refresh rather than drop it.
       if (!updating) snapshot.prs = snapshot.prs.filter((item) => item.id !== pr.id);
+      history.record({ kind: pendingAction, pr });
       if (pendingAction === 'merge' || pendingAction === 'approve-merge') mergedPR = pr;
       actionPR = null;
     } catch (e) {
@@ -1035,7 +1055,13 @@
         onrestore={(id) => restore('snoozed', id)}
       />
     {:else if screen === 'completed'}
-      <Completed snapshot={completed} loading={completedLoading} {now} onopen={open} />
+      <Completed
+        snapshot={completed}
+        loading={completedLoading}
+        {now}
+        trackingSince={history.account?.trackingSince ?? null}
+        onopen={open}
+      />
     {:else if screen === 'labels'}
       <Labels
         {preferences}

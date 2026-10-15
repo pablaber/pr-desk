@@ -50,6 +50,17 @@ export interface RawMergedPR {
   mergedAt: string | null;
   mergedBy: { login: string } | null;
 }
+export interface RawHistoryPR {
+  url: string;
+  number: number;
+  title: string;
+  author: { __typename?: string; login: string } | null;
+  repository: { nameWithOwner: string };
+  createdAt: string;
+  mergedAt: string | null;
+  mergedBy: { login: string } | null;
+  reviews: { nodes: { submittedAt: string }[] } | null;
+}
 export type MergedSearchQualifier = 'author' | 'reviewed-by' | 'user-review-requested';
 export interface GitHubService {
   authenticate(): Promise<void>;
@@ -63,6 +74,7 @@ export interface GitHubService {
     ignoredRepositories?: string[],
   ): Promise<RawMergedPR[]>;
   getRepositoryMergedPullRequests(repo: string): Promise<RawMergedPR[]>;
+  getHistoryPullRequests(search: string, login: string): Promise<RawHistoryPR[]>;
   validateRepository(repo: string): Promise<void>;
   getPullRequest(id: string, seed?: RawPR): Promise<PullRequest>;
 }

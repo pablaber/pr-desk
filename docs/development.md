@@ -54,6 +54,8 @@ access and persistence require Tauri.
 - `src/lib/pr/`: normalized model → signals → declarative dashboard rules →
   classification and sorting → card view models.
 - `src/lib/store/`: versioned local preferences and canonical input validation.
+- `src/lib/history/`: the local history of your merges, approvals and in-app actions — the
+  `history.json` file, ingest rules, and the background sync schedule.
 - `src/lib/updates/`: the update service — launch and 24-hour checks, coalescing,
   download progress, errors, releasing the updater's resource, and restarting only once
   pending writes finish. Updates are off in `npm run dev` and `npm run tauri dev`
@@ -110,10 +112,20 @@ Tauri Store writes `preferences.json` to the app data directory (on macOS,
 }
 ```
 
-No PR titles, GitHub status, or credentials are persisted. Repository and PR
+`preferences.json` persists no PR titles, GitHub status, or credentials. Repository and PR
 identifiers are canonicalized to lowercase. Unsupported storage versions stop loading
 without overwriting the file. Temporarily inaccessible PRs do not erase their saved
 preferences, and neither do ignore rules, snoozes, or individual ignores.
+
+A separate `history.json` in the same directory keeps, per GitHub login, the PRs that count
+toward your history: ones you authored that merged, ones you merged, and ones you approved, with
+their title, author and merge/approval times. It also keeps in-app events (Close as stale,
+Update branch, and days the board had nothing in Needs attention). Tracking starts at local
+midnight of the first day PR Desk sees the login; nothing earlier is recorded. A background sync
+fills it after the first successful refresh, then hourly and whenever Completed opens; it never
+holds up the dashboard. Ignore rules are applied when history is shown, not when it is stored.
+It is not part of the settings export, and an unsupported version stops loading and writing
+without overwriting the file.
 
 Watches and labels are pruned after a successful refresh (`src/lib/pr/prune.ts`). A PR that
 is merged or closed, with fresh data, is unwatched and loses its labels. A labeled PR that no

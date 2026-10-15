@@ -128,6 +128,8 @@ may skip.
   Troubleshooting also lists this session's errors, each with its own copy button.
 - Opens a card's menu on right-click as well as from its ⋯ button.
 - Stores preferences locally and uses your existing GitHub CLI authentication.
+- Keeps a local history of your merged PRs, merges by you and approvals in `history.json`,
+  starting the first day you use this version; Completed shows when tracking began.
 - Closes PRs with red staleness (over 28 days) after confirmation, leaving an automated
   comment with their inactivity in days. Enter confirms; Escape cancels.
 
@@ -150,6 +152,9 @@ PR Desk never handles a GitHub token itself. GraphQL queries fetch:
 - `repository.pullRequests(states: OPEN)` for tracked repositories.
 - `repository.pullRequest(number: ...)` for missing connection pages and PRs absent from
   discovery (watched PRs or IDs retained from failed sources).
+- For the local history, in the background: searches for your merged PRs, PRs you reviewed,
+  merged PRs you were asked to review, and merged PRs in each tracked repository, with who
+  merged them and when you first approved.
 - Aggregate `reviewDecision`, `mergeable`, `mergeStateStatus`, draft/state/update
   fields, base and head branch names, reviewer requests, review threads, and the latest commit's status-check
   rollup.

@@ -3,6 +3,7 @@ import { parsePullRequest, parseRepository } from '../store/app-state';
 import { githubErrorMessage } from './errors';
 import { normalize, rawConnections } from './normalize';
 import {
+  historySearchQuery,
   mergedRepositoryQuery,
   mergedSearchQuery,
   pullRequestQuery,
@@ -14,6 +15,7 @@ import type {
   GitHubService,
   GhCliInfo,
   MergedSearchQualifier,
+  RawHistoryPR,
   RawMergedPR,
   RawPR,
 } from './types';
@@ -120,6 +122,20 @@ export class GhGitHubService implements GitHubService {
     }>(mergedRepositoryQuery(parseRepository(repo)));
     if (!data.repository) throw new Error('Repository not found or inaccessible.');
     return data.repository.pullRequests.nodes.filter(Boolean);
+  }
+  // Unlike the board's searches, ignored repositories stay in: ignore rules apply when history is
+  // shown, so removing one brings its numbers back.
+  async getHistoryPullRequests(search: string, login: string) {
+    const prs: RawHistoryPR[] = [];
+    let cursor: string | null = null;
+    do {
+      const { search: result }: { search: Connection<RawHistoryPR> } = await this.query<{
+        search: Connection<RawHistoryPR>;
+      }>(historySearchQuery(search, login, cursor));
+      prs.push(...result.nodes.filter((pr) => pr?.url));
+      cursor = continuationCursor(result, cursor);
+    } while (cursor);
+    return prs;
   }
   async validateRepository(repo: string) {
     const data = await this.query<{ repository: unknown }>(
