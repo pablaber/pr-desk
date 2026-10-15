@@ -1060,6 +1060,9 @@
         loading={completedLoading}
         {now}
         trackingSince={history.account?.trackingSince ?? null}
+        history={history.account}
+        {login}
+        {preferences}
         onopen={open}
       />
     {:else if screen === 'labels'}

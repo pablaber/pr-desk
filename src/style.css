@@ -1922,6 +1922,310 @@ fieldset:disabled .segmented-control input {
   background: #fff;
 }
 
+/* Activity: merges, merges by you and approvals per day, as a week chart or a month calendar. */
+.completed-panel {
+  display: grid;
+  gap: 16px;
+  padding: 18px 20px 16px;
+  background: #fff;
+  border: 1px solid #e1e7dc;
+  border-radius: 8px;
+}
+.completed-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.completed-panel-head h2 {
+  font-size: 13px;
+}
+.activity-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.activity-controls .segmented-control {
+  font-size: 11px;
+}
+.activity-period {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3e4a42;
+  font-variant-numeric: tabular-nums;
+}
+.activity-period .quiet {
+  padding: 3px 5px;
+  line-height: 0;
+  color: #5d6a5a;
+}
+.activity-key {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+.activity-key.authored,
+.activity-bar.authored {
+  background: #2f7a4a;
+}
+.activity-key.merged-by-you,
+.activity-bar.merged-by-you {
+  background: #5b7fc0;
+}
+.activity-key.approved,
+.activity-bar.approved {
+  background: #b8741f;
+}
+.activity-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  align-items: baseline;
+}
+.activity-total {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 11px;
+  color: #5d6a5a;
+}
+.activity-total b {
+  font-size: 20px;
+  font-weight: 650;
+  color: #26332e;
+  letter-spacing: -0.4px;
+  margin-right: -2px;
+}
+.activity-total .activity-key {
+  align-self: center;
+}
+.activity-delta {
+  font-size: 11px;
+  color: #79827b;
+}
+.activity-delta.up {
+  color: #2f7a4a;
+}
+.activity-delta.down {
+  color: #a15f4c;
+}
+.activity-week {
+  display: grid;
+  gap: 6px;
+  padding-left: 28px;
+}
+.activity-plot {
+  position: relative;
+  height: 146px;
+  margin-top: 8px;
+}
+.activity-grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid #edf0e9;
+}
+.activity-grid.base {
+  border-top-color: #cfd8cb;
+}
+.activity-grid span {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: -7px;
+  font-size: 10px;
+  color: #8a9483;
+  font-variant-numeric: tabular-nums;
+}
+.activity-columns,
+.activity-labels {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+.activity-columns {
+  position: absolute;
+  inset: 0;
+}
+.activity-day {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  margin: 0 6px;
+  border-radius: 5px;
+}
+.activity-day:hover {
+  background: #f2f5f0;
+}
+.activity-bar {
+  width: 18px;
+  max-width: 28%;
+  border-radius: 4px 4px 0 0;
+}
+.activity-none {
+  align-self: flex-end;
+  margin-bottom: 6px;
+  font-size: 10px;
+  color: #c3cabe;
+}
+.activity-labels span {
+  text-align: center;
+  font-size: 10px;
+  color: #8a9483;
+  white-space: nowrap;
+}
+.activity-labels .today {
+  color: #26332e;
+  font-weight: 600;
+}
+.activity-tip {
+  display: none;
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  left: calc(100% + 4px);
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: #26332e;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px #26332e33;
+  pointer-events: none;
+}
+.activity-tip strong {
+  display: block;
+  font-size: 12px;
+}
+.activity-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.activity-tip .activity-key {
+  width: 8px;
+  height: 8px;
+}
+.activity-week .activity-tip {
+  left: calc(50% + 34px);
+}
+.activity-day.flip .activity-tip,
+.activity-cell.flip .activity-tip {
+  left: auto;
+  right: calc(100% + 4px);
+}
+.activity-week .activity-day.flip .activity-tip {
+  right: calc(50% + 34px);
+}
+.activity-day:hover .activity-tip,
+.activity-cell:hover .activity-tip {
+  display: block;
+}
+.activity-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.activity-dow {
+  padding-left: 2px;
+  font-size: 10px;
+  color: #8a9483;
+}
+.activity-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 52px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.activity-cell.untracked {
+  background: transparent;
+  border: 1px dashed #dde3d8;
+}
+.activity-cell.untracked .activity-date {
+  color: #b7bfb2;
+}
+.activity-cell.today,
+.activity-cell:hover:not(.untracked) {
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 3.5px #26332e;
+}
+.activity-date {
+  color: #5d6a5a;
+}
+.activity-count {
+  align-self: flex-end;
+  font-size: 13px;
+  font-weight: 650;
+}
+.heat-0 {
+  background: #eceee8;
+}
+.heat-1 {
+  background: #c5dfc6;
+}
+.heat-2 {
+  background: #8fc49b;
+}
+.heat-3 {
+  background: #55a06c;
+}
+.heat-4 {
+  background: #2f7a4a;
+}
+.activity-cell.heat-3 :is(.activity-date, .activity-count),
+.activity-cell.heat-4 :is(.activity-date, .activity-count) {
+  color: #fff;
+}
+.activity-legend {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: #798675;
+}
+.activity-ramp {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.activity-ramp i {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+}
+.activity-ramp i:first-of-type {
+  margin-left: 3px;
+}
+.activity-ramp i:last-of-type {
+  margin-right: 3px;
+}
+.activity-note {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #798675;
+}
+.activity-note .lucide {
+  margin-top: 2px;
+}
+
 /* Sidebar collapse. Collapsed, the sidebar is an icon rail; labels move into hover tooltips.
    It only animates once preferences have loaded, so a saved collapsed sidebar does not slide shut
    at launch. */

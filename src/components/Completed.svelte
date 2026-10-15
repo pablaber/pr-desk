@@ -2,18 +2,27 @@
   import GitMerge from '@lucide/svelte/icons/git-merge';
   import type { CompletedSnapshot } from '../lib/github/completed';
   import { COMPLETED_DAYS } from '../lib/github/completed';
+  import type { AccountHistory } from '../lib/history/types';
   import { completedGroups } from '../lib/pr/completed';
+  import type { AppState } from '../lib/store/app-state';
+  import Activity from './Activity.svelte';
   let {
     snapshot,
     loading,
     now,
     trackingSince,
+    history,
+    login,
+    preferences,
     onopen,
   }: {
     snapshot: CompletedSnapshot | null;
     loading: boolean;
     now: number;
     trackingSince: number | null;
+    history: AccountHistory | null;
+    login: string;
+    preferences: Pick<AppState, 'knownBots' | 'ignoreRules'>;
     onopen: (url: string) => void;
   } = $props();
   let groups = $derived(completedGroups(snapshot?.prs ?? [], now));
@@ -28,6 +37,7 @@
   </div>
 </div>
 <div class="completed-list" aria-busy={loading}>
+  {#if history}<Activity account={history} {login} {preferences} {now} />{/if}
   {#each snapshot?.warnings ?? [] as warning (warning)}
     <div class="alert" role="status">{warning}</div>
   {/each}

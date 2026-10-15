@@ -67,7 +67,7 @@ Inspect the generated screenshot and include the updated image in the change.
 | `src/lib/github/`                   | `queries.ts` GraphQL text, `normalize.ts` raw → domain, `refresh.ts` orchestration/concurrency, `client.ts` transport |
 | `src/lib/pr/`                       | `signals.ts` → `dashboard-rules.ts` → `classify.ts` → `card-view-model.ts`                                            |
 | `src/lib/store/app-state.ts`        | versioned preferences and all input validation                                                                        |
-| `src/lib/history/`                  | `history.json` per-login log of merges, approvals and in-app events; ingest rules and background sync scheduling      |
+| `src/lib/history/`                  | `history.json` per-login log; ingest and sync scheduling; `facts.ts` (display-time facts), `activity.ts` (buckets)    |
 | `src/lib/updates/`                  | update service: scheduling, coalescing, progress, errors, Update resource cleanup, restart gating                     |
 | `src/App.svelte`, `src/components/` | rendering only                                                                                                        |
 | `src/test/fixtures.ts`              | shared unit-test fixtures (never shipped)                                                                             |

@@ -130,6 +130,9 @@ may skip.
 - Stores preferences locally and uses your existing GitHub CLI authentication.
 - Keeps a local history of your merged PRs, merges by you and approvals in `history.json`,
   starting the first day you use this version; Completed shows when tracking began.
+- Charts that history on Completed as an Activity panel: a Week chart or a Month calendar of your
+  merged PRs, PRs you merged and PRs you approved, with totals, a comparison with the previous
+  period and navigation back to the day tracking began.
 - Closes PRs with red staleness (over 28 days) after confirmation, leaving an automated
   comment with their inactivity in days. Enter confirms; Escape cancels.
 
