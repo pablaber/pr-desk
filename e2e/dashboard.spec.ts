@@ -314,23 +314,35 @@ test.beforeEach(async ({ page }) => {
                 : [],
             },
           };
-        // History sync finds #1 merged just now; the other searches find nothing.
-        if (query.includes('DeskHistorySearch'))
-          return {
-            search: connection(
-              query.includes('author:@me')
-                ? [
-                    {
-                      ...raw(1),
-                      createdAt: new Date(Date.now() - 86400000).toISOString(),
-                      mergedAt: new Date().toISOString(),
-                      mergedBy: { login: 'alex' },
-                      reviews: { nodes: [] },
-                    },
-                  ]
-                : [],
-            ),
-          };
+        // History sync finds #1 merged just now by you, #4 merged by you, and #6 approved by you.
+        if (query.includes('DeskHistorySearch')) {
+          const found = (number: number, extra: Record<string, unknown>) => ({
+            ...raw(number),
+            createdAt: new Date(Date.now() - 86400000).toISOString(),
+            mergedAt: null,
+            mergedBy: null,
+            reviews: { nodes: [] },
+            ...extra,
+          });
+          const nodes = query.includes('author:@me')
+            ? [
+                found(1, {
+                  mergedAt: new Date().toISOString(),
+                  mergedBy: { login: 'alex' },
+                }),
+              ]
+            : query.includes('user-review-requested:@me')
+              ? [
+                  found(4, {
+                    mergedAt: new Date().toISOString(),
+                    mergedBy: { login: 'alex' },
+                  }),
+                ]
+              : query.includes('reviewed-by:@me')
+                ? [found(6, { reviews: { nodes: [{ submittedAt: new Date().toISOString() }] } })]
+                : [];
+          return { search: connection(nodes) };
+        }
         if (query.includes('author:@me')) w.refreshCount++;
         if (query.includes('DeskSearch'))
           return {
@@ -531,6 +543,138 @@ test('history syncs in the background and Completed shows when tracking began', 
   await page.keyboard.press('Shift+C');
   await expect(page.locator('.completed-summary')).toContainText('Tracking since Sep 1, 2026');
   await expect.poll(async () => (await history())?.accounts.alex.syncedThrough).toBeGreaterThan(0);
+});
+
+test('Completed charts activity by week and by month within the tracked range', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.getByRole('button', { name: /^Completed/ }).click();
+  const activity = page.getByRole('region', { name: 'Activity' });
+  const total = (name: string) => activity.locator('.activity-total').filter({ hasText: name });
+  await expect(total('of your PRs merged').locator('b')).toHaveText('1');
+  await expect(total('merged by you').locator('b')).toHaveText('2');
+  await expect(total('approved').locator('b')).toHaveText('1');
+  await expect(
+    activity.getByRole('img', { name: /: 1 of your PRs merged, 2 merged by you, 1 approved$/ }),
+  ).toHaveCount(1);
+  await expect(activity.getByRole('img', { name: /: no data$/ })).not.toHaveCount(0);
+  // Tracking began today, so there is nowhere to go in either view.
+  await expect(activity.getByRole('button', { name: 'Previous week' })).toBeDisabled();
+  await expect(activity.getByRole('button', { name: 'Next week' })).toBeDisabled();
+  await expect(activity.locator('.activity-delta')).toHaveCount(0);
+
+  await activity.getByRole('radio', { name: 'Month' }).click();
+  await expect(activity.getByRole('button', { name: 'Previous month' })).toBeDisabled();
+  await expect(activity.getByRole('button', { name: 'Next month' })).toBeDisabled();
+  await expect(total('merged by you').locator('b')).toHaveText('2');
+  await expect(activity.locator('.activity-cell.today .activity-count')).toHaveText('3');
+  await expect(activity.getByText('merged by you” only sees PRs you wrote')).toBeVisible();
+  await page.screenshot({ path: '.context/activity-first-day.png', fullPage: true });
+});
+
+test('Activity moves between periods and stops at the first tracked one', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const weeksBack = await page.evaluate(() => {
+    const day = 86400000;
+    const midnight = (offset: number) => {
+      const d = new Date();
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate() + offset).getTime();
+    };
+    const monday = (t: number) => {
+      const d = new Date(t);
+      return new Date(
+        d.getFullYear(),
+        d.getMonth(),
+        d.getDate() - ((d.getDay() + 6) % 7),
+      ).getTime();
+    };
+    const iso = (offset: number, hour: number) =>
+      new Date(midnight(offset) + hour * 3600000).toISOString();
+    const entries: Record<string, unknown> = {};
+    for (let i = 0; i < 21; i++) {
+      const mine = (i * 7) % 4;
+      for (let k = 0; k < mine; k++) {
+        const id = `acme/platform#${100 + i * 10 + k}`;
+        entries[id] = {
+          id,
+          url: `https://github.com/${id.replace('#', '/pull/')}`,
+          repository: 'acme/platform',
+          number: 100 + i * 10 + k,
+          title: `Seeded ${id}`,
+          author: 'alex',
+          authorIsApp: false,
+          createdAt: iso(-i - 1, 9),
+          mergedAt: iso(-i, 10 + k),
+          mergedBy: k === 1 ? 'alex' : 'sam',
+          approvedAt: null,
+        };
+      }
+      for (let k = 0; k < (i * 5) % 4; k++) {
+        const id = `acme/web#${500 + i * 10 + k}`;
+        entries[id] = {
+          id,
+          url: `https://github.com/${id.replace('#', '/pull/')}`,
+          repository: 'acme/web',
+          number: 500 + i * 10 + k,
+          title: `Reviewed ${id}`,
+          author: 'jordan',
+          authorIsApp: false,
+          createdAt: iso(-i - 2, 9),
+          mergedAt: null,
+          mergedBy: null,
+          approvedAt: iso(-i, 14 + k),
+        };
+      }
+    }
+    const trackingSince = midnight(-20);
+    localStorage.setItem(
+      'history',
+      JSON.stringify({
+        version: 1,
+        accounts: { alex: { trackingSince, syncedThrough: Date.now(), entries, events: [] } },
+      }),
+    );
+    return Math.round((monday(midnight(0)) - monday(trackingSince)) / (7 * day));
+  });
+  expect(weeksBack).toBeGreaterThanOrEqual(2);
+  await page.reload();
+  await page.keyboard.press('Shift+C');
+  const activity = page.getByRole('region', { name: 'Activity' });
+  const label = activity.locator('.activity-period span');
+  const current = await label.textContent();
+  await expect(activity.locator('.activity-delta')).toContainText('vs last week, same point');
+  await activity.locator('.activity-day').nth(1).hover();
+  await expect(activity.locator('.activity-tip:visible')).toContainText('of your PRs merged');
+  await page.screenshot({ path: '.context/activity.png', fullPage: true });
+
+  const previous = activity.getByRole('button', { name: 'Previous week' });
+  for (let i = 0; i < weeksBack; i++) {
+    await expect(previous).toBeEnabled();
+    await previous.click();
+  }
+  await expect(previous).toBeDisabled();
+  await expect(label).not.toHaveText(current!);
+  // Nothing earlier was tracked, so there is nothing to compare with yet.
+  await expect(activity.locator('.activity-delta')).toHaveCount(0);
+  const next = activity.getByRole('button', { name: 'Next week' });
+  await next.click();
+  await expect(activity.locator('.activity-delta')).toContainText('vs the week before');
+  await previous.click();
+  for (let i = 0; i < weeksBack; i++) {
+    await expect(next).toBeEnabled();
+    await next.click();
+  }
+  await expect(next).toBeDisabled();
+  await expect(label).toHaveText(current!);
+
+  await activity.getByRole('radio', { name: 'Month' }).click();
+  await expect(activity.locator('.activity-cell')).not.toHaveCount(0);
+  await activity.locator('.activity-cell.flip').first().hover();
+  await expect(activity.locator('.activity-tip:visible')).toContainText('approved');
+  await page.screenshot({ path: '.context/activity-month.png', fullPage: true });
 });
 
 test('cards show the author and the most severe stale badge', async ({ page }) => {

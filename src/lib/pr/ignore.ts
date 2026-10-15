@@ -1,6 +1,9 @@
 import type { IgnoreRule } from '../store/app-state';
 import type { PullRequest } from './types';
 
+// The fields ignore rules read, so history entries can be checked without being full PRs.
+type IgnorableFields = Pick<PullRequest, 'author' | 'repository' | 'title'>;
+
 // Match the whole value. Only * and ? are special; regex punctuation stays literal.
 // Remembering the most recent star avoids exponential regex backtracking.
 export function matchesGlob(value: string, pattern: string): boolean {
@@ -31,12 +34,12 @@ export function ignoresRepository(repository: string, rules: IgnoreRule[]): bool
   return rules.some((rule) => rule.kind === 'repository' && matchesGlob(repository, rule.value));
 }
 
-export function ignoreRuleMatches(pr: PullRequest, rule: IgnoreRule): boolean {
+export function ignoreRuleMatches(pr: IgnorableFields, rule: IgnoreRule): boolean {
   if (rule.kind === 'author') return pr.author.toLowerCase() === rule.value.toLowerCase();
   return matchesGlob(rule.kind === 'repository' ? pr.repository : pr.title, rule.value);
 }
 
-export function ignoresPullRequest(pr: PullRequest, rules: IgnoreRule[]): boolean {
+export function ignoresPullRequest(pr: IgnorableFields, rules: IgnoreRule[]): boolean {
   return rules.some((rule) => ignoreRuleMatches(pr, rule));
 }
 
