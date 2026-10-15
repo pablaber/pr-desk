@@ -7,11 +7,13 @@
     snapshot,
     loading,
     now,
+    trackingSince,
     onopen,
   }: {
     snapshot: CompletedSnapshot | null;
     loading: boolean;
     now: number;
+    trackingSince: number | null;
     onopen: (url: string) => void;
   } = $props();
   let groups = $derived(completedGroups(snapshot?.prs ?? [], now));
@@ -29,9 +31,17 @@
   {#each snapshot?.warnings ?? [] as warning (warning)}
     <div class="alert" role="status">{warning}</div>
   {/each}
-  {#if snapshot}
+  {#if snapshot || trackingSince !== null}
     <div class="completed-summary">
-      <span>{count} merged pull request{count === 1 ? '' : 's'}</span><span>Most recent first</span>
+      {#if snapshot}<span>{count} merged pull request{count === 1 ? '' : 's'}</span>{/if}
+      {#if trackingSince !== null}<span
+          >Tracking since {new Date(trackingSince).toLocaleDateString([], {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })}</span
+        >{/if}
+      {#if snapshot}<span>Most recent first</span>{/if}
     </div>
   {/if}
   {#each groups as group (group.key)}

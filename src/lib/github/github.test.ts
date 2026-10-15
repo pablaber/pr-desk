@@ -38,6 +38,7 @@ function service(): GitHubService {
     getRepositoryPullRequests: vi.fn(async () => [raw()]),
     getMergedPullRequests: vi.fn(async () => []),
     getRepositoryMergedPullRequests: vi.fn(async () => []),
+    getHistoryPullRequests: vi.fn(async () => []),
     validateRepository: vi.fn(async () => {}),
     getPullRequest: vi.fn(async () => pr()),
   };

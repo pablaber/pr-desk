@@ -40,3 +40,7 @@ export function mergedRepositoryQuery(repo: string) {
   const [owner, name] = repo.split('/');
   return `query DeskMergedRepository { repository(owner: ${q(owner)}, name: ${q(name)}) { pullRequests(states: MERGED, orderBy: { field: UPDATED_AT, direction: DESC }, first: 25) { nodes { ${mergedFields} } } } }`;
 }
+// History needs who merged and when you first approved; a PR has at most one first approval.
+export function historySearchQuery(search: string, login: string, cursor: string | null) {
+  return `query DeskHistorySearch { search(query: ${q(search)}, type: ISSUE, first: 50, after: ${q(cursor)}) { ${page} nodes { ... on PullRequest { url number title author { login __typename } repository { nameWithOwner } createdAt mergedAt mergedBy { login } reviews(author: ${q(login)}, states: APPROVED, first: 1) { nodes { submittedAt } } } } } }`;
+}
