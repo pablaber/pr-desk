@@ -13,6 +13,8 @@ function account(entries: HistoryEntry[], events: AccountHistory['events'] = [])
     syncedThrough: null,
     entries: Object.fromEntries(entries.map((entry) => [entry.id, entry])),
     events,
+    achievements: {},
+    achievementsSeenAt: 0,
   };
 }
 

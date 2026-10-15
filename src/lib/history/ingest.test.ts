@@ -13,6 +13,8 @@ describe('tracking window', () => {
       syncedThrough: null,
       entries: {},
       events: [],
+      achievements: {},
+      achievementsSeenAt: 0,
     });
   });
 

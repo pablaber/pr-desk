@@ -1,11 +1,13 @@
 <script lang="ts">
   import GitMerge from '@lucide/svelte/icons/git-merge';
+  import { achievements } from '../lib/achievements/record';
   import type { CompletedSnapshot } from '../lib/github/completed';
   import { COMPLETED_DAYS } from '../lib/github/completed';
   import { historyFacts } from '../lib/history/facts';
   import type { AccountHistory } from '../lib/history/types';
   import { completedGroups } from '../lib/pr/completed';
   import type { AppState } from '../lib/store/app-state';
+  import Achievements from './Achievements.svelte';
   import Activity from './Activity.svelte';
   import ThisWeek from './ThisWeek.svelte';
   let {
@@ -30,6 +32,7 @@
   let groups = $derived(completedGroups(snapshot?.prs ?? [], now));
   let count = $derived(snapshot?.prs.length ?? 0);
   let facts = $derived(history ? historyFacts(history, login, preferences) : null);
+  let earned = $derived(history && facts ? achievements(history, facts, preferences, now) : null);
   // One string, so the time and the person who merged it cannot run together.
   function mergedLine(pr: { mergedAt: string; mergedBy: string | null }) {
     const time = new Date(pr.mergedAt).toLocaleTimeString([], {
@@ -58,6 +61,10 @@
       {onopen}
     />
   {/if}
+  {#if history && earned}<Achievements
+      evaluation={earned}
+      trackingSince={history.trackingSince}
+    />{/if}
   {#if history}<Activity account={history} {login} {preferences} {now} />{/if}
   {#each snapshot?.warnings ?? [] as warning (warning)}
     <div class="alert" role="status">{warning}</div>

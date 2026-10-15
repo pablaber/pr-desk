@@ -139,6 +139,10 @@ may skip.
   the longest streak and the fastest merge. A first-day notice explains that nothing earlier counts.
   Settings → Completed sets the goal (1 to 999, default 10) and the streak days (default Monday to
   Friday); days you don't pick never break or extend a streak. Edit goal on the panel opens them.
+- Awards achievements on Completed for what you ship, review and tidy up (first PR shipped,
+  streaks, weekly goals met, approvals, same-day reviews, bot PRs merged, repositories, and
+  in-app actions such as Close as stale and Update branch), each with levels you keep once
+  reached. A dot on Completed in the sidebar marks levels you have not seen yet.
 - Closes PRs with red staleness (over 28 days) after confirmation, leaving an automated
   comment with their inactivity in days. Enter confirms; Escape cancels.
 

@@ -1,3 +1,9 @@
+import {
+  hasUnseenAchievements,
+  recordAchievements,
+  type AchievementPreferences,
+} from '../achievements/record';
+import type { Unlock } from '../achievements/types';
 import { applyAction, ingest, newAccount, syncDate } from './ingest';
 import type { AccountHistory, HistoryAction, HistoryFile, HistorySyncResult } from './types';
 
@@ -8,6 +14,8 @@ export interface HistoryDeps {
   save: (file: HistoryFile) => Promise<void>;
   fetch: (login: string, since: string) => Promise<HistorySyncResult>;
   onWarning: (message: string) => void;
+  // Read at every change, so achievements always use the goal and bots in force at the time.
+  preferences: () => AchievementPreferences;
   now?: () => number;
 }
 
@@ -57,11 +65,23 @@ export class HistoryLog {
     this.#set(existing ?? newAccount(this.#now()), !existing);
   }
 
-  #set(account: AccountHistory, write = true) {
-    if (!this.#file) return;
-    this.account = account;
-    this.#file = { ...this.#file, accounts: { ...this.#file.accounts, [this.#login]: account } };
-    if (write) this.#write(this.#file);
+  // Every change is evaluated against the achievements, and an unchanged account is only written
+  // when the evaluation recorded something. Returns the levels this change unlocked.
+  #set(account: AccountHistory, write = true): Unlock[] {
+    if (!this.#file) return [];
+    const evaluated = recordAchievements(
+      account,
+      this.#login,
+      this.#deps.preferences(),
+      this.#now(),
+    );
+    this.account = evaluated.account;
+    this.#file = {
+      ...this.#file,
+      accounts: { ...this.#file.accounts, [this.#login]: evaluated.account },
+    };
+    if (write || evaluated.account !== account) this.#write(this.#file);
+    return evaluated.unlocked;
   }
 
   #write(file: HistoryFile) {
@@ -72,9 +92,23 @@ export class HistoryLog {
       .finally(() => this.#pendingWrites--);
   }
 
-  // Updates the in-memory history synchronously, so it can be read straight after.
-  record(action: HistoryAction) {
-    if (this.account) this.#set(applyAction(this.account, action, this.#login, this.#now()));
+  // Updates the in-memory history synchronously, so it can be read straight after, and returns
+  // the achievement levels the action unlocked.
+  record(action: HistoryAction): Unlock[] {
+    if (!this.account) return [];
+    const next = applyAction(this.account, action, this.#login, this.#now());
+    // A repeated same-day attention-clear comes back unchanged and needs no write.
+    return this.#set(next, next !== this.account);
+  }
+
+  get hasUnseenAchievements() {
+    return this.account !== null && hasUnseenAchievements(this.account);
+  }
+
+  // Called while Completed is on screen, so every level recorded so far has been seen.
+  markAchievementsSeen() {
+    if (this.account && hasUnseenAchievements(this.account))
+      this.#set({ ...this.account, achievementsSeenAt: this.#now() });
   }
 
   // The first call syncs straight away and then every hour; later calls do nothing.

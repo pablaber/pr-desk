@@ -68,6 +68,7 @@ Inspect the generated screenshot and include the updated image in the change.
 | `src/lib/pr/`                       | `signals.ts` → `dashboard-rules.ts` → `classify.ts` → `card-view-model.ts`                                            |
 | `src/lib/store/app-state.ts`        | versioned preferences and all input validation                                                                        |
 | `src/lib/history/`                  | `history.json` per-login log; ingest and sync scheduling; `facts.ts` (display-time facts), `activity.ts` (buckets)    |
+| `src/lib/achievements/`             | `catalog.ts` declarative achievements; `evaluate.ts` levels, unlock dates and view models; `record.ts` storing them   |
 | `src/lib/updates/`                  | update service: scheduling, coalescing, progress, errors, Update resource cleanup, restart gating                     |
 | `src/App.svelte`, `src/components/` | rendering only                                                                                                        |
 | `src/test/fixtures.ts`              | shared unit-test fixtures (never shipped)                                                                             |
@@ -87,6 +88,11 @@ Inspect the generated screenshot and include the updated image in the change.
   components.** Priorities, predicates, destination columns and labels are declarative
   in `dashboard-rules.ts`; sorting is centralized in `classify.ts`. Update
   `docs/pr-states.md` in the same change whenever rules, signals or sorting change.
+- Achievements are added in `src/lib/achievements/catalog.ts`. Ids are permanent, because
+  `history.json` stores levels by id; tiers, titles, descriptions and icons can change after
+  release. Evaluation never drops a level a user has reached, whatever the tiers or facts later
+  say. Choose `retroactive` for each new one: `true` counts all tracked history and unlocks
+  with past dates; `false` counts only what happens after the user first sees it.
 - Fetching and normalization belong in `src/lib/github/`. Components consume the
   normalized model, not raw GraphQL shapes.
 - Persisted preference shape and canonical input validation belong in

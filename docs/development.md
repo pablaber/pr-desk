@@ -56,6 +56,8 @@ access and persistence require Tauri.
 - `src/lib/store/`: versioned local preferences and canonical input validation.
 - `src/lib/history/`: the local history of your merges, approvals and in-app actions — the
   `history.json` file, ingest rules, and the background sync schedule.
+- `src/lib/achievements/`: the declarative achievement catalog and the pure evaluation that turns
+  history facts into levels, unlock dates and the cards on Completed.
 - `src/lib/updates/`: the update service — launch and 24-hour checks, coalescing,
   download progress, errors, releasing the updater's resource, and restarting only once
   pending writes finish. Updates are off in `npm run dev` and `npm run tauri dev`
@@ -128,6 +130,14 @@ fills it after the first successful refresh, then hourly and whenever Completed 
 holds up the dashboard. Ignore rules are applied when history is shown, not when it is stored.
 It is not part of the settings export, and an unsupported version stops loading and writing
 without overwriting the file.
+
+Each account in `history.json` also keeps its achievements: `achievements` maps an achievement
+id to `{ firstSeenAt, levels: [{ threshold, at, recordedAt }] }`, where `at` is when the threshold
+was really reached and `recordedAt` when PR Desk stored it, and `achievementsSeenAt` is when
+Completed was last viewed. Both are optional and default when missing, so they need no version
+bump. Levels are evaluated after every sync and every in-app action and are never removed, and
+ids no longer in the catalog stay in the file. A level recorded after `achievementsSeenAt` puts a
+dot on Completed in the sidebar until the page is viewed.
 
 Watches and labels are pruned after a successful refresh (`src/lib/pr/prune.ts`). A PR that
 is merged or closed, with fresh data, is unwatched and loses its labels. A labeled PR that no
