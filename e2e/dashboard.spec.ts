@@ -2904,7 +2904,8 @@ test('settings shows read-only GitHub connection details and handles CLI lookup 
 });
 
 test('ready PRs merge only after confirmation with the selected method', async ({ page }) => {
-  // Nothing found by sync, so this merge is the first PR shipped.
+  // Nothing found by sync, so this merge is the first PR shipped, on a Thursday for the streak.
+  await page.clock.install({ time: new Date(2026, 9, 15, 14, 0) });
   await page.addInitScript(() => localStorage.setItem('historyEmpty', '1'));
   await page.goto('/');
   await expect
@@ -2936,6 +2937,21 @@ test('ready PRs merge only after confirmation with the selected method', async (
   await expect(dialog).toBeHidden();
   const celebration = page.getByRole('status').filter({ hasText: 'Merged' });
   await expect(celebration).toContainText('acme/platform #1');
+  await expect(celebration.locator('.chip')).toHaveText([
+    '1st today',
+    '1-day streak',
+    'Unlocked: Off the line',
+  ]);
+  // Seek the overlay to when the chips are fully in, then let it finish.
+  await celebration.locator('.chip').first().waitFor();
+  await page.evaluate(() =>
+    document.getAnimations().forEach((animation) => {
+      animation.pause();
+      animation.currentTime = 1700;
+    }),
+  );
+  await page.screenshot({ path: '.context/merge-chips.png', fullPage: true });
+  await page.evaluate(() => document.getAnimations().forEach((animation) => animation.finish()));
   await expect(celebration).toHaveCount(0);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mergeCalls') ?? '[]'))).toEqual(
     [{ url: 'https://github.com/acme/platform/pull/1', headOid: 'a'.repeat(40), method: 'rebase' }],
