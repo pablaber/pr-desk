@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.20.0](https://github.com/pablaber/pr-desk/compare/v1.19.0...v1.20.0) (2026-10-15)
+
+
+### Features
+
+* add achievements to completed page ([#141](https://github.com/pablaber/pr-desk/issues/141)) ([9df5521](https://github.com/pablaber/pr-desk/commit/9df552141d968b99ea5d6d5c81542fc55fc03d35))
+* add activity chart to completed page ([#139](https://github.com/pablaber/pr-desk/issues/139)) ([8e1fc32](https://github.com/pablaber/pr-desk/commit/8e1fc324d7fa6e06919a8954db279403c29d486c))
+* add weekly goal, streaks and personal records ([#140](https://github.com/pablaber/pr-desk/issues/140)) ([86e5cf4](https://github.com/pablaber/pr-desk/commit/86e5cf4e7f559abb28a2030d0310dff8666a5182))
+* keep a local history of your merges and approvals ([#138](https://github.com/pablaber/pr-desk/issues/138)) ([07c34b1](https://github.com/pablaber/pr-desk/commit/07c34b1d26d3e79ebf6e037cc6160ba31dac140b))
+* show stats on the merge celebration ([#142](https://github.com/pablaber/pr-desk/issues/142)) ([6869a79](https://github.com/pablaber/pr-desk/commit/6869a794086393461efd23b54d9965c2b8045aaa))
+
 ## [1.19.0](https://github.com/pablaber/pr-desk/compare/v1.18.0...v1.19.0) (2026-10-14)
 
 
