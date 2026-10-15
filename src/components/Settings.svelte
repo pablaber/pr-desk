@@ -1,3 +1,22 @@
+<script lang="ts" module>
+  export type SettingsSection =
+    | 'github'
+    | 'refresh'
+    | 'badge'
+    | 'scale'
+    | 'snooze'
+    | 'completed'
+    | 'tracked'
+    | 'watched'
+    | 'bots'
+    | 'ignore-rules'
+    | 'ignored'
+    | 'check-rules'
+    | 'title-tags'
+    | 'transfer'
+    | 'troubleshooting';
+</script>
+
 <script lang="ts">
   import AlarmClock from '@lucide/svelte/icons/alarm-clock';
   import ArrowDownUp from '@lucide/svelte/icons/arrow-down-up';
@@ -9,6 +28,7 @@
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import FolderGit2 from '@lucide/svelte/icons/folder-git-2';
   import FunnelX from '@lucide/svelte/icons/funnel-x';
+  import GitMerge from '@lucide/svelte/icons/git-merge';
   import ListChecks from '@lucide/svelte/icons/list-checks';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import Plug from '@lucide/svelte/icons/plug';
@@ -17,6 +37,7 @@
   import X from '@lucide/svelte/icons/x';
   import ZoomIn from '@lucide/svelte/icons/zoom-in';
   import { githubErrorMessage } from '../lib/github/errors';
+  import CompletedSettings from './CompletedSettings.svelte';
   import DockBadge from './DockBadge.svelte';
   import Ignored from './Ignored.svelte';
   import InterfaceScaleControl from './InterfaceScale.svelte';
@@ -68,6 +89,9 @@
     interfaceScale,
     oninterfacescale,
     onsnoozeoptions,
+    onweeklygoal,
+    onstreakdays,
+    section = $bindable('github'),
     onopen,
     onunignore,
     oncopydebuginfo,
@@ -105,6 +129,10 @@
     interfaceScale: InterfaceScale;
     oninterfacescale: (scale: InterfaceScale) => Promise<void>;
     onsnoozeoptions: (options: SnoozeOption[]) => Promise<void>;
+    onweeklygoal: (goal: number) => Promise<void>;
+    onstreakdays: (days: number[]) => Promise<void>;
+    // Kept by App, so reopening Settings returns to the section last used.
+    section?: SettingsSection;
     onopen: (url: string) => void;
     onunignore: (id: string) => void;
     oncopydebuginfo: () => void;
@@ -112,22 +140,10 @@
     oncopysettings: () => void;
     onimportsettings: (config: SettingsConfig) => Promise<boolean>;
   } = $props();
-  type Section =
-    | 'github'
-    | 'refresh'
-    | 'badge'
-    | 'scale'
-    | 'snooze'
-    | 'tracked'
-    | 'watched'
-    | 'bots'
-    | 'ignore-rules'
-    | 'ignored'
-    | 'check-rules'
-    | 'title-tags'
-    | 'transfer'
-    | 'troubleshooting';
-  const groups: { label: string; items: { id: Section; title: string; icon: typeof Plug }[] }[] = [
+  const groups: {
+    label: string;
+    items: { id: SettingsSection; title: string; icon: typeof Plug }[];
+  }[] = [
     {
       label: 'GENERAL',
       items: [
@@ -136,6 +152,7 @@
         { id: 'badge', title: 'Dock badge', icon: BellDot },
         { id: 'scale', title: 'Interface size', icon: ZoomIn },
         { id: 'snooze', title: 'Snooze options', icon: AlarmClock },
+        { id: 'completed', title: 'Completed', icon: GitMerge },
       ],
     },
     {
@@ -155,9 +172,7 @@
   const troubleshooting = { id: 'troubleshooting', title: 'Troubleshooting', icon: Bug } as const;
   const titles = Object.fromEntries(
     [...groups.flatMap((g) => g.items), transfer, troubleshooting].map((i) => [i.id, i.title]),
-  ) as Record<Section, string>;
-  // Kept while the app runs, so reopening Settings returns to the section last used.
-  let section = $state<Section>('github');
+  ) as Record<SettingsSection, string>;
   let dialog = $state<HTMLDialogElement>();
   // showModal() brings the focus trap, inert background and top-layer stacking with it.
   $effect(() => {
@@ -206,7 +221,7 @@
   }
 </script>
 
-{#snippet navItem(item: { id: Section; title: string; icon: typeof Plug })}
+{#snippet navItem(item: { id: SettingsSection; title: string; icon: typeof Plug })}
   <button
     type="button"
     class:active={section === item.id}
@@ -340,6 +355,22 @@
             options={preferences.settings.snoozeOptions}
             {busy}
             onsave={onsnoozeoptions}
+          />
+        </section>
+      {:else if section === 'completed'}
+        <section
+          id="settings-section-completed"
+          class="settings-section"
+          aria-labelledby="settings-section-heading"
+        >
+          <h2 id="settings-section-heading">Completed</h2>
+          <p>Set the weekly goal and streak days that the Completed page tracks.</p>
+          <CompletedSettings
+            weeklyGoal={preferences.settings.weeklyGoal}
+            streakDays={preferences.settings.streakDays}
+            {busy}
+            ongoal={onweeklygoal}
+            {onstreakdays}
           />
         </section>
       {:else if section === 'tracked'}

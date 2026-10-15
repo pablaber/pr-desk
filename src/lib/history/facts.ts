@@ -5,6 +5,8 @@ import type { AccountHistory, HistoryEvent } from './types';
 
 export interface Fact {
   id: string;
+  url: string;
+  title: string;
   repository: string;
   at: number;
   // Null until a sync has seen the PR: in-app merges are recorded without a creation time.
@@ -56,6 +58,8 @@ export function historyFacts(
       isKnownBot({ author: entry.author, authorIsBot: entry.authorIsApp }, preferences.knownBots);
     const fact = (at: number): Fact => ({
       id: entry.id,
+      url: entry.url,
+      title: entry.title,
       repository: entry.repository,
       at,
       createdAt: parse(entry.createdAt),

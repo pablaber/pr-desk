@@ -1307,6 +1307,22 @@ footer {
   padding: 0;
   margin-bottom: 12px;
 }
+.completed-settings {
+  display: grid;
+  gap: 24px;
+  margin-top: 18px;
+  max-width: 460px;
+}
+.goal-setting label {
+  display: block;
+  margin-bottom: 12px;
+}
+.goal-setting .refresh-number input {
+  flex: none;
+}
+.completed-settings .streak-days {
+  margin: 0;
+}
 .segmented-control {
   display: inline-flex;
   gap: 2px;
@@ -2224,6 +2240,207 @@ fieldset:disabled .segmented-control input {
 }
 .activity-note .lucide {
   margin-top: 2px;
+}
+
+/* This week: the weekly goal, the current streak and personal records. */
+.completed-panel-sub {
+  margin-top: 3px;
+  font-size: 11px;
+  color: #798675;
+}
+.this-week-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.tracking-since,
+.this-week-actions .quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: #79827b;
+}
+.this-week-actions .quiet {
+  padding: 4px 6px;
+  color: #5d6a5a;
+}
+.first-run-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #dce4d5;
+  border-radius: 8px;
+  background: #f4f8f1;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #3e4a42;
+}
+.first-run-notice .lucide {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #3f6746;
+}
+.goal-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 12px;
+}
+.goal-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #e6ebe2;
+  border-radius: 7px;
+  background: #fdfefb;
+}
+.goal-card h3 {
+  font-size: 12px;
+  font-weight: 400;
+  color: #798675;
+}
+.goal-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.goal-count b {
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -0.8px;
+}
+.goal-count small {
+  font-size: 13px;
+  font-weight: 500;
+  color: #79827b;
+}
+.goal-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #5d6a5a;
+}
+.goal-streak .lucide {
+  color: #c2410c;
+}
+.goal-streak.idle .lucide {
+  color: #b7bfb2;
+}
+.goal-meter {
+  height: 10px;
+  border-radius: 5px;
+  background: #dfe9da;
+  overflow: hidden;
+}
+.goal-meter i {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  background: #3f7d57;
+}
+.goal-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  text-align: center;
+  font-size: 10px;
+  color: #8a9483;
+}
+.goal-week span {
+  display: block;
+  margin-top: 4px;
+}
+.goal-day {
+  display: grid;
+  place-items: center;
+  height: 30px;
+  border-radius: 6px;
+  background: #eef2ea;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #3e4a42;
+}
+.goal-day.done {
+  background: #2f7a4a;
+  color: #fff;
+}
+.goal-day.untracked {
+  background: transparent;
+  border: 1px dashed #d3dbcf;
+  font-weight: 500;
+  color: #a0aa99;
+}
+.goal-day.today {
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px #2f7a4a;
+}
+.goal-status {
+  font-size: 11px;
+  color: #79827b;
+}
+.records {
+  margin: 0;
+}
+.record {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid #edf0e9;
+  font-size: 12px;
+}
+.record:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.record dt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #5d6a5a;
+}
+.record dd {
+  margin: 0;
+  color: #8a9483;
+}
+.record b {
+  font-weight: 650;
+  color: #26332e;
+}
+.record em {
+  margin-left: 6px;
+  font-size: 11px;
+  font-style: normal;
+}
+.record-link {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+  color: #8a9483;
+}
+.record-link:hover {
+  color: #3f6746;
+  text-decoration: underline;
+}
+.empty-note {
+  align-self: center;
+  padding: 6px 0;
+  font-size: 12px;
+  color: #8a9483;
+}
+@media (max-width: 760px) {
+  .goal-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Sidebar collapse. Collapsed, the sidebar is an icon rail; labels move into hover tooltips.

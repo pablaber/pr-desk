@@ -44,7 +44,7 @@
   import Completed from './components/Completed.svelte';
   import Labels from './components/Labels.svelte';
   import LabelPullRequests from './components/LabelPullRequests.svelte';
-  import Settings from './components/Settings.svelte';
+  import Settings, { type SettingsSection } from './components/Settings.svelte';
   import UnsavedChanges from './components/UnsavedChanges.svelte';
   import HotkeyHelp from './components/HotkeyHelp.svelte';
   import Toaster from './components/Toaster.svelte';
@@ -76,6 +76,8 @@
     type IgnoreRuleKind,
     parsePullRequest,
     isRefreshInterval,
+    isWeeklyGoal,
+    parseStreakDays,
     isDockBadgeMode,
     type DockBadgeMode,
     isInterfaceScale,
@@ -131,6 +133,7 @@
   // Settings is an overlay above the current screen. Its edits live here until Save, so a refresh
   // never fires for a half-finished list of repositories.
   let settingsOpen = $state(false);
+  let settingsSection = $state<SettingsSection>('github');
   let confirmClose = $state(false);
   let settingsDraft = $state<PreferenceDraft | null>(null);
   let settingsDirty = $derived(settingsDraft !== null && draftDiffers(settingsDraft, preferences));
@@ -352,6 +355,18 @@
   async function zoomTo(scale: InterfaceScale, icon: typeof ZoomIn) {
     await setInterfaceScale(scale);
     showToast(icon, `Interface size ${scale}%`, 'interface-size');
+  }
+  async function setWeeklyGoal(goal: number) {
+    if (!isWeeklyGoal(goal)) return;
+    await change((next) => {
+      next.settings.weeklyGoal = goal;
+    });
+  }
+  async function setStreakDays(days: number[]) {
+    const validated = parseStreakDays(days);
+    await change((next) => {
+      next.settings.streakDays = validated;
+    });
   }
   async function setSnoozeOptions(options: SnoozeOption[]) {
     const validated = parseSnoozeOptions(options);
@@ -1059,10 +1074,13 @@
         snapshot={completed}
         loading={completedLoading}
         {now}
-        trackingSince={history.account?.trackingSince ?? null}
         history={history.account}
         {login}
         {preferences}
+        onedit={() => {
+          settingsSection = 'completed';
+          settingsOpen = true;
+        }}
         onopen={open}
       />
     {:else if screen === 'labels'}
@@ -1233,6 +1251,9 @@
     interfaceScale={preferences.settings.interfaceScale}
     oninterfacescale={setInterfaceScale}
     onsnoozeoptions={setSnoozeOptions}
+    onweeklygoal={setWeeklyGoal}
+    onstreakdays={setStreakDays}
+    bind:section={settingsSection}
     onopen={open}
     onunignore={(id) => restore('ignored', id)}
     oncopydebuginfo={() => copyDebugInfo()}

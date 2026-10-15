@@ -41,7 +41,7 @@ export interface PRLabel {
 export type DockBadgeMode = 'off' | 'ready-to-merge' | 'needs-attention' | 'both';
 export type InterfaceScale = 90 | 100 | 115 | 130;
 export interface AppState {
-  schemaVersion: 15;
+  schemaVersion: 16;
   trackedRepositories: string[];
   ignoreRules: IgnoreRule[];
   checkRules: CheckRule[];
@@ -58,6 +58,9 @@ export interface AppState {
     dockBadge: DockBadgeMode;
     interfaceScale: InterfaceScale;
     sidebarCollapsed: boolean;
+    weeklyGoal: number;
+    // JS weekdays (0 is Sunday) on which shipping a PR extends your streak, sorted.
+    streakDays: number[];
   };
 }
 export const MAX_SNOOZE_OPTIONS = 5;
@@ -67,9 +70,11 @@ export const defaultSnoozeOptions = (): SnoozeOption[] => [
   { kind: 'duration', amount: 1, unit: 'days' },
   { kind: 'duration', amount: 1, unit: 'weeks' },
 ];
+const DEFAULT_WEEKLY_GOAL = 10;
+const defaultStreakDays = (): number[] => [1, 2, 3, 4, 5];
 const defaultKnownBots = (): string[] => ['dependabot[bot]', 'renovate[bot]'];
 export const defaultState = (): AppState => ({
-  schemaVersion: 15,
+  schemaVersion: 16,
   trackedRepositories: [],
   ignoreRules: [],
   checkRules: [],
@@ -86,6 +91,8 @@ export const defaultState = (): AppState => ({
     dockBadge: 'both',
     interfaceScale: 100,
     sidebarCollapsed: false,
+    weeklyGoal: DEFAULT_WEEKLY_GOAL,
+    streakDays: defaultStreakDays(),
   },
 });
 export async function loadState(): Promise<AppState> {
@@ -105,7 +112,7 @@ export function migrateState(value: unknown): AppState {
     labeledPullRequests?: unknown;
     knownBots?: unknown;
   };
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].includes(stored.schemaVersion))
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].includes(stored.schemaVersion))
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
@@ -131,7 +138,7 @@ export function migrateState(value: unknown): AppState {
     watchedPullRequests: stored.watchedPullRequests,
     ignoredPullRequests: stored.ignoredPullRequests,
     snoozedPullRequests: stored.snoozedPullRequests,
-    schemaVersion: 15,
+    schemaVersion: 16,
     knownBots: readStoredKnownBots(stored),
     ignoreRules: readStoredIgnoreRules(stored),
     checkRules: readStoredCheckRules(stored),
@@ -147,6 +154,7 @@ export function migrateState(value: unknown): AppState {
       dockBadge: readStoredDockBadge(stored),
       interfaceScale: readStoredInterfaceScale(stored),
       sidebarCollapsed: readStoredSidebarCollapsed(stored),
+      ...readStoredCompleted(stored),
     },
   };
 }
@@ -190,6 +198,37 @@ function readStoredSidebarCollapsed(stored: { schemaVersion: number; settings?: 
   if (typeof collapsed !== 'boolean')
     throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
   return collapsed;
+}
+export function isWeeklyGoal(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 999;
+}
+// Sorted and unique, so the same days always compare and store the same way.
+export function parseStreakDays(value: unknown): number[] {
+  if (!Array.isArray(value) || value.length === 0)
+    throw new Error('Choose at least one streak day.');
+  if (value.some((day) => typeof day !== 'number' || !Number.isInteger(day) || day < 0 || day > 6))
+    throw new Error('Invalid streak day.');
+  return [...new Set(value as number[])].sort((a, b) => a - b);
+}
+function readStoredCompleted(stored: {
+  schemaVersion: number;
+  settings?: unknown;
+}): Pick<AppState['settings'], 'weeklyGoal' | 'streakDays'> {
+  const defaults = { weeklyGoal: DEFAULT_WEEKLY_GOAL, streakDays: defaultStreakDays() };
+  if (stored.schemaVersion < 16) return defaults;
+  const { weeklyGoal, streakDays } = (stored.settings ?? {}) as {
+    weeklyGoal?: unknown;
+    streakDays?: unknown;
+  };
+  try {
+    if (weeklyGoal !== undefined && !isWeeklyGoal(weeklyGoal)) throw new Error('Invalid goal');
+    return {
+      weeklyGoal: weeklyGoal ?? defaults.weeklyGoal,
+      streakDays: streakDays === undefined ? defaults.streakDays : parseStreakDays(streakDays),
+    };
+  } catch {
+    throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
+  }
 }
 // A saved file that no longer validates must never be silently rewritten with defaults. An
 // absent list is different from an empty one: only the empty list means "the user removed them".

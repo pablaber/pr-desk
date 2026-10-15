@@ -34,7 +34,7 @@ export interface ActivityPeriod {
 
 // Dates are built from calendar fields so a day is always local midnight to local midnight, even
 // across daylight saving changes.
-function addDays(time: number, days: number) {
+export function addDays(time: number, days: number) {
   const date = new Date(time);
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days).getTime();
 }
