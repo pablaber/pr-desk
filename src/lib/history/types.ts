@@ -33,6 +33,25 @@ export interface AccountHistory {
   syncedThrough: number | null;
   entries: Record<string, HistoryEntry>;
   events: HistoryEvent[];
+  // Keyed by achievement id. Ids no longer in the catalog stay, so nothing earned is ever lost.
+  achievements: Record<string, StoredAchievement>;
+  // Levels recorded after this were never shown on Completed, which puts a dot on its nav entry.
+  achievementsSeenAt: number;
+}
+
+export interface AchievementLevel {
+  threshold: number;
+  // When the threshold was really reached.
+  at: number;
+  // When PR Desk stored it.
+  recordedAt: number;
+}
+
+export interface StoredAchievement {
+  // The first time this account was evaluated against the achievement.
+  firstSeenAt: number;
+  // Only ever grows: its length is the highest level reached, whatever the tiers say now.
+  levels: AchievementLevel[];
 }
 
 export interface HistoryFile {

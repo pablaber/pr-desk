@@ -116,6 +116,7 @@
     save: saveHistoryFile,
     fetch: (login, since) => fetchHistory(service, login, preferences.trackedRepositories, since),
     onWarning: (message) => recordError('history', message),
+    preferences: () => preferences,
   });
   let snapshot = $state<DashboardSnapshot>({
     prs: [],
@@ -415,6 +416,11 @@
         void loadCompleted();
         void history.sync();
       });
+  });
+  // Levels unlocked while Completed is open are seen straight away.
+  $effect(() => {
+    if (screen === 'completed' && history.hasUnseenAchievements)
+      untrack(() => history.markAchievementsSeen());
   });
   async function refresh(silent = false) {
     if (loading || saving) {
@@ -898,14 +904,16 @@
   active: boolean,
   onclick: () => void,
   hotkey: ReturnType<typeof hotkeyFor>,
+  dot: string | null = null,
 )}
   <button
     class:active
     {onclick}
-    aria-label={sidebarCollapsed ? label : null}
+    aria-label={sidebarCollapsed ? (dot ? `${label}, ${dot}` : label) : null}
     aria-keyshortcuts={hotkey ? ariaKeyShortcut(hotkey) : null}
     data-tip={sidebarCollapsed ? `${label}${hotkey ? ` ${compactKeys(hotkey)}` : ''}` : null}
     ><Icon size={15} /><span class="nav-text">{label}</span>
+    {#if dot}<span class="nav-dot" role="img" aria-label={dot}></span>{/if}
     {#if hotkey}<span class="nav-hotkey nav-text" aria-hidden="true">{compactKeys(hotkey)}</span
       >{/if}</button
   >
@@ -962,6 +970,7 @@
         screen === 'completed',
         () => (screen = 'completed'),
         completedHotkey,
+        history.hasUnseenAchievements ? 'New achievement' : null,
       )}
       {@render navButton(
         'Labels',

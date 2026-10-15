@@ -21,12 +21,19 @@ function setup(file: HistoryFile | Error = { version: 1, accounts: {} }) {
     save: vi.fn<HistoryDeps['save']>(async (next) => void saved.push(structuredClone(next))),
     fetch: vi.fn<HistoryDeps['fetch']>(async () => ({ entries: [], warnings: [], complete: true })),
     onWarning: vi.fn(),
+    preferences: () => preferences,
     now: () => Date.now(),
   };
   return { deps, saved, log: new HistoryLog(deps) };
 }
 
 const flush = () => vi.advanceTimersByTimeAsync(0);
+
+const preferences = {
+  knownBots: [],
+  ignoreRules: [],
+  settings: { weeklyGoal: 10, streakDays: [1, 2, 3, 4, 5] },
+};
 
 describe('HistoryLog', () => {
   beforeEach(() => {
@@ -45,15 +52,21 @@ describe('HistoryLog', () => {
   });
 
   it('keeps an existing account and other accounts untouched', async () => {
-    const other = { trackingSince: 1, syncedThrough: null, entries: {}, events: [] };
+    const other = {
+      trackingSince: 1,
+      syncedThrough: null,
+      entries: {},
+      events: [],
+      achievements: {},
+      achievementsSeenAt: 0,
+    };
     const mine = { ...other, trackingSince: 2 };
     const { log, saved } = setup({ version: 1, accounts: { other, me: mine } });
     await log.open('me');
-    expect(log.account).toEqual(mine);
+    expect(log.account?.trackingSince).toBe(2);
     log.record({ kind: 'attention-clear' });
     await flush();
-    expect(saved).toHaveLength(1);
-    expect(saved[0].accounts.other).toEqual(other);
+    expect(saved.at(-1)?.accounts.other).toEqual(other);
   });
 
   it('records nothing and writes nothing when the file cannot be read', async () => {
@@ -174,6 +187,68 @@ describe('HistoryLog', () => {
     await sync;
     expect(log.account?.events).toHaveLength(1);
     expect(log.account?.syncedThrough).toBe(start);
+  });
+
+  it('returns the levels an in-app merge unlocks and keeps them new until seen', async () => {
+    const { log, saved } = setup();
+    await log.open('me');
+    expect(log.hasUnseenAchievements).toBe(false);
+    vi.setSystemTime(start + 1000);
+    expect(log.record({ kind: 'merge', pr: pr() })).toEqual([
+      { id: 'off-the-line', title: 'Off the line', threshold: 1 },
+    ]);
+    expect(log.account?.achievements['off-the-line'].levels).toEqual([
+      { threshold: 1, at: start + 1000, recordedAt: start + 1000 },
+    ]);
+    expect(log.hasUnseenAchievements).toBe(true);
+    expect(log.record({ kind: 'update-branch', pr: pr() })).toEqual([]);
+    vi.setSystemTime(start + 2000);
+    log.markAchievementsSeen();
+    expect(log.hasUnseenAchievements).toBe(false);
+    await flush();
+    expect(saved.at(-1)?.accounts.me.achievementsSeenAt).toBe(start + 2000);
+    const writes = saved.length;
+    log.markAchievementsSeen();
+    await flush();
+    expect(saved).toHaveLength(writes);
+  });
+
+  it('records levels a sync unlocks without returning them', async () => {
+    const { log, deps } = setup();
+    await log.open('me');
+    deps.fetch.mockResolvedValueOnce({
+      entries: [historyEntry({ mergedAt: new Date(start + 1000).toISOString() })],
+      warnings: [],
+      complete: true,
+    });
+    await log.sync();
+    expect(log.account?.achievements['off-the-line'].levels).toHaveLength(1);
+    expect(log.hasUnseenAchievements).toBe(true);
+  });
+
+  it('writes an opened account only when achievements were first seen or unlocked', async () => {
+    const { log, deps, saved } = setup();
+    await log.open('me');
+    await flush();
+    const stored = saved[0];
+    expect(Object.keys(stored.accounts.me.achievements)).toContain('century');
+    expect(stored.accounts.me.achievements.century.firstSeenAt).toBe(start);
+
+    const again = setup(stored);
+    await again.log.open('me');
+    await flush();
+    expect(again.deps.save).not.toHaveBeenCalled();
+
+    const missing = { ...stored.accounts.me.achievements };
+    delete missing.century;
+    const older = setup({
+      version: 1,
+      accounts: { me: { ...stored.accounts.me, achievements: missing } },
+    });
+    await older.log.open('me');
+    await flush();
+    expect(older.deps.save).toHaveBeenCalledTimes(1);
+    expect(deps.save).toHaveBeenCalledTimes(1);
   });
 
   it('stops the hourly sync when disposed', async () => {

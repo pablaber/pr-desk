@@ -9,7 +9,14 @@ function localMidnight(now: number) {
 }
 
 export function newAccount(now: number): AccountHistory {
-  return { trackingSince: localMidnight(now), syncedThrough: null, entries: {}, events: [] };
+  return {
+    trackingSince: localMidnight(now),
+    syncedThrough: null,
+    entries: {},
+    events: [],
+    achievements: {},
+    achievementsSeenAt: 0,
+  };
 }
 
 // GitHub search takes a day, not a time. The UTC day of an instant never starts after it, so the

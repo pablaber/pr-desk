@@ -316,6 +316,7 @@ test.beforeEach(async ({ page }) => {
           };
         // History sync finds #1 merged just now by you, #4 merged by you, and #6 approved by you.
         if (query.includes('DeskHistorySearch')) {
+          if (localStorage.getItem('historyEmpty')) return { search: connection([]) };
           const found = (number: number, extra: Record<string, unknown>) => ({
             ...raw(number),
             createdAt: new Date(Date.now() - 86400000).toISOString(),
@@ -792,8 +793,80 @@ test('This week shows the goal, streak and personal records', async ({ page }) =
   const order = await page
     .locator('.completed-list > .completed-panel')
     .evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
-  expect(order).toEqual(['This week', 'Activity']);
+  expect(order).toEqual(['This week', 'Achievements', 'Activity']);
   await page.screenshot({ path: '.context/this-week.png', fullPage: true });
+});
+
+test('achievements show levels earned from history and a New dot until Completed is seen', async ({
+  page,
+}) => {
+  await seedWeek(page);
+  // Five days the board was clear and five branch updates, all last week.
+  await page.addInitScript(() => {
+    const file = JSON.parse(localStorage.getItem('history')!);
+    const account = file.accounts.alex;
+    if (account.events.length) return;
+    const at = (day: number, hour: number) => new Date(2026, 9, day, hour).getTime();
+    for (const day of [5, 6, 7, 8, 9])
+      account.events.push(
+        { kind: 'attention-clear', at: at(day, 9) },
+        { kind: 'branch-updated', at: at(day, 11), pr: 'acme/platform#2' },
+      );
+    localStorage.setItem('history', JSON.stringify(file));
+  });
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const completed = page.getByRole('button', { name: /^Completed/ });
+  const dot = completed.locator('.nav-dot');
+  await expect(dot).toBeVisible();
+  await expect(dot).toHaveAttribute('aria-label', 'New achievement');
+  await page.locator('aside nav').first().screenshot({ path: '.context/achievements-dot.png' });
+  const saved = () =>
+    page.evaluate(() => JSON.parse(localStorage.getItem('history')!).accounts.alex);
+  await expect
+    .poll(async () => (await saved()).achievements['off-the-line']?.levels)
+    .toEqual([expect.objectContaining({ threshold: 1, at: new Date(2026, 9, 5, 10).getTime() })]);
+
+  // The collapsed rail keeps the dot and says so in the button's name.
+  await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Completed, New achievement' })).toBeVisible();
+  await expect(dot).toBeVisible();
+  await page
+    .locator('aside nav')
+    .first()
+    .screenshot({ path: '.context/achievements-dot-collapsed.png' });
+  await page.getByRole('button', { name: 'Expand sidebar', exact: true }).click();
+
+  await completed.click();
+  const panel = page.getByRole('region', { name: 'Achievements' });
+  await expect(panel).toContainText('Earned from activity since tracking began on Sep 14, 2026');
+  await expect(panel.locator('.achievements-total')).toHaveText('5 of 38 levels unlocked');
+  await expect(panel.locator('.achievement')).toHaveCount(12);
+  const card = (title: string) => panel.getByRole('article', { name: title, exact: true });
+  await expect(card('Off the line').locator('.achievement-progress')).toHaveText(
+    'Complete · Oct 5',
+  );
+  await expect(card('Off the line').locator('.achievement-level')).toHaveCount(0);
+  // Monday 5 to Friday 9, then Monday 12 to today: nine streak days.
+  await expect(card('On a roll').locator('.achievement-progress')).toHaveText('9 / 10 days');
+  await expect(card('On a roll').getByRole('img', { name: 'Level 1' })).toHaveText('I');
+  await expect(card('On a roll').locator('.achievement-tiers li.done')).toHaveText(['5']);
+  await expect(card('Goal getter').locator('.achievement-progress')).toHaveText('1 / 4 weeks');
+  await expect(card('Clear desk')).toContainText('Only counts days PR Desk was open');
+  await expect(card('Clear desk').locator('.achievement-progress')).toHaveText('5 / 25 days');
+  await expect(card('Up to date')).toContainText('Only counts what you do in PR Desk');
+  await expect(card('Century')).toHaveClass(/locked/);
+  await expect(card('Century').locator('.achievement-progress')).toHaveText('19 / 100 PRs');
+  await expect(card('Explorer').locator('.achievement-progress')).toHaveText('2 / 3 repos');
+  await expect(panel.locator('.achievement.locked')).toHaveCount(7);
+
+  // Seeing Completed clears the dot, and it stays clear after a restart.
+  await expect(dot).toHaveCount(0);
+  await expect.poll(async () => (await saved()).achievementsSeenAt).toBeGreaterThan(0);
+  await panel.screenshot({ path: '.context/achievements.png' });
+  await page.reload();
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect(page.locator('.nav-dot')).toHaveCount(0);
 });
 
 test('This week leaves out last week when it was not tracked', async ({ page }) => {
@@ -2831,7 +2904,15 @@ test('settings shows read-only GitHub connection details and handles CLI lookup 
 });
 
 test('ready PRs merge only after confirmation with the selected method', async ({ page }) => {
+  // Nothing found by sync, so this merge is the first PR shipped.
+  await page.addInitScript(() => localStorage.setItem('historyEmpty', '1'));
   await page.goto('/');
+  await expect
+    .poll(() =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('history')!).accounts.alex.syncedThrough),
+    )
+    .toBeGreaterThan(0);
+  await expect(page.locator('.nav-dot')).toHaveCount(0);
   const merge = page.getByRole('button', {
     name: 'Merge Reduce cache lookup latency',
     exact: true,
@@ -2868,6 +2949,16 @@ test('ready PRs merge only after confirmation with the selected method', async (
     .toMatchObject({ mergedBy: 'alex', approvedAt: null });
   await expect(page.locator('.pr-card')).toHaveCount(3);
   expect(await page.evaluate(() => (window as any).opened)).toEqual([]);
+
+  // The merge unlocked Off the line straight away.
+  await expect(page.locator('.nav-dot')).toBeVisible();
+  await page.getByRole('button', { name: /^Completed/ }).click();
+  const offTheLine = page
+    .getByRole('region', { name: 'Achievements' })
+    .getByRole('article', { name: 'Off the line' });
+  await expect(offTheLine).not.toHaveClass(/locked/);
+  await expect(offTheLine.locator('.achievement-progress')).toHaveText(/^Complete · /);
+  await expect(page.locator('.nav-dot')).toHaveCount(0);
 });
 
 test('merge failures keep the dialog and card available', async ({ page }) => {

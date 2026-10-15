@@ -23,6 +23,18 @@ const invalid = () =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const isLevel = (level: unknown) =>
+  isRecord(level) &&
+  Number.isFinite(level.threshold) &&
+  Number.isFinite(level.at) &&
+  Number.isFinite(level.recordedAt);
+
+const isAchievement = (stored: unknown) =>
+  isRecord(stored) &&
+  Number.isFinite(stored.firstSeenAt) &&
+  Array.isArray(stored.levels) &&
+  stored.levels.every(isLevel);
+
 // Fields added later are optional and default here, so adding one needs no version bump. Anything
 // unrecognised throws, and the caller then stops writing so the file is never overwritten.
 export function readHistoryFile(value: unknown): HistoryFile {
@@ -36,10 +48,26 @@ export function readHistoryFile(value: unknown): HistoryFile {
   const accounts: Record<string, AccountHistory> = {};
   for (const [login, stored] of Object.entries(value.accounts ?? {})) {
     if (!isRecord(stored) || !Number.isFinite(stored.trackingSince)) throw invalid();
-    const { syncedThrough = null, entries = {}, events = [] } = stored;
+    const {
+      syncedThrough = null,
+      entries = {},
+      events = [],
+      achievements = {},
+      achievementsSeenAt = 0,
+    } = stored;
     if (syncedThrough !== null && !Number.isFinite(syncedThrough)) throw invalid();
     if (!isRecord(entries) || !Array.isArray(events)) throw invalid();
-    accounts[login] = { ...stored, syncedThrough, entries, events } as AccountHistory;
+    if (!isRecord(achievements) || !Object.values(achievements).every(isAchievement))
+      throw invalid();
+    if (!Number.isFinite(achievementsSeenAt)) throw invalid();
+    accounts[login] = {
+      ...stored,
+      syncedThrough,
+      entries,
+      events,
+      achievements,
+      achievementsSeenAt,
+    } as AccountHistory;
   }
   return { ...value, version: 1, accounts };
 }
