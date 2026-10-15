@@ -56,6 +56,7 @@
   import { refreshDashboard, type DashboardSnapshot } from './lib/github/refresh';
   import { fetchCompleted, type CompletedSnapshot } from './lib/github/completed';
   import { fetchHistory } from './lib/github/history';
+  import { celebrationChips, type CelebrationChip } from './lib/achievements/celebration';
   import { HistoryLog } from './lib/history/history.svelte';
   import { loadHistoryFile, saveHistoryFile } from './lib/history/store';
   import { settledPullRequest } from './lib/github/mergeability';
@@ -141,7 +142,7 @@
   let settingsView = $derived(settingsDraft ? { ...preferences, ...settingsDraft } : preferences);
   let actionPR = $state<PullRequest | null>(null);
   let actionError = $state('');
-  let mergedPR = $state<PullRequest | null>(null);
+  let merged = $state<{ pr: PullRequest; chips: CelebrationChip[] } | null>(null);
   let actionStatus = $state('');
   let pendingAction = $state<'close-stale' | 'merge' | 'approve-merge' | 'update-branch'>(
     'close-stale',
@@ -751,8 +752,12 @@
       }
       // An updated PR stays open while its checks re-run, so refresh rather than drop it.
       if (!updating) snapshot.prs = snapshot.prs.filter((item) => item.id !== pr.id);
-      history.record({ kind: pendingAction, pr });
-      if (pendingAction === 'merge' || pendingAction === 'approve-merge') mergedPR = pr;
+      const unlocks = history.record({ kind: pendingAction, pr });
+      if (pendingAction === 'merge' || pendingAction === 'approve-merge')
+        merged = {
+          pr,
+          chips: celebrationChips(history.account, login, preferences, unlocks, Date.now()),
+        };
       actionPR = null;
     } catch (e) {
       actionError = String(e);
@@ -1301,8 +1306,8 @@
     if (!saving) actionPR = null;
   }}
 />
-{#if mergedPR}
-  {#key mergedPR.id}
-    <MergeCelebration pr={mergedPR} ondone={() => (mergedPR = null)} />
+{#if merged}
+  {#key merged.pr.id}
+    <MergeCelebration pr={merged.pr} chips={merged.chips} ondone={() => (merged = null)} />
   {/key}
 {/if}

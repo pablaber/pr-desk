@@ -1,7 +1,16 @@
 <script lang="ts">
   import Check from '@lucide/svelte/icons/check';
+  import Flame from '@lucide/svelte/icons/flame';
+  import GitMerge from '@lucide/svelte/icons/git-merge';
+  import Medal from '@lucide/svelte/icons/medal';
+  import type { CelebrationChip } from '../lib/achievements/celebration';
   import type { PullRequest } from '../lib/pr/types';
-  let { pr, ondone }: { pr: PullRequest; ondone: () => void } = $props();
+  let {
+    pr,
+    chips = [],
+    ondone,
+  }: { pr: PullRequest; chips?: CelebrationChip[]; ondone: () => void } = $props();
+  const icons = { today: GitMerge, streak: Flame, unlock: Medal };
 </script>
 
 <!-- Clicks pass through, so the board stays usable while the overlay plays out. -->
@@ -17,6 +26,14 @@
     <span class="ring"></span><span class="ring later"></span>
     <span class="disc"><Check size={64} /></span>
     <span class="caption"><strong>Merged</strong>{pr.repository} #{pr.number}</span>
+    {#if chips.length > 0}
+      <span class="chips">
+        {#each chips as chip (chip.text)}
+          {@const Icon = icons[chip.kind]}
+          <span class="chip {chip.kind}"><Icon size={14} />{chip.text}</span>
+        {/each}
+      </span>
+    {/if}
   </div>
 </div>
 
@@ -81,6 +98,39 @@
     font-weight: 650;
     letter-spacing: -0.5px;
   }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    max-width: min(90vw, 560px);
+    margin-top: 12px;
+    animation: merge-celebration-rise 0.4s 0.8s ease-out both;
+  }
+  .chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: #ffffffee;
+    color: #26332e;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: 0 6px 18px #0003;
+  }
+  .chip :global(.lucide) {
+    color: #287a3e;
+  }
+  .chip.streak :global(.lucide) {
+    color: #c2410c;
+  }
+  .chip.unlock {
+    background: #fff7df;
+  }
+  .chip.unlock :global(.lucide) {
+    color: #a16207;
+  }
   @keyframes merge-celebration-fade {
     from,
     to {
@@ -120,7 +170,8 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .disc,
-    .caption {
+    .caption,
+    .chips {
       animation: none;
     }
     .disc :global(.lucide path) {

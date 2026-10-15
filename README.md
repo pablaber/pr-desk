@@ -143,6 +143,8 @@ may skip.
   streaks, weekly goals met, approvals, same-day reviews, bot PRs merged, repositories, and
   in-app actions such as Close as stale and Update branch), each with levels you keep once
   reached. A dot on Completed in the sidebar marks levels you have not seen yet.
+- Adds chips to the merge celebration from that history: how many PRs you have shipped today,
+  your current streak, and any achievement level the merge unlocked.
 - Closes PRs with red staleness (over 28 days) after confirmation, leaving an automated
   comment with their inactivity in days. Enter confirms; Escape cancels.
 
