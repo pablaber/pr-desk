@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
   import Bug from '@lucide/svelte/icons/bug';
   import Copy from '@lucide/svelte/icons/copy';
@@ -62,16 +63,46 @@
     submenu = $state<'snooze' | 'labels' | null>(null);
   let at = $state<{ x: number; y: number } | null>(null);
   let cardEl: HTMLElement;
+  let submenuEl = $state<HTMLElement>();
   let card = $derived(cardViewModel(item, now));
   function close() {
     menu = false;
     submenu = null;
     at = null;
   }
-  export function openSubmenu(which: 'snooze' | 'labels') {
+  export async function openSubmenu(which: 'snooze' | 'labels') {
     if (busy) return;
     menu = true;
     submenu = which;
+    if (which !== 'snooze') return;
+    await tick();
+    submenuItems()[0]?.focus();
+  }
+  // The custom date field keeps the arrow keys for stepping its own segments, so only the
+  // buttons take part; Tab still reaches the field.
+  const submenuItems = () =>
+    [...(submenuEl?.querySelectorAll<HTMLButtonElement>('button') ?? [])].filter(
+      (b) => !b.disabled,
+    );
+  function moveFocus(e: KeyboardEvent) {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+    if (e.target instanceof HTMLInputElement) return;
+    const items = submenuItems();
+    if (!items.length) return;
+    e.preventDefault();
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    const last = items.length - 1;
+    const next = {
+      Home: 0,
+      End: last,
+      ArrowDown: current < last ? current + 1 : 0,
+      ArrowUp: current > 0 ? current - 1 : last,
+    }[e.key]!;
+    items[next].focus();
+  }
+  function arrowKeys(node: HTMLElement) {
+    node.addEventListener('keydown', moveFocus);
+    return { destroy: () => node.removeEventListener('keydown', moveFocus) };
   }
   function act(action: string, until?: string) {
     if (busy) return;
@@ -226,6 +257,8 @@
         {#if submenu === 'snooze'}
           <div
             use:keepInView
+            use:arrowKeys
+            bind:this={submenuEl}
             class="card-menu card-submenu"
             role="group"
             aria-label="Snooze options"
