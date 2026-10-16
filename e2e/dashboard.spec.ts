@@ -1836,6 +1836,29 @@ test('hovering a card and pressing a letter acts on it', async ({ page }) => {
   await expect(page.locator('.pr-card')).toHaveCount(3);
 });
 
+test('the snooze hotkey focuses the first choice and arrow keys move through them', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await page.locator('.pr-card').first().hover();
+  await page.keyboard.press('s');
+  const options = page.getByRole('group', { name: 'Snooze options' });
+  const choice = (name: string) => options.getByRole('button', { name, exact: true });
+  await expect(choice('1 hour')).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(choice('4 hours')).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+  // Snooze until custom date stays disabled until a date is picked, so it is skipped.
+  await expect(choice('1 week')).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(choice('1 hour')).toBeFocused();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.pr-card')).toHaveCount(3);
+});
+
 test('copying a PR URL from the card menu shows a toast', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => {
