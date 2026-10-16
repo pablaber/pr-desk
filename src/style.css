@@ -2553,16 +2553,16 @@ fieldset:disabled .segmented-control input {
   margin-top: 4px;
 }
 .achievement-pips span {
-  position: relative;
   flex: 1;
-  height: 5px;
+  height: 6px;
   overflow: hidden;
   border-radius: 3px;
   background: #e6ebe2;
 }
 .achievement-pips i {
-  position: absolute;
-  inset: 0 auto 0 0;
+  display: block;
+  height: 100%;
+  border-radius: 3px;
   background: #9cbf9f;
 }
 .achievement-pips span.done,
