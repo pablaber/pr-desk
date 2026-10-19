@@ -590,6 +590,8 @@ test('Completed charts activity by week and by month within the tracked range', 
 });
 
 test('Activity moves between periods and stops at the first tracked one', async ({ page }) => {
+  // A Thursday, so the hovered Tuesday is always in the past.
+  await page.clock.install({ time: new Date(2026, 9, 15, 14, 0) });
   await page.goto('/');
   await expect(page.locator('.pr-card')).toHaveCount(4);
   const weeksBack = await page.evaluate(() => {
