@@ -171,8 +171,8 @@ PR Desk never handles a GitHub token itself. GraphQL queries fetch:
   merged PRs you were asked to review, and merged PRs in each tracked repository, with who
   merged them and when you first approved.
 - Aggregate `reviewDecision`, `mergeable`, `mergeStateStatus`, draft/state/update
-  fields, base and head branch names, reviewer requests, review threads, and the latest commit's status-check
-  rollup.
+  fields, base and head branch names, reviewer requests, review threads, the latest commit's status-check
+  rollup, and who authored the last three commits.
 - Every check contributes to status. Pending/unknown checks never count as passing;
   success, neutral, and skipped checks pass. Empty check sets also pass. PR Desk can
   withhold readiness when GitHub permits merging because an optional check failed.

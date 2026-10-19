@@ -134,22 +134,30 @@ test.beforeEach(async ({ page }) => {
           ? Array.from({ length: 3 }, () => ({ isResolved: false, isOutdated: false }))
           : [],
       ),
+      // A PR listed in myCommitPrs has your commit as its latest; bots made their own otherwise.
+      recentCommits: {
+        nodes: [
+          {
+            commit: {
+              parents: { totalCount: 1 },
+              author: (
+                JSON.parse(localStorage.getItem('myCommitPrs') ?? '[]') as number[]
+              ).includes(number)
+                ? { name: 'Alex', user: { login: 'alex' } }
+                : number === 7 && localStorage.getItem('machineUserPr')
+                  ? { name: 'Release', user: { login: 'release-user' } }
+                  : number === 7 || number === 8
+                    ? { name: `${number === 7 ? 'dependabot' : 'renovate'}[bot]`, user: null }
+                    : { name: 'Someone', user: { login: 'someone' } },
+            },
+          },
+        ],
+      },
       commits: {
         nodes: [
           {
             commit: {
               oid: 'a'.repeat(40),
-              // A PR listed in myCommitPrs has your commit as its latest.
-              author: {
-                user: {
-                  login: (
-                    JSON.parse(localStorage.getItem('myCommitPrs') ?? '[]') as number[]
-                  ).includes(number)
-                    ? 'alex'
-                    : 'someone',
-                },
-              },
-              parents: { totalCount: 1 },
               statusCheckRollup: {
                 contexts: connection([
                   {

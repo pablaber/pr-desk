@@ -25,10 +25,12 @@ export function normalizeCheck(check: RawCheck): PullRequest['checks'][number] {
   };
 }
 // Updating the branch from the base creates a merge commit authored by whoever clicked it,
-// which says nothing about who changed the PR, so merge commits leave the author unknown.
-function headAuthor(raw: RawPR) {
-  const commit = raw.commits.nodes[0]?.commit;
-  return commit?.parents?.totalCount === 1 ? (commit.author?.user?.login ?? '') : '';
+// which says nothing about who changed the PR, so merge commits are skipped.
+function headAuthor(raw: RawPR): PullRequest['headAuthor'] {
+  const author = [...(raw.recentCommits?.nodes ?? [])]
+    .reverse()
+    .find((n) => n.commit.parents?.totalCount === 1)?.commit.author;
+  return { login: author?.user?.login ?? '', name: author?.name ?? '' };
 }
 export function normalize(raw: RawPR): PullRequest {
   return {

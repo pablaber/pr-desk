@@ -10,13 +10,13 @@ function connections(cursors: (string | null | undefined)[] = [null, null, null]
       : `reviewThreads(first: 100, after: ${q(cursors[1])}) { ${page} nodes { isResolved isOutdated } }`,
     cursors[2] === undefined
       ? ''
-      : `commits(last: 1) { nodes { commit { oid author { user { login } } parents { totalCount } statusCheckRollup { contexts(first: 100, after: ${q(cursors[2])}) { ${page} nodes {
+      : `commits(last: 1) { nodes { commit { oid statusCheckRollup { contexts(first: 100, after: ${q(cursors[2])}) { ${page} nodes {
       __typename ... on CheckRun { name status conclusion }
       ... on StatusContext { context state }
     } } } } } }`,
   ].join(' ');
 }
-const fields = `url number title author { __typename login } repository { nameWithOwner } state isDraft baseRefName headRefName isCrossRepository updatedAt reviewDecision mergeable mergeStateStatus mergeQueueEntry { state position } autoMergeRequest { enabledAt }`;
+const fields = `url number title author { __typename login } repository { nameWithOwner } state isDraft baseRefName headRefName isCrossRepository updatedAt reviewDecision mergeable mergeStateStatus mergeQueueEntry { state position } autoMergeRequest { enabledAt } recentCommits: commits(last: 3) { nodes { commit { parents { totalCount } author { name user { login } } } } }`;
 export function searchQuery(search: string, cursor: string | null) {
   return `query DeskSearch { search(query: ${q(search)}, type: ISSUE, first: 100, after: ${q(cursor)}) { issueCount ${page} nodes { ... on PullRequest { ${fields} ${connections()} } } } }`;
 }

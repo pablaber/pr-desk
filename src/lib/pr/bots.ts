@@ -13,3 +13,15 @@ export function isKnownBot(
 ): boolean {
   return pr.author !== '' && knownBots.includes(knownBotKey(pr));
 }
+
+// Whether the bot made the latest non-merge commit. App commits link to no user account, so
+// their git author name, `name[bot]`, identifies them; a linked login would be a user's.
+export function isBotCommit(
+  pr: Pick<PullRequest, 'author' | 'authorIsBot' | 'headAuthor'>,
+): boolean {
+  const { login, name } = pr.headAuthor;
+  if (pr.author === '') return false;
+  return pr.authorIsBot
+    ? login === '' && name.toLowerCase() === knownBotKey(pr)
+    : login.toLowerCase() === pr.author.toLowerCase();
+}

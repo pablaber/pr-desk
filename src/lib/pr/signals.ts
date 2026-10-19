@@ -1,5 +1,5 @@
 import type { AppState } from '../store/app-state';
-import { isKnownBot } from './bots';
+import { isBotCommit, isKnownBot } from './bots';
 import { matchesGlob } from './ignore';
 import type { PullRequest } from './types';
 export function deriveSignals(
@@ -15,7 +15,10 @@ export function deriveSignals(
   const managed = owned || bot;
   // Branch protection can require the latest push to be approved by someone else, and GitHub
   // hides whether it does. The pusher is not exposed either; the head commit author stands in.
-  const lastPushedByYou = !owned && pr.headAuthor.toLowerCase() === login.toLowerCase();
+  const lastPushedByYou = !owned && pr.headAuthor.login.toLowerCase() === login.toLowerCase();
+  // A commit author GitHub cannot link to an account may still be you, so only the bot's own
+  // latest change is safe to approve in-app.
+  const headByBot = bot && isBotCommit(pr);
   const matchingRules = (name: string) =>
     prefs.checkRules.filter(
       (rule) => matchesGlob(pr.repository, rule.repository) && matchesGlob(name, rule.check),
@@ -53,6 +56,7 @@ export function deriveSignals(
     bot,
     managed,
     lastPushedByYou,
+    headByBot,
     directReviewRequested: pr.directReviewers.some((r) => r.toLowerCase() === login.toLowerCase()),
     trackedRepository: pr.reasons.includes('tracked-repository'),
     activeThreads: pr.activeUnresolvedThreads,
@@ -85,8 +89,7 @@ export function deriveSignals(
     // in-app approve and merge revalidates readiness after approving. Every raw check must
     // pass, so a non-blocking pending or allowed failed check still disqualifies the PR.
     approvable:
-      bot &&
-      !lastPushedByYou &&
+      headByBot &&
       !pr.draft &&
       pr.reviewDecision !== 'APPROVED' &&
       pr.reviewDecision !== 'CHANGES_REQUESTED' &&

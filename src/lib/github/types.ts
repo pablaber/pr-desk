@@ -34,9 +34,15 @@ export interface RawPR {
     nodes: {
       commit: {
         oid: string;
-        author?: { user: { login: string } | null } | null;
-        parents?: { totalCount: number };
         statusCheckRollup: { contexts: Connection<RawCheck> } | null;
+      };
+    }[];
+  };
+  recentCommits?: {
+    nodes: {
+      commit: {
+        parents?: { totalCount: number };
+        author?: { name?: string | null; user: { login: string } | null } | null;
       };
     }[];
   };
