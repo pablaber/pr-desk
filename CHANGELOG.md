@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.21.0](https://github.com/pablaber/pr-desk/compare/v1.20.0...v1.21.0) (2026-10-20)
+
+
+### Features
+
+* navigate the snooze menu with arrow keys ([#145](https://github.com/pablaber/pr-desk/issues/145)) ([bb591df](https://github.com/pablaber/pr-desk/commit/bb591dff460c31de71597917ca4f7e5c3f43e8a4))
+
+
+### Bug Fixes
+
+* only offer approve and merge when the bot made the latest commit ([#148](https://github.com/pablaber/pr-desk/issues/148)) ([030b27c](https://github.com/pablaber/pr-desk/commit/030b27cb842e5745e2c1da6453b0f3262c2867bb))
+* round partial achievement progress fills ([#146](https://github.com/pablaber/pr-desk/issues/146)) ([35ec023](https://github.com/pablaber/pr-desk/commit/35ec02351ed23ff289714d4dce6b65a2e7ba2384))
+
 ## [1.20.0](https://github.com/pablaber/pr-desk/compare/v1.19.0...v1.20.0) (2026-10-15)
 
 
