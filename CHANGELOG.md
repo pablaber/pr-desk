@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.21.1](https://github.com/pablaber/pr-desk/compare/v1.21.0...v1.21.1) (2026-10-20)
+
+
+### Bug Fixes
+
+* right-align achievement tier numbers under their segments ([#151](https://github.com/pablaber/pr-desk/issues/151)) ([786a06e](https://github.com/pablaber/pr-desk/commit/786a06e364c6647c08d5062ee59a107cef1b73c0))
+* share the snooze menu highlight between hover and arrow keys ([#149](https://github.com/pablaber/pr-desk/issues/149)) ([f9f0645](https://github.com/pablaber/pr-desk/commit/f9f0645be56b07263e1821357ba05773bc7a2a59))
+
 ## [1.21.0](https://github.com/pablaber/pr-desk/compare/v1.20.0...v1.21.0) (2026-10-20)
 
 
