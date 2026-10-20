@@ -100,9 +100,20 @@
     }[e.key]!;
     items[next].focus();
   }
+  // Hovering a choice focuses it, so the mouse and the arrow keys share one highlighted row.
+  function focusHovered(e: PointerEvent) {
+    const button = (e.target as Element).closest('button');
+    if (button && submenuItems().includes(button)) button.focus({ preventScroll: true });
+  }
   function arrowKeys(node: HTMLElement) {
     node.addEventListener('keydown', moveFocus);
-    return { destroy: () => node.removeEventListener('keydown', moveFocus) };
+    node.addEventListener('pointerover', focusHovered);
+    return {
+      destroy: () => {
+        node.removeEventListener('keydown', moveFocus);
+        node.removeEventListener('pointerover', focusHovered);
+      },
+    };
   }
   function act(action: string, until?: string) {
     if (busy) return;
@@ -259,7 +270,7 @@
             use:keepInView
             use:arrowKeys
             bind:this={submenuEl}
-            class="card-menu card-submenu"
+            class="card-menu card-submenu arrow-menu"
             role="group"
             aria-label="Snooze options"
           >

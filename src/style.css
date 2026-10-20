@@ -862,6 +862,13 @@ i.waiting {
   right: calc(100% + 8px);
   top: -6px;
 }
+.arrow-menu button:hover {
+  background: #fff;
+}
+.arrow-menu button:focus {
+  outline: none;
+  background: #f0f4ef;
+}
 .menu-label {
   font-size: 9px;
   text-transform: uppercase;

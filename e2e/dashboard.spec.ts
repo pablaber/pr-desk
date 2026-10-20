@@ -1864,6 +1864,11 @@ test('the snooze hotkey focuses the first choice and arrow keys move through the
   await expect(choice('1 week')).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await expect(choice('1 hour')).toBeFocused();
+  // Hovering moves the same highlight, and the arrow keys continue from the hovered choice.
+  await choice('4 hours').hover();
+  await expect(choice('4 hours')).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(choice('1 day')).toBeFocused();
   await page.keyboard.press('End');
   await page.keyboard.press('Enter');
   await expect(page.locator('.pr-card')).toHaveCount(3);
