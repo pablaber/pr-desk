@@ -365,7 +365,13 @@ describe('non-blocking check rules', () => {
 
 describe('known bots', () => {
   const bot = (overrides: Partial<PullRequest> = {}) =>
-    run({ author: 'dependabot', authorIsBot: true, reasons: ['tracked-repository'], ...overrides });
+    run({
+      author: 'dependabot',
+      authorIsBot: true,
+      headAuthor: { login: '', name: 'dependabot[bot]' },
+      reasons: ['tracked-repository'],
+      ...overrides,
+    });
   it('needs attention until approved or approvable', () => {
     expect(bot({ checks: [{ name: 'CI', state: 'pending' }] })).toMatchObject({
       state: 'needs-attention',
@@ -425,6 +431,7 @@ describe('approve and merge', () => {
     pr({
       author: 'dependabot',
       authorIsBot: true,
+      headAuthor: { login: '', name: 'dependabot[bot]' },
       reasons: ['tracked-repository'],
       reviewDecision: 'REVIEW_REQUIRED',
       mergeStateStatus: 'BLOCKED',
@@ -465,26 +472,52 @@ describe('approve and merge', () => {
     expect(classify(waiting(overrides), 'me', local)?.canApproveAndMerge ?? false).toBe(false);
   });
   it('waits for another reviewer once your commit is the latest on a bot PR', () => {
-    expect(classify(waiting({ headAuthor: 'Me' }), 'me', local)).toMatchObject({
+    const mine = { login: 'Me', name: 'Me' };
+    expect(classify(waiting({ headAuthor: mine }), 'me', local)).toMatchObject({
       state: 'waiting',
       primary: 'Waiting for another reviewer',
       canApproveAndMerge: false,
     });
-    expect(classify(waiting({ headAuthor: 'renovate' }), 'me', local)?.canApproveAndMerge).toBe(
-      true,
-    );
     expect(
       classify(
-        waiting({ headAuthor: 'me', reviewDecision: 'APPROVED', mergeStateStatus: 'CLEAN' }),
+        waiting({ headAuthor: mine, reviewDecision: 'APPROVED', mergeStateStatus: 'CLEAN' }),
         'me',
         local,
       ),
     ).toMatchObject({ state: 'ready-to-merge', canMerge: true });
   });
+  it.each([
+    ['an author GitHub cannot link to an account', { login: '', name: 'Pat' }],
+    ['a teammate', { login: 'teammate', name: 'Teammate' }],
+    ['a user account named like the App', { login: 'dependabot', name: 'dependabot[bot]' }],
+    ['an unknown author', { login: '', name: '' }],
+  ])('asks for your review once the latest commit is by %s', (_, headAuthor) =>
+    expect(classify(waiting({ headAuthor }), 'me', local)).toMatchObject({
+      state: 'needs-attention',
+      primary: 'Waiting for your review',
+      canApproveAndMerge: false,
+    }),
+  );
+  it('is offered when a machine user made the latest commit', () =>
+    expect(
+      classify(
+        waiting({
+          author: 'renovate-user',
+          authorIsBot: false,
+          headAuthor: { login: 'Renovate-User', name: 'Renovate' },
+        }),
+        'me',
+        { ...local, knownBots: ['renovate-user'] },
+      )?.canApproveAndMerge,
+    ).toBe(true));
   it('stops asking for your review on a tracked PR whose latest commit is yours', () =>
     expect(
       classify(
-        pr({ author: 'someone', reasons: ['tracked-repository'], headAuthor: 'me' }),
+        pr({
+          author: 'someone',
+          reasons: ['tracked-repository'],
+          headAuthor: { login: 'me', name: 'Me' },
+        }),
         'me',
         local,
       ),

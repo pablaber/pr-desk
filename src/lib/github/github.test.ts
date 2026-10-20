@@ -481,22 +481,23 @@ it('preserves the displayed commit for merge confirmation and leaves missing hea
   expect(normalize(input).headOid).toBe('a'.repeat(40));
 });
 
-it('records the head commit author, but not for merge commits', () => {
+it('records the latest non-merge commit author', () => {
   const input = raw();
-  const head = (login: string | null, parents: number) => {
-    input.commits.nodes = [
-      {
+  const head = (...commits: [string | null, number][]) => {
+    input.recentCommits = {
+      nodes: commits.map(([login, parents]) => ({
         commit: {
-          oid: 'a'.repeat(40),
-          author: { user: login ? { login } : null },
+          author: { name: login ? `${login} name` : 'Pat', user: login ? { login } : null },
           parents: { totalCount: parents },
-          statusCheckRollup: null,
         },
-      },
-    ];
+      })),
+    };
     return normalize(input).headAuthor;
   };
-  expect(head('me', 1)).toBe('me');
-  expect(head('me', 2)).toBe('');
-  expect(head(null, 1)).toBe('');
+  expect(head(['bot', 1], ['me', 1])).toEqual({ login: 'me', name: 'me name' });
+  expect(head(['me', 1], ['bot', 2])).toEqual({ login: 'me', name: 'me name' });
+  expect(head([null, 1])).toEqual({ login: '', name: 'Pat' });
+  expect(head(['me', 2], ['me', 2], ['me', 2])).toEqual({ login: '', name: '' });
+  delete input.recentCommits;
+  expect(normalize(input).headAuthor).toEqual({ login: '', name: '' });
 });
