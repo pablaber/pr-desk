@@ -8,7 +8,6 @@
     "store:default",
     { "identifier": "opener:allow-open-url", "allow": [{ "url": "https://github.com/*" }] },
     "updater:allow-check",
-    "updater:allow-download-and-install",
-    "process:allow-restart"
+    "updater:allow-download-and-install"
   ]
 }

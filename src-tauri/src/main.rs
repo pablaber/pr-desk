@@ -3,6 +3,8 @@ mod errors;
 #[cfg(target_os = "macos")]
 mod menu;
 mod merge;
+#[cfg(target_os = "macos")]
+mod relaunch;
 
 use std::{path::PathBuf, time::Duration};
 use tokio::process::Command;
@@ -265,9 +267,7 @@ fn main() {
     // Update checks and downloads use the updater's own HTTPS client against public release
     // assets, not gh; every package must pass the signature check against plugins.updater.pubkey.
     #[cfg(desktop)]
-    let builder = builder
-        .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init());
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
     #[cfg(target_os = "macos")]
     let builder = builder
         .menu(menu::app_menu)
@@ -278,7 +278,9 @@ fn main() {
             close_stale_pr,
             merge::merge_pr,
             merge::approve_and_merge_pr,
-            merge::update_pr_branch
+            merge::update_pr_branch,
+            #[cfg(target_os = "macos")]
+            relaunch::relaunch_app
         ])
         .run(tauri::generate_context!())
         .expect("error running PR Desk");
