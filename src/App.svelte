@@ -1,12 +1,11 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
   import { getVersion } from '@tauri-apps/api/app';
-  import { isTauri } from '@tauri-apps/api/core';
+  import { invoke, isTauri } from '@tauri-apps/api/core';
   import { listen } from '@tauri-apps/api/event';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { openUrl } from '@tauri-apps/plugin-opener';
-  import { relaunch } from '@tauri-apps/plugin-process';
   import { check } from '@tauri-apps/plugin-updater';
   import { version as buildVersion } from '../package.json';
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
@@ -160,7 +159,7 @@
   let version = $state(buildVersion);
   const updates = new UpdateService({
     check,
-    relaunch,
+    relaunch: () => invoke('relaunch_app'),
     // Every preference write and confirmed GitHub action runs under saving; reads can be abandoned.
     busy: () => saving || history.busy,
     onError: (message) => recordError('updates', message),

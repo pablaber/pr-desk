@@ -236,7 +236,7 @@ test.beforeEach(async ({ page }) => {
           w.closedResources.push(args.rid);
           return;
         }
-        if (command === 'plugin:process|restart') {
+        if (command === 'relaunch_app') {
           w.restarts++;
           return;
         }
