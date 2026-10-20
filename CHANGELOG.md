@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.2](https://github.com/pablaber/pr-desk/compare/v1.21.1...v1.21.2) (2026-10-20)
+
+
+### Bug Fixes
+
+* relaunch into the pinned dock icon after an update ([#152](https://github.com/pablaber/pr-desk/issues/152)) ([e5967c3](https://github.com/pablaber/pr-desk/commit/e5967c3018c0359a2cf8f5a2652b24bb7f55f808))
+
 ## [1.21.1](https://github.com/pablaber/pr-desk/compare/v1.21.0...v1.21.1) (2026-10-20)
 
 
