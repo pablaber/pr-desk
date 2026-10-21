@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.22.0](https://github.com/pablaber/pr-desk/compare/v1.21.3...v1.22.0) (2026-10-21)
+
+
+### Features
+
+* wait on the author after you request changes ([#156](https://github.com/pablaber/pr-desk/issues/156)) ([e1c128a](https://github.com/pablaber/pr-desk/commit/e1c128a618b05f49f9b29e2c5b8680e0561c777f))
+
+
+### Bug Fixes
+
+* remove expired snoozes from saved preferences ([#157](https://github.com/pablaber/pr-desk/issues/157)) ([158b621](https://github.com/pablaber/pr-desk/commit/158b621370d73989955f9f675a2620a00f8bcb49))
+
 ## [1.21.3](https://github.com/pablaber/pr-desk/compare/v1.21.2...v1.21.3) (2026-10-21)
 
 
