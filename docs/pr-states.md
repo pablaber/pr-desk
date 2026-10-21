@@ -145,7 +145,8 @@ The Waiting fallback picks its label from the first that applies:
   author the latest commit on a PR that is not yours, it stops asking for your review: a bot PR
   waits as "Waiting for another reviewer". Someone else's approval makes it Ready to merge as
   usual.
-- A bot PR is approvable only while the bot made its latest non-merge commit. Once anyone else
+- A bot PR is approvable only while the bot made its latest non-merge commit, whether GitHub links
+  that commit to the App's `name[bot]` account or to no account at all. Once anyone else
   pushes to it, including you from a git email GitHub cannot link to your account, it needs a
   review on GitHub and is not approvable.
 - A known bot is a GitHub App, entered as `name[bot]`, or a machine user account, entered as its

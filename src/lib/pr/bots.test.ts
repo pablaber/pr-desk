@@ -23,7 +23,9 @@ describe('bots', () => {
     const user = (login: string, name: string) =>
       isBotCommit({ author: 'ci-user', authorIsBot: false, headAuthor: { login, name } });
     expect(app('', 'Renovate[bot]')).toBe(true);
+    expect(app('Renovate[bot]', 'renovate[bot]')).toBe(true);
     expect(app('renovate', 'renovate[bot]')).toBe(false);
+    expect(app('dependabot[bot]', 'renovate[bot]')).toBe(false);
     expect(app('', 'renovate')).toBe(false);
     expect(app('', 'Pat')).toBe(false);
     expect(user('CI-User', 'CI')).toBe(true);

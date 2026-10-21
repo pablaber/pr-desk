@@ -453,6 +453,17 @@ describe('approve and merge', () => {
         local,
       )?.canApproveAndMerge,
     ).toBe(true);
+    expect(
+      classify(
+        waiting({
+          headAuthor: { login: 'dependabot[bot]', name: 'dependabot[bot]' },
+          reviewDecision: null,
+          mergeStateStatus: 'CLEAN',
+        }),
+        'me',
+        local,
+      )?.canApproveAndMerge,
+    ).toBe(true);
   });
   it.each([
     ['a non-bot author', { author: 'someone' }],
