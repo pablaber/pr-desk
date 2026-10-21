@@ -452,15 +452,21 @@
       await refresh(true);
     }
   }
-  // Watches and labels for finished or untracked PRs are dropped once a refresh can tell.
+  // Watches and labels for finished or untracked PRs, and expired snoozes, are dropped once a
+  // refresh can tell.
   async function prune() {
-    const pruned = prunePreferences($state.snapshot(preferences), $state.snapshot(snapshot));
+    const pruned = prunePreferences(
+      $state.snapshot(preferences),
+      $state.snapshot(snapshot),
+      Date.now(),
+    );
     if (!pruned) return;
     const kept = new Set(pruned.watchedPullRequests);
     const dropped = preferences.watchedPullRequests.filter((id) => !kept.has(id));
     await change((next) => {
       next.watchedPullRequests = pruned.watchedPullRequests;
       next.labeledPullRequests = pruned.labeledPullRequests;
+      next.snoozedPullRequests = pruned.snoozedPullRequests;
     });
     // A Settings draft still holding a pruned watch would look dirty and bring it back on Save.
     if (settingsDraft)

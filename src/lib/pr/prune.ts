@@ -5,13 +5,16 @@ import type { AppState } from '../store/app-state';
 export interface PrunedPreferences {
   watchedPullRequests: string[];
   labeledPullRequests: Record<string, string[]>;
+  snoozedPullRequests: AppState['snoozedPullRequests'];
 }
 
-// Watches and labels only matter while a PR is live, so a refresh drops them for PRs that
-// finished. Anything whose state cannot be known — a failed fetch or discovery — is kept.
+// Watches, labels and snoozes only matter while a PR is live, so a refresh drops them for PRs
+// that finished, and drops snoozes whose time is up. Anything whose state cannot be known — a
+// failed fetch or discovery — is kept.
 export function prunePreferences(
   local: AppState,
   snapshot: DashboardSnapshot,
+  now: number,
 ): PrunedPreferences | null {
   const stale = new Set(snapshot.staleIds);
   const finished = new Set(
@@ -28,10 +31,16 @@ export function prunePreferences(
   const labeledPullRequests = Object.fromEntries(
     Object.entries(local.labeledPullRequests).filter(([id]) => !finished.has(id) && !untracked(id)),
   );
+  const snoozedPullRequests = Object.fromEntries(
+    Object.entries(local.snoozedPullRequests).filter(
+      ([id, { until }]) => Date.parse(until) > now && !finished.has(id),
+    ),
+  );
   if (
     watchedPullRequests.length === local.watchedPullRequests.length &&
-    Object.keys(labeledPullRequests).length === Object.keys(local.labeledPullRequests).length
+    Object.keys(labeledPullRequests).length === Object.keys(local.labeledPullRequests).length &&
+    Object.keys(snoozedPullRequests).length === Object.keys(local.snoozedPullRequests).length
   )
     return null;
-  return { watchedPullRequests, labeledPullRequests };
+  return { watchedPullRequests, labeledPullRequests, snoozedPullRequests };
 }
