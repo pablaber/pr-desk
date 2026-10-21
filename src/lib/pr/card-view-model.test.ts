@@ -30,6 +30,23 @@ describe('review badges', () => {
     expect(item.state).not.toBe('ready-to-merge');
     expect(cardViewModel(item, now).reviewBadge?.label).toBe('Approved');
   });
+  it('replaces changes requested once the author pushes after yours', () => {
+    const item = classify(
+      pr({
+        author: 'other',
+        reasons: ['tracked-repository'],
+        reviewDecision: 'CHANGES_REQUESTED',
+        changeRequests: [{ login: 'me', pushedSince: true }],
+      }),
+      'me',
+      defaultState(),
+      now,
+    )!;
+    expect(cardViewModel(item, now).reviewBadge).toEqual({
+      label: 'Updated since changes',
+      tone: 'updated',
+    });
+  });
 });
 describe('staleness', () => {
   it.each([

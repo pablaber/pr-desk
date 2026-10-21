@@ -16,7 +16,9 @@ function connections(cursors: (string | null | undefined)[] = [null, null, null]
     } } } } } }`,
   ].join(' ');
 }
-const fields = `url number title author { __typename login } repository { nameWithOwner } state isDraft baseRefName headRefName isCrossRepository updatedAt reviewDecision mergeable mergeStateStatus mergeQueueEntry { state position } autoMergeRequest { enabledAt } recentCommits: commits(last: 3) { nodes { commit { parents { totalCount } author { name user { login } } } } }`;
+// latestOpinionatedReviews holds one review per reviewer, so it is not paged: a PR would need more
+// than 100 approving or change-requesting reviewers to lose one.
+const fields = `url number title author { __typename login } repository { nameWithOwner } state isDraft baseRefName headRefName isCrossRepository updatedAt reviewDecision mergeable mergeStateStatus mergeQueueEntry { state position } autoMergeRequest { enabledAt } recentCommits: commits(last: 3) { nodes { commit { oid parents { totalCount } author { name user { login } } } } } latestOpinionatedReviews(first: 100) { nodes { state author { login } commit { oid } } }`;
 export function searchQuery(search: string, cursor: string | null) {
   return `query DeskSearch { search(query: ${q(search)}, type: ISSUE, first: 100, after: ${q(cursor)}) { issueCount ${page} nodes { ... on PullRequest { ${fields} ${connections()} } } } }`;
 }

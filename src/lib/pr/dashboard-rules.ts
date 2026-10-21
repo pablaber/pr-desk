@@ -94,6 +94,21 @@ export const dashboardRules: DashboardRule[] = [
     getLabel: () => 'Ready to approve and merge',
   },
   {
+    id: 'changes-updated',
+    state: 'needs-attention',
+    priority: 20,
+    matches: (s) => s.updatedSinceYourChanges,
+    getLabel: () => 'Updated since you requested changes',
+  },
+  {
+    id: 'your-changes-requested',
+    state: 'waiting',
+    priority: 15,
+    // The author has your requested changes to make, so the review prompt waits for a new commit.
+    matches: (s) => s.changesRequestedByYou,
+    getLabel: () => 'Waiting on author · changes requested',
+  },
+  {
     id: 'tracked-repository',
     state: 'needs-attention',
     priority: 10,

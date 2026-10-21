@@ -39,6 +39,7 @@ export function describePullRequest(
   return {
     pr,
     bot: signals.bot,
+    updatedSinceYourChanges: signals.updatedSinceYourChanges,
     state: primary.state,
     priority: primary.priority,
     canMerge: signals.ready && primary.state === 'ready-to-merge',

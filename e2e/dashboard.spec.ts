@@ -1144,6 +1144,51 @@ test('an approved human PR in a tracked repository moves from review attention t
   await page.screenshot({ path: '.context/approved-human-pr.png', fullPage: true });
 });
 
+test('a PR you requested changes on waits for the author, then returns once they push', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const w = window as any,
+      invoke = w.__TAURI_INTERNALS__.invoke;
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      const result = await invoke(command, args);
+      for (const pr of result?.repository?.pullRequests?.nodes ?? []) {
+        if (pr.number !== 6) continue;
+        pr.reviewDecision = 'CHANGES_REQUESTED';
+        pr.latestOpinionatedReviews = {
+          nodes: [
+            {
+              state: 'CHANGES_REQUESTED',
+              author: { login: 'alex' },
+              commit: { oid: 'a'.repeat(40) },
+            },
+          ],
+        };
+        pr.recentCommits.nodes[0].commit.oid = (
+          localStorage.getItem('authorPushed') ? 'b' : 'a'
+        ).repeat(40);
+      }
+      return result;
+    };
+  });
+  await page.goto('/');
+  await trackPlatformRepository(page);
+  const column = (index: number) =>
+    page
+      .locator('.column')
+      .nth(index)
+      .locator('.pr-card', { hasText: 'Document the retry policy' });
+  await expect(column(2)).toContainText('Waiting on author · changes requested');
+  await expect(column(2).locator('.badge.review')).toHaveText('Changes requested');
+  await page.evaluate(() => localStorage.setItem('authorPushed', '1'));
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(column(1)).toContainText('Updated since you requested changes');
+  const badge = column(1).locator('.badge.review');
+  await expect(badge).toHaveText('Updated since changes');
+  await expect(badge).toHaveCSS('color', 'rgb(47, 95, 138)');
+  await page.screenshot({ path: '.context/updated-since-changes.png', fullPage: true });
+});
+
 test('the card menu dismisses on an outside click and nests snooze choices', async ({ page }) => {
   await page.goto('/');
   const trigger = page.getByRole('button', {

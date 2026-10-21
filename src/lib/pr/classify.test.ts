@@ -613,3 +613,50 @@ describe('update branch', () => {
     expect(behind(overrides)?.canUpdateBranch ?? false).toBe(false);
   });
 });
+describe('your requested changes', () => {
+  const tracked: Partial<PullRequest> = {
+    author: 'other',
+    reasons: ['tracked-repository'],
+    reviewDecision: 'CHANGES_REQUESTED',
+  };
+  const requested = (pushedSince: boolean, login = 'ME') => ({
+    ...tracked,
+    changeRequests: [{ login, pushedSince }],
+  });
+  it('waits on the author until a new commit lands', () =>
+    expect(run(requested(false))).toMatchObject({
+      state: 'waiting',
+      primary: 'Waiting on author · changes requested',
+      updatedSinceYourChanges: false,
+    }));
+  it('needs attention once the author pushes after your review', () =>
+    expect(run(requested(true))).toMatchObject({
+      state: 'needs-attention',
+      primary: 'Updated since you requested changes',
+      statuses: ['Updated since you requested changes', 'Waiting for your review'],
+      updatedSinceYourChanges: true,
+    }));
+  it('still needs attention when your review is requested again', () =>
+    expect(run({ ...requested(false), directReviewers: ['me'] })).toMatchObject({
+      state: 'needs-attention',
+      primary: 'Review requested',
+    }));
+  it('ignores changes someone else requested', () =>
+    expect(run(requested(false, 'reviewer'))).toMatchObject({
+      state: 'needs-attention',
+      primary: 'Waiting for your review',
+    }));
+  it('does not count your own commit as the author responding', () =>
+    expect(
+      run({ ...requested(true), headAuthor: { login: 'me', name: 'Me' } }).updatedSinceYourChanges,
+    ).toBe(false));
+  it('brings a watched PR back once updated', () =>
+    expect(run({ ...requested(true), reasons: ['watched'] }).state).toBe('needs-attention'));
+  it('leaves your own PRs to the owned rules', () =>
+    expect(
+      run({
+        reviewDecision: 'CHANGES_REQUESTED',
+        changeRequests: [{ login: 'me', pushedSince: false }],
+      }),
+    ).toMatchObject({ state: 'needs-attention', primary: 'Changes requested' }));
+});
