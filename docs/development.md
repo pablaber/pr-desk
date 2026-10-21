@@ -160,7 +160,8 @@ tracking without losing tracked or watched preferences.
 
 Settings holds up to five snooze options. Each can be a duration or a `Next` time
 anchor; cards also offer a custom local date/time. An in-memory clock checks expiry
-every 15 seconds. The Snoozed screen restores snoozed PRs. Settings → Ignored pull requests
+every 15 seconds. The Snoozed screen restores snoozed PRs. The next refresh removes expired
+snoozes, and snoozes for merged or closed PRs, from the saved preferences. Settings → Ignored pull requests
 lists individually ignored PRs, whose only PR action is unignoring; broad repository, author,
 and title rules live in Settings → Ignore rules.
 
