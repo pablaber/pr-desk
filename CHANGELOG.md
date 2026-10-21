@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.3](https://github.com/pablaber/pr-desk/compare/v1.21.2...v1.21.3) (2026-10-21)
+
+
+### Bug Fixes
+
+* offer approve and merge when an app's commits link to its bot account ([#154](https://github.com/pablaber/pr-desk/issues/154)) ([f24a028](https://github.com/pablaber/pr-desk/commit/f24a0289ca72a4107c7d9cfcc5d6b843c5239e70))
+
 ## [1.21.2](https://github.com/pablaber/pr-desk/compare/v1.21.1...v1.21.2) (2026-10-20)
 
 
