@@ -41,9 +41,17 @@ export interface RawPR {
   recentCommits?: {
     nodes: {
       commit: {
+        oid?: string;
         parents?: { totalCount: number };
         author?: { name?: string | null; user: { login: string } | null } | null;
       };
+    }[];
+  };
+  latestOpinionatedReviews?: {
+    nodes: {
+      state: string;
+      author: { login: string } | null;
+      commit: { oid: string } | null;
     }[];
   };
 }

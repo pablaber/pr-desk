@@ -501,3 +501,49 @@ it('records the latest non-merge commit author', () => {
   delete input.recentCommits;
   expect(normalize(input).headAuthor).toEqual({ login: '', name: '' });
 });
+
+it('records who requested changes and whether a non-merge commit followed', () => {
+  const input = raw();
+  input.commits.nodes = [{ commit: { oid: 'merge', statusCheckRollup: null } }];
+  const requests = (
+    commits: [string, number][],
+    reviewed: string | null,
+    state = 'CHANGES_REQUESTED',
+  ) => {
+    input.recentCommits = {
+      nodes: commits.map(([oid, parents]) => ({
+        commit: { oid, parents: { totalCount: parents } },
+      })),
+    };
+    input.latestOpinionatedReviews = {
+      nodes: [
+        { state, author: { login: 'reviewer' }, commit: reviewed ? { oid: reviewed } : null },
+      ],
+    };
+    return normalize(input).changeRequests;
+  };
+  expect(requests([['fix', 1]], 'fix')).toEqual([{ login: 'reviewer', pushedSince: false }]);
+  expect(
+    requests(
+      [
+        ['fix', 1],
+        ['merge', 2],
+      ],
+      'fix',
+    ),
+  ).toEqual([{ login: 'reviewer', pushedSince: false }]);
+  expect(
+    requests(
+      [
+        ['fix', 1],
+        ['next', 1],
+      ],
+      'fix',
+    ),
+  ).toEqual([{ login: 'reviewer', pushedSince: true }]);
+  expect(requests([['fix', 1]], null)).toEqual([{ login: 'reviewer', pushedSince: true }]);
+  expect(requests([['merge', 2]], 'merge')).toEqual([{ login: 'reviewer', pushedSince: false }]);
+  expect(requests([['fix', 1]], 'fix', 'APPROVED')).toEqual([]);
+  delete input.latestOpinionatedReviews;
+  expect(normalize(input).changeRequests).toEqual([]);
+});

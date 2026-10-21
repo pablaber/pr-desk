@@ -19,6 +19,9 @@ export function deriveSignals(
   // A commit author GitHub cannot link to an account may still be you, so only the bot's own
   // latest change is safe to approve in-app.
   const headByBot = bot && isBotCommit(pr);
+  const yourChangeRequest = owned
+    ? undefined
+    : pr.changeRequests.find((r) => r.login.toLowerCase() === login.toLowerCase());
   const matchingRules = (name: string) =>
     prefs.checkRules.filter(
       (rule) => matchesGlob(pr.repository, rule.repository) && matchesGlob(name, rule.check),
@@ -61,6 +64,9 @@ export function deriveSignals(
     trackedRepository: pr.reasons.includes('tracked-repository'),
     activeThreads: pr.activeUnresolvedThreads,
     changesRequested: pr.reviewDecision === 'CHANGES_REQUESTED',
+    changesRequestedByYou: !!yourChangeRequest && !yourChangeRequest.pushedSince,
+    // Your own commit is not the author answering your review.
+    updatedSinceYourChanges: !!yourChangeRequest?.pushedSince && !lastPushedByYou,
     failedChecks: checks.filter((c) => c.state === 'failed').length,
     checksRunning: checks.some((c) => c.state === 'pending'),
     checksPassing: checks.every((c) => c.state === 'passing'),

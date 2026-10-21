@@ -26,11 +26,30 @@ export function normalizeCheck(check: RawCheck): PullRequest['checks'][number] {
 }
 // Updating the branch from the base creates a merge commit authored by whoever clicked it,
 // which says nothing about who changed the PR, so merge commits are skipped.
-function headAuthor(raw: RawPR): PullRequest['headAuthor'] {
-  const author = [...(raw.recentCommits?.nodes ?? [])]
+function latestChange(raw: RawPR) {
+  return [...(raw.recentCommits?.nodes ?? [])]
     .reverse()
-    .find((n) => n.commit.parents?.totalCount === 1)?.commit.author;
+    .find((n) => n.commit.parents?.totalCount === 1)?.commit;
+}
+function headAuthor(raw: RawPR): PullRequest['headAuthor'] {
+  const author = latestChange(raw)?.author;
   return { login: author?.user?.login ?? '', name: author?.name ?? '' };
+}
+// Only the last three commits are fetched, so after three branch updates in a row the head
+// stands in. A rebase rewrites the reviewed commit, so it counts as a change, as does a review
+// GitHub can no longer tie to a commit.
+function changeRequests(raw: RawPR): PullRequest['changeRequests'] {
+  const latest = latestChange(raw)?.oid ?? raw.commits.nodes[0]?.commit.oid;
+  return (raw.latestOpinionatedReviews?.nodes ?? []).flatMap((review) =>
+    review.state === 'CHANGES_REQUESTED' && review.author?.login
+      ? [
+          {
+            login: review.author.login,
+            pushedSince: latest !== undefined && review.commit?.oid !== latest,
+          },
+        ]
+      : [],
+  );
 }
 export function normalize(raw: RawPR): PullRequest {
   return {
@@ -68,6 +87,7 @@ export function normalize(raw: RawPR): PullRequest {
     checks: (raw.commits.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? []).map(
       normalizeCheck,
     ),
+    changeRequests: changeRequests(raw),
     reasons: [],
   };
 }

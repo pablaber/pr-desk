@@ -59,8 +59,9 @@ export function cardViewModel(item: ClassifiedPR, now: number) {
     badges: [...sourceReasons(item.pr.reasons), ...(item.bot ? ['bot' as const] : [])].map(
       (kind) => ({ kind, label: sourceLabels[kind] }),
     ),
-    reviewBadge:
-      item.pr.reviewDecision === 'APPROVED'
+    reviewBadge: item.updatedSinceYourChanges
+      ? { label: 'Updated since changes', tone: 'updated' }
+      : item.pr.reviewDecision === 'APPROVED'
         ? { label: 'Approved', tone: 'approved' }
         : item.pr.reviewDecision === 'CHANGES_REQUESTED'
           ? { label: 'Changes requested', tone: 'changes-requested' }

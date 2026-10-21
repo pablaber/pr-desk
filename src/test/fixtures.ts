@@ -26,6 +26,7 @@ export function pr(overrides: Partial<PullRequest> = {}): PullRequest {
     activeUnresolvedThreads: 0,
     outdatedUnresolvedThreads: 0,
     checks: [],
+    changeRequests: [],
     reasons: ['owned'],
     ...overrides,
   };

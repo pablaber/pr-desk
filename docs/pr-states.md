@@ -68,6 +68,8 @@ Each visible PR is reduced to a handful of booleans. The terms used in the rule 
 | **review requested**           | you personally are in the PR's requested reviewers                                                                                                                                                                                                                                                                    |
 | **active threads**             | unresolved review threads that are not outdated (outdated unresolved threads only show as secondary text)                                                                                                                                                                                                             |
 | **changes requested**          | GitHub's aggregate `reviewDecision` is `CHANGES_REQUESTED`                                                                                                                                                                                                                                                            |
+| **your changes requested**     | not owned, your latest approve or request-changes review requests changes, and no non-merge commit has landed since it                                                                                                                                                                                                |
+| **updated since your changes** | not owned, your latest approve or request-changes review requests changes, a non-merge commit has landed since it, and you did not author the latest one                                                                                                                                                              |
 | **failed checks**              | any check on the latest commit failed — including optional and non-blocking checks, except those matching a rule that allows failures                                                                                                                                                                                 |
 | **conflict**                   | `mergeable` is `CONFLICTING`                                                                                                                                                                                                                                                                                          |
 | **behind**                     | `mergeStateStatus` is `BEHIND` — GitHub only reports this when branch protection requires an up-to-date branch                                                                                                                                                                                                        |
@@ -111,6 +113,8 @@ label; other matching rules (except the `waiting` catch-all) show as secondary s
 |       50 | `ready`                     | **Ready to merge**  | ready                                                                                 | Ready to merge                                       |
 |       50 | `ready-non-blocking-checks` | **Ready to merge**  | ready, non-blocking checks                                                            | Ready · _check names_ pending · _check names_ failed |
 |       50 | `approvable`                | **Ready to merge**  | approvable                                                                            | Ready to approve and merge                           |
+|       20 | `changes-updated`           | **Needs attention** | updated since your changes                                                            | Updated since you requested changes                  |
+|       15 | `your-changes-requested`    | **Waiting**         | your changes requested                                                                | Waiting on author · changes requested                |
 |       10 | `tracked-repository`        | **Needs attention** | from a tracked repository, not owned, not last pushed by you, not draft, not approved | Waiting for your review                              |
 |        0 | `waiting`\*                 | **Waiting**         | always (fallback)                                                                     | see below                                            |
 
@@ -152,6 +156,12 @@ The Waiting fallback picks its label from the first that applies:
 - A known bot is a GitHub App, entered as `name[bot]`, or a machine user account, entered as its
   bare login. The author's account type must match, so a user account never counts as an App
   with the same name.
+- Once you request changes on someone else's PR, it waits on the author instead of asking for
+  your review. When they commit after your review it needs attention again as "Updated since you
+  requested changes", until you review it. Merge commits, such as updating the branch, do not
+  count, but a rebase does, because it rewrites the commit you reviewed. Only the last three
+  commits are looked at; if all three are merge commits, the head commit stands in. A personal
+  review re-request outranks both.
 - "Waiting for your review" is a status: when a higher rule such as "Checks failed" is primary,
   it still shows beneath it.
 - Thread and changes-requested rules apply only to owned PRs, not bot PRs.
@@ -177,10 +187,12 @@ The common situations, from your point of view:
 | A known bot's PR you track has a failing check or a conflict                       | Needs attention |
 | Your PR or a tracked bot PR is behind a base branch that must be up to date        | Needs attention |
 | Someone else's unapproved open PR in a repository you track, including bot PRs     | Needs attention |
+| Someone else's tracked or watched PR, updated since you requested changes          | Needs attention |
 | Your PR or tracked bot PR is approved, green, and mergeable                        | Ready to merge  |
 | Same, but a non-blocking check is still pending, or failed under Allow failures    | Ready to merge  |
 | A tracked bot PR waiting for review with passing checks that GitHub can merge      | Ready to merge  |
 | A tracked bot PR whose latest commit you authored, waiting for review              | Waiting         |
+| Someone else's PR you requested changes on, with no commit since                   | Waiting         |
 | Any PR in a merge queue or with auto-merge on                                      | Waiting         |
 | Your draft                                                                         | Waiting         |
 | Your PR waiting on review or still running checks                                  | Waiting         |
@@ -231,7 +243,8 @@ These do not affect the column:
 | Secondary status  | other matching non-catch-all rules; "Checks failed" on any PR with a failed check; outdated threads |
 | Checks badge      | at least one check; red if any failed, otherwise amber if any are pending, otherwise green          |
 | Approved badge    | `reviewDecision` is `APPROVED`                                                                      |
-| Changes badge     | `reviewDecision` is `CHANGES_REQUESTED`                                                             |
+| Changes badge     | `reviewDecision` is `CHANGES_REQUESTED`, unless the Updated badge replaces it                       |
+| Updated badge     | updated since your changes (blue, "Updated since changes")                                          |
 | Staleness         | not updated for more than 7 days (low), 14 days (medium), or 28 days (high, red)                    |
 | Stale data marker | the last refresh could not fetch this PR, so it shows previous results                              |
 

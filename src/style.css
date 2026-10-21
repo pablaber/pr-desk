@@ -753,6 +753,11 @@ i.waiting {
   border-color: #eeb2ab;
   background: #fdeae7;
 }
+.badge.review.updated {
+  color: #2f5f8a;
+  border-color: #b7cde3;
+  background: #eaf2fa;
+}
 .badge.staleness.low {
   color: #8a6d1f;
   border-color: #ecd9a1;

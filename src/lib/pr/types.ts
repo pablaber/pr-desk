@@ -29,6 +29,9 @@ export interface PullRequest {
   activeUnresolvedThreads: number;
   outdatedUnresolvedThreads: number;
   checks: { name: string; state: 'passing' | 'pending' | 'failed' }[];
+  // Reviewers whose latest approve or request-changes review requests changes, and whether a
+  // non-merge commit has landed since that review.
+  changeRequests: { login: string; pushedSince: boolean }[];
   reasons: TrackingReason[];
 }
 export interface CompletedPR {
