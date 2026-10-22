@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.23.0](https://github.com/pablaber/pr-desk/compare/v1.22.0...v1.23.0) (2026-10-22)
+
+
+### Features
+
+* filter the board by title tag ([#162](https://github.com/pablaber/pr-desk/issues/162)) ([f321e46](https://github.com/pablaber/pr-desk/commit/f321e46f11ed9562ba5f7761451edaa2289f1e38))
+* record gh command and request details with session errors ([#161](https://github.com/pablaber/pr-desk/issues/161)) ([6a8833b](https://github.com/pablaber/pr-desk/commit/6a8833bb5e90323c662c970223c5efdcf8201ee9))
+
+
+### Bug Fixes
+
+* merge prs in repositories that require no review ([#159](https://github.com/pablaber/pr-desk/issues/159)) ([435199c](https://github.com/pablaber/pr-desk/commit/435199c57ca0a3657ea86e3455a8b608cbf403a2))
+
 ## [1.22.0](https://github.com/pablaber/pr-desk/compare/v1.21.3...v1.22.0) (2026-10-21)
 
 
