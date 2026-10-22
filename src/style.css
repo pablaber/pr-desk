@@ -1137,6 +1137,18 @@ footer {
 .session-error code {
   white-space: pre-wrap;
 }
+.session-error details {
+  margin-top: 5px;
+  font-size: 10px;
+  color: #8d9a80;
+}
+.session-error details code {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #4c5643;
+  user-select: text;
+}
 .empty-setting {
   padding: 12px 0;
 }

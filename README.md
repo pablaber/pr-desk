@@ -125,7 +125,9 @@ may skip.
   for one PR): each PR's normalized GitHub state, matched dashboard rules, derived signals and
   why it landed in its column or was hidden, alongside preferences, refresh warnings and the
   errors seen since launch — ready to paste into an issue or a coding agent. Settings →
-  Troubleshooting also lists this session's errors, each with its own copy button.
+  Troubleshooting also lists this session's errors, each with its own copy button. A failed
+  GitHub request also records the `gh` command that ran, how it failed, its HTTP status, GitHub's
+  request ID and the rate limit remaining — never `gh`'s output or GitHub's message text.
 - Opens a card's menu on right-click as well as from its ⋯ button.
 - Stores preferences locally and uses your existing GitHub CLI authentication.
 - Keeps a local history of your merged PRs, merges by you and approvals in `history.json`,

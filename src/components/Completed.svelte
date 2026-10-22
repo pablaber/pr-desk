@@ -66,8 +66,8 @@
       trackingSince={history.trackingSince}
     />{/if}
   {#if history}<Activity account={history} {login} {preferences} {now} />{/if}
-  {#each snapshot?.warnings ?? [] as warning (warning)}
-    <div class="alert" role="status">{warning}</div>
+  {#each snapshot?.warnings ?? [] as warning (warning.message)}
+    <div class="alert" role="status">{warning.message}</div>
   {/each}
   {#if snapshot}
     <div class="completed-summary">

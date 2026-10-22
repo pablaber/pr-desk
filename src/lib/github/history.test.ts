@@ -56,7 +56,7 @@ it('marks the sync incomplete when any search fails', async () => {
   const result = await fetchHistory({ getHistoryPullRequests }, 'me', [], '2026-10-15');
   expect(result.complete).toBe(false);
   expect(result.warnings).toEqual([
-    'History sync (is:pr reviewed-by:@me updated:>=2026-10-15): Error: offline',
+    { message: 'History sync (is:pr reviewed-by:@me updated:>=2026-10-15): Error: offline' },
   ]);
   expect(result.entries[0]).toMatchObject({
     authorIsApp: true,

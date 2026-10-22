@@ -3,13 +3,14 @@ import type { CompletedPR } from '../pr/types';
 import type { AppState } from '../store/app-state';
 import { parsePullRequest } from '../store/app-state';
 import { pool } from './pool';
-import type { GitHubService, MergedSearchQualifier, RawMergedPR } from './types';
+import { sourceWarning } from './errors';
+import type { GitHubService, MergedSearchQualifier, RawMergedPR, SourceWarning } from './types';
 
 export const COMPLETED_DAYS = 7;
 
 export interface CompletedSnapshot {
   prs: CompletedPR[];
-  warnings: string[];
+  warnings: SourceWarning[];
 }
 
 // Reviewing clears a review request, so "was in my review queue" needs both sources.
@@ -35,7 +36,7 @@ export async function fetchCompleted(
       .map((repo) => ({ key: repo, run: () => service.getRepositoryMergedPullRequests(repo) })),
   ];
   const found = new Map<string, CompletedPR>();
-  const warnings: string[] = [];
+  const warnings: SourceWarning[] = [];
   await pool(jobs, async (job) => {
     try {
       for (const raw of await job.run()) {
@@ -55,7 +56,7 @@ export async function fetchCompleted(
         });
       }
     } catch (e) {
-      warnings.push(`${job.key}: ${String(e)}`);
+      warnings.push(sourceWarning(`${job.key}: ${String(e)}`, e));
     }
   });
   return { prs: [...found.values()], warnings };

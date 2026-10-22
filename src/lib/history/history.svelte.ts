@@ -4,6 +4,8 @@ import {
   type AchievementPreferences,
 } from '../achievements/record';
 import type { Unlock } from '../achievements/types';
+import { requestDetails } from '../github/errors';
+import type { GitHubRequestDetails } from '../github/types';
 import { applyAction, ingest, newAccount, syncDate } from './ingest';
 import type { AccountHistory, HistoryAction, HistoryFile, HistorySyncResult } from './types';
 
@@ -13,7 +15,7 @@ export interface HistoryDeps {
   load: () => Promise<HistoryFile>;
   save: (file: HistoryFile) => Promise<void>;
   fetch: (login: string, since: string) => Promise<HistorySyncResult>;
-  onWarning: (message: string) => void;
+  onWarning: (message: string, details?: GitHubRequestDetails) => void;
   // Read at every change, so achievements always use the goal and bots in force at the time.
   preferences: () => AchievementPreferences;
   now?: () => number;
@@ -135,11 +137,11 @@ export class HistoryLog {
     const startedAt = this.#now();
     try {
       const result = await this.#deps.fetch(login, syncDate(this.account));
-      for (const warning of result.warnings) this.#deps.onWarning(warning);
+      for (const warning of result.warnings) this.#deps.onWarning(warning.message, warning.details);
       if (login !== this.#login || !this.account) return;
       this.#set(ingest(this.account, login, result.entries, result.complete ? startedAt : null));
     } catch (e) {
-      this.#deps.onWarning(`History sync failed: ${String(e)}`);
+      this.#deps.onWarning(`History sync failed: ${String(e)}`, requestDetails(e));
     }
   }
 
