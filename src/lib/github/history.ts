@@ -1,7 +1,8 @@
 import type { HistoryEntry, HistorySyncResult } from '../history/types';
 import { parsePullRequest } from '../store/app-state';
+import { sourceWarning } from './errors';
 import { pool } from './pool';
-import type { GitHubService, RawHistoryPR } from './types';
+import type { GitHubService, RawHistoryPR, SourceWarning } from './types';
 
 function toEntry(raw: RawHistoryPR): HistoryEntry {
   return {
@@ -34,12 +35,12 @@ export async function fetchHistory(
     ...trackedRepositories.map((repo) => `repo:${repo} is:pr is:merged merged:>=${since}`),
   ];
   const entries: HistoryEntry[] = [];
-  const warnings: string[] = [];
+  const warnings: SourceWarning[] = [];
   await pool(searches, async (search) => {
     try {
       entries.push(...(await service.getHistoryPullRequests(search, login)).map(toEntry));
     } catch (e) {
-      warnings.push(`History sync (${search}): ${String(e)}`);
+      warnings.push(sourceWarning(`History sync (${search}): ${String(e)}`, e));
     }
   });
   return { entries, warnings, complete: warnings.length === 0 };

@@ -1,3 +1,4 @@
+import type { SourceWarning } from '../github/types';
 import type { PullRequest } from '../pr/types';
 
 export interface HistoryEntry {
@@ -61,7 +62,7 @@ export interface HistoryFile {
 
 export interface HistorySyncResult {
   entries: HistoryEntry[];
-  warnings: string[];
+  warnings: SourceWarning[];
   // False when any search failed, so the window must be searched again next time.
   complete: boolean;
 }

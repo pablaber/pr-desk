@@ -1991,7 +1991,22 @@ test('lists errors from this session in Troubleshooting and the debug info', asy
     const w = window as any;
     const invoke = w.__TAURI_INTERNALS__.invoke;
     w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
-      if (command === 'github' && args?.operation === 'graphql') throw new Error('offline');
+      // The shape the github command rejects with, minus fields not every failure has.
+      if (command === 'github' && args?.operation === 'graphql')
+        throw {
+          message: 'offline',
+          details: {
+            operation: 'DeskSearch',
+            command:
+              "gh api --hostname github.com graphql --include -f 'query=query DeskSearch {}'",
+            failure: 'http',
+            exitStatus: 1,
+            durationMs: 3140,
+            httpStatus: 502,
+            requestId: 'C582:11C129',
+            rateLimit: { resource: 'graphql', limit: 5000, remaining: 4978, reset: 1792680215 },
+          },
+        };
       return invoke(command, args);
     };
   });
@@ -2011,9 +2026,17 @@ test('lists errors from this session in Troubleshooting and the debug info', asy
   await expect(errors.filter({ hasText: 'clipboard denied' })).toContainText(
     /Could not copy the PR URL.*clipboard ·/,
   );
-  await expect(errors.filter({ hasText: 'offline' }).first()).toContainText(
-    /refresh-warning · .* · 2 times since/,
+  const offline = errors.filter({ hasText: 'owned: Error: offline' });
+  await expect(offline).toContainText(/refresh-warning · .* · 2 times since/);
+  await expect(offline).toContainText(
+    'DeskSearch · HTTP 502 · exit 1 · 3.1s · rate limit 4978/5000 left · request C582:11C129',
   );
+  await offline.getByText('Command').click();
+  await expect(
+    offline.getByText(
+      "gh api --hostname github.com graphql --include -f 'query=query DeskSearch {}'",
+    ),
+  ).toBeVisible();
   await page.screenshot({ path: '.context/session-errors.png' });
   await page.getByRole('button', { name: 'Copy debug info' }).click();
   const info = await copied();
@@ -2023,6 +2046,11 @@ test('lists errors from this session in Troubleshooting and the debug info', asy
       expect.objectContaining({ source: 'refresh-warning', count: 2 }),
     ]),
   );
+  expect(info.errors.find((e: any) => e.message.startsWith('owned:')).details).toMatchObject({
+    command: expect.stringContaining('gh api'),
+    httpStatus: 502,
+    rateLimit: { remaining: 4978, resetAt: '2026-10-22T14:43:35.000Z' },
+  });
 
   await errors
     .filter({ hasText: 'clipboard denied' })

@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { GhGitHubService } from './client';
+import { GitHubRequestError } from './errors';
 import { fetchCompleted } from './completed';
 import { defaultState } from '../store/app-state';
 import type { GitHubService, RawMergedPR } from './types';
@@ -50,15 +51,22 @@ it('drops PRs merged before the cutoff, never merged, or in ignored repositories
 });
 
 it('keeps results from sources that worked and warns about the ones that failed', async () => {
+  const details = {
+    operation: 'DeskMergedSearch',
+    command: 'gh api graphql',
+    failure: 'http' as const,
+    durationMs: 10,
+    httpStatus: 502,
+  };
   const api = service({
     getMergedPullRequests: vi.fn(async (qualifier) => {
-      if (qualifier === 'author') throw new Error('offline');
+      if (qualifier === 'author') throw new GitHubRequestError('offline', details);
       return [merged('acme/api', 1, '2026-09-30T10:00:00Z')];
     }),
   });
   const result = await fetchCompleted(api, defaultState(), now);
   expect(result.prs).toHaveLength(1);
-  expect(result.warnings).toEqual(['author: Error: offline']);
+  expect(result.warnings).toEqual([{ message: 'author: Error: offline', details }]);
 });
 
 it('builds merged search and repository queries', async () => {

@@ -97,3 +97,31 @@ export interface GhCliInfo {
   version: string;
   path: string;
 }
+
+// Facts about a failed gh call. The bridge only passes allowlisted, validated fields, never gh's
+// output or GitHub's messages.
+export interface GitHubRequestDetails {
+  operation: string;
+  // Shell-quoted, so it can be rerun in Terminal.
+  command: string;
+  // `exit` means gh failed without an HTTP response (or its output was not read, as for auth).
+  failure: 'launch' | 'timeout' | 'exit' | 'http' | 'graphql' | 'invalid-response';
+  exitStatus?: number;
+  durationMs: number;
+  httpStatus?: number;
+  requestId?: string;
+  rateLimit?: {
+    resource?: string;
+    limit?: number;
+    remaining?: number;
+    used?: number;
+    resetAt?: string;
+  };
+  retryAfterSeconds?: number;
+  graphqlErrors?: { type?: string; code?: string; path?: (string | number)[] }[];
+}
+
+export interface SourceWarning {
+  message: string;
+  details?: GitHubRequestDetails;
+}

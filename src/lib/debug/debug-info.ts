@@ -39,7 +39,8 @@ export function buildDebugInfo(input: DebugInfoInput, prId?: string) {
     },
     refresh: {
       discoveryComplete: snapshot.discoveryComplete,
-      warnings: snapshot.warnings,
+      // Details for each warning are in errors, recorded as refresh-warning.
+      warnings: snapshot.warnings.map((w) => w.message),
       staleIds: snapshot.staleIds,
       sources: snapshot.sources,
     },

@@ -4,11 +4,12 @@ import type { PullRequest, TrackingReason } from '../pr/types';
 import { parsePullRequest } from '../store/app-state';
 import { completeSeed } from './normalize';
 import { pool } from './pool';
-import type { GitHubService, RawPR } from './types';
+import { sourceWarning } from './errors';
+import type { GitHubService, RawPR, SourceWarning } from './types';
 export interface DashboardSnapshot {
   prs: PullRequest[];
   sources: Record<string, string[]>;
-  warnings: string[];
+  warnings: SourceWarning[];
   staleIds: string[];
   // False when any discovery job failed, so a PR missing from `sources` may just be unseen.
   discoveryComplete: boolean;
@@ -18,7 +19,7 @@ export async function refreshDashboard(
   local: AppState,
   previous?: DashboardSnapshot,
 ): Promise<DashboardSnapshot> {
-  const warnings: string[] = [],
+  const warnings: SourceWarning[] = [],
     sources: Record<string, string[]> = {},
     staleIds: string[] = [];
   let discoveryComplete = true;
@@ -50,7 +51,7 @@ export async function refreshDashboard(
     } catch (e) {
       discoveryComplete = false;
       sources[job.key] = (previous?.sources[job.key] ?? []).filter(include);
-      warnings.push(`${job.key}: ${String(e)} Previous results retained.`);
+      warnings.push(sourceWarning(`${job.key}: ${String(e)} Previous results retained.`, e));
       staleIds.push(...sources[job.key]);
     }
   });
@@ -78,7 +79,7 @@ export async function refreshDashboard(
     try {
       prs.push({ ...(await service.getPullRequest(id, seeds.get(id))), reasons: [...why] });
     } catch (e) {
-      warnings.push(`${id}: ${String(e)}`);
+      warnings.push(sourceWarning(`${id}: ${String(e)}`, e));
       staleIds.push(id);
       const old = previous?.prs.find((p) => p.id === id);
       if (old) prs.push({ ...old, reasons: [...why] });

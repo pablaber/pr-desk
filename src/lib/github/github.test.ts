@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { GhGitHubService, type QueryRunner } from './client';
+import { GitHubRequestError } from './errors';
 import { normalize, normalizeCheck } from './normalize';
 import { refreshDashboard } from './refresh';
 import { classify } from '../pr/classify';
@@ -371,11 +372,19 @@ it('retains conservative source staleness despite a successful fresh seed', asyn
   const api = service(),
     local = defaultState(),
     previous = await refreshDashboard(api, local);
-  vi.mocked(api.getOwnedPullRequests).mockRejectedValue(new Error('offline'));
+  const details = {
+    operation: 'DeskSearch',
+    command: 'gh api graphql',
+    failure: 'exit' as const,
+    durationMs: 10,
+  };
+  vi.mocked(api.getOwnedPullRequests).mockRejectedValue(new GitHubRequestError('offline', details));
   const result = await refreshDashboard(api, local, previous);
   expect(result.prs).toHaveLength(1);
   expect(result.staleIds).toEqual(['acme/api#1']);
-  expect(result.warnings).toHaveLength(1);
+  expect(result.warnings).toEqual([
+    { message: 'owned: Error: offline Previous results retained.', details },
+  ]);
 });
 it('omits incomplete new records and retains previous complete records on continuation failures', async () => {
   const seed = raw();

@@ -6,7 +6,10 @@ mod merge;
 #[cfg(target_os = "macos")]
 mod relaunch;
 
-use std::{path::PathBuf, time::Duration};
+use std::{
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 use tokio::process::Command;
 
 fn gh_path() -> Result<PathBuf, String> {
@@ -22,60 +25,116 @@ fn gh_path() -> Result<PathBuf, String> {
     })
 }
 
+// Failures reject with { message, details }; see errors.rs for what details may contain.
 #[tauri::command]
-async fn github(operation: String, query: Option<String>) -> Result<serde_json::Value, String> {
-    let path = gh_path()?;
+async fn github(
+    operation: String,
+    query: Option<String>,
+) -> Result<serde_json::Value, serde_json::Value> {
+    let path = gh_path().map_err(errors::plain)?;
+    let (name, args): (&str, Vec<String>) = match operation.as_str() {
+        "info" => ("version", vec!["--version".into()]),
+        "auth" => (
+            "auth status",
+            ["auth", "status", "--hostname", "github.com"]
+                .map(String::from)
+                .to_vec(),
+        ),
+        "graphql" => {
+            let query = query.ok_or("Missing query").map_err(errors::plain)?;
+            let operation_name = query_operation_name(&query).map_err(errors::plain)?;
+            // Select the named query explicitly, even if another operation appears in the document.
+            // --include adds the status line and headers, which carry the request ID and rate limit.
+            (
+                operation_name,
+                vec![
+                    "api".into(),
+                    "--hostname".into(),
+                    "github.com".into(),
+                    "graphql".into(),
+                    "--include".into(),
+                    "-f".into(),
+                    format!("query={query}"),
+                    "-f".into(),
+                    format!("operationName={operation_name}"),
+                ],
+            )
+        }
+        _ => return Err(errors::plain("Unsupported GitHub operation")),
+    };
+    let attempt = errors::Attempt {
+        operation: name,
+        args: &args,
+        started: Instant::now(),
+    };
     let mut command = Command::new(&path);
     command
+        .args(&args)
         .env("GH_PROMPT_DISABLED", "1")
         .env("GH_PAGER", "cat")
         .kill_on_drop(true);
-    match operation.as_str() {
-        "info" => {
-            command.arg("--version");
+    let output = match tokio::time::timeout(Duration::from_secs(45), command.output()).await {
+        Err(_) => {
+            return Err(attempt.fail(
+                "GitHub request timed out. Try refreshing.",
+                "timeout",
+                None,
+                None,
+            ))
         }
-        "auth" => {
-            command.args(["auth", "status", "--hostname", "github.com"]);
+        Ok(Err(e)) => {
+            return Err(attempt.fail(format!("Could not launch gh: {e}"), "launch", None, None))
         }
-        "graphql" => {
-            let query = query.ok_or("Missing query")?;
-            let operation_name = query_operation_name(&query)?;
-            // Select the named query explicitly, even if another operation appears in the document.
-            command
-                .args(["api", "--hostname", "github.com", "graphql", "-f"])
-                .arg(format!("query={query}"))
-                .arg("-f")
-                .arg(format!("operationName={operation_name}"));
-        }
-        _ => return Err("Unsupported GitHub operation".into()),
-    }
-    let output = tokio::time::timeout(Duration::from_secs(45), command.output())
-        .await
-        .map_err(|_| "GitHub request timed out. Try refreshing.".to_string())?
-        .map_err(|e| format!("Could not launch gh: {e}"))?;
-    if !output.status.success() {
-        // Never return auth output: gh may include credential details in diagnostics.
-        if operation == "auth" {
-            return Err("GitHub authentication failed. Run gh auth login --hostname github.com in Terminal, then retry.".into());
-        }
-        if let Some(code) = errors::graphql_error_code(&output.stdout) {
-            return Err(code.into());
-        }
-        return Err(format!("GitHub request failed ({}). Check repository access, connectivity, and API rate limits.", output.status));
-    }
+        Ok(Ok(output)) => output,
+    };
+    let exit_status = output.status.code();
+    // Never read auth output: gh may include credential details in diagnostics.
     if operation == "auth" {
+        if !output.status.success() {
+            return Err(attempt.fail("GitHub authentication failed. Run gh auth login --hostname github.com in Terminal, then retry.", "exit", exit_status, None));
+        }
         return Ok(serde_json::Value::Null);
     }
+    let general = format!(
+        "GitHub request failed ({}). Check repository access, connectivity, and API rate limits.",
+        output.status
+    );
     if operation == "info" {
+        if !output.status.success() {
+            return Err(attempt.fail(general, "exit", exit_status, None));
+        }
         return Ok(serde_json::json!({
-            "version": parse_gh_version(&output.stdout)?,
+            "version": parse_gh_version(&output.stdout).map_err(errors::plain)?,
             "path": path.to_string_lossy(),
         }));
     }
-    let value: serde_json::Value =
-        serde_json::from_slice(&output.stdout).map_err(|_| "Invalid GitHub response")?;
+    let response = errors::split_response(&output.stdout);
+    if !output.status.success() {
+        let failure = match response.status {
+            None => "exit",
+            Some(status) if status >= 400 => "http",
+            Some(_) => "graphql",
+        };
+        let message = errors::graphql_error_code(response.body)
+            .map(String::from)
+            .unwrap_or(general);
+        return Err(attempt.fail(message, failure, exit_status, Some(&response)));
+    }
+    let value: serde_json::Value = serde_json::from_slice(response.body).map_err(|_| {
+        attempt.fail(
+            "Invalid GitHub response",
+            "invalid-response",
+            exit_status,
+            Some(&response),
+        )
+    })?;
     if value.get("errors").is_some() {
-        return Err("GitHub could not complete this query. Check access and try again.".into());
+        return Err(attempt.fail(
+            "GitHub could not complete this query. Check access and try again.",
+            "graphql",
+            exit_status,
+            Some(&response),
+        ));
     }
     Ok(value["data"].clone())
 }

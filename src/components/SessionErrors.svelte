@@ -1,6 +1,10 @@
 <script lang="ts">
   import Copy from '@lucide/svelte/icons/copy';
-  import { sessionErrors, type SessionError } from '../lib/debug/session-errors.svelte';
+  import {
+    requestSummary,
+    sessionErrors,
+    type SessionError,
+  } from '../lib/debug/session-errors.svelte';
   let { oncopy }: { oncopy: (error: SessionError) => void } = $props();
   const time = (iso: string) =>
     new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -17,7 +21,8 @@
         >{error.source} · {time(error.lastAt)}{error.count > 1
           ? ` · ${error.count} times since ${time(error.firstAt)}`
           : ''}</small
-      ></span
+      >{#if error.details}<small>{requestSummary(error.details)}</small>
+        <details><summary>Command</summary><code>{error.details.command}</code></details>{/if}</span
     ><button
       type="button"
       aria-label="Copy error"

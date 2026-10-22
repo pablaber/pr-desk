@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { GitHubRequestError } from '../github/errors';
 import { historyEntry, pr } from '../../test/fixtures';
 import { HistoryLog, SYNC_INTERVAL_MS, type HistoryDeps } from './history.svelte';
 import type { HistoryFile, HistorySyncResult } from './types';
@@ -168,24 +169,30 @@ describe('HistoryLog', () => {
 
   it('advances syncedThrough only when every search succeeded', async () => {
     const { log, deps } = setup();
+    const details = {
+      operation: 'DeskHistorySearch',
+      command: 'gh api graphql',
+      failure: 'exit' as const,
+      durationMs: 10,
+    };
     await log.open('me');
     const mergedAt = new Date(start + 1000).toISOString();
     deps.fetch.mockResolvedValueOnce({
       entries: [historyEntry({ mergedAt })],
-      warnings: ['History sync (repo:a/b): offline'],
+      warnings: [{ message: 'History sync (repo:a/b): offline', details }],
       complete: false,
     });
     vi.setSystemTime(start + 5000);
     await log.sync();
     expect(log.account?.entries['acme/api#1']).toMatchObject({ mergedAt });
     expect(log.account?.syncedThrough).toBeNull();
-    expect(deps.onWarning).toHaveBeenCalledWith('History sync (repo:a/b): offline');
+    expect(deps.onWarning).toHaveBeenCalledWith('History sync (repo:a/b): offline', details);
     await log.sync();
     expect(log.account?.syncedThrough).toBe(start + 5000);
-    deps.fetch.mockRejectedValueOnce(new Error('boom'));
+    deps.fetch.mockRejectedValueOnce(new GitHubRequestError('boom', details));
     await log.sync();
     expect(log.account?.syncedThrough).toBe(start + 5000);
-    expect(deps.onWarning).toHaveBeenCalledWith('History sync failed: Error: boom');
+    expect(deps.onWarning).toHaveBeenCalledWith('History sync failed: Error: boom', details);
   });
 
   it('keeps in-app writes made while a sync was running', async () => {

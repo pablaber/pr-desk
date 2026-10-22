@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { parsePullRequest, parseRepository } from '../store/app-state';
-import { githubErrorMessage } from './errors';
+import { githubRequestError } from './errors';
 import { normalize, rawConnections } from './normalize';
 import {
   historySearchQuery,
@@ -20,16 +20,15 @@ import type {
   RawPR,
 } from './types';
 export type QueryRunner = <T>(query: string) => Promise<T>;
+async function github<T>(operation: string, query?: string) {
+  try {
+    return await invoke<T>('github', { operation, query });
+  } catch (error) {
+    throw githubRequestError(error);
+  }
+}
 export class GhGitHubService implements GitHubService {
-  constructor(
-    private query: QueryRunner = async (query) => {
-      try {
-        return await invoke('github', { operation: 'graphql', query });
-      } catch (error) {
-        throw new Error(githubErrorMessage(error));
-      }
-    },
-  ) {}
+  constructor(private query: QueryRunner = (query) => github('graphql', query)) {}
   async closeStalePullRequest(input: string) {
     const [repository, number] = parsePullRequest(input).split('#');
     await invoke('close_stale_pr', { url: `https://github.com/${repository}/pull/${number}` });
@@ -61,10 +60,10 @@ export class GhGitHubService implements GitHubService {
     });
   }
   getCliInfo() {
-    return invoke<GhCliInfo>('github', { operation: 'info' });
+    return github<GhCliInfo>('info');
   }
   async authenticate() {
-    await invoke('github', { operation: 'auth' });
+    await github('auth');
   }
   async getCurrentUser() {
     return (

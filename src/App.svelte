@@ -50,8 +50,9 @@
   import UpdateDialog from './components/UpdateDialog.svelte';
   import { UpdateService } from './lib/updates/updater';
   import { showToast } from './lib/toast/toasts.svelte';
-  import type { GhCliInfo } from './lib/github/types';
+  import type { GhCliInfo, GitHubRequestDetails } from './lib/github/types';
   import { GhGitHubService } from './lib/github/client';
+  import { requestDetails } from './lib/github/errors';
   import { refreshDashboard, type DashboardSnapshot } from './lib/github/refresh';
   import { fetchCompleted, type CompletedSnapshot } from './lib/github/completed';
   import { fetchHistory } from './lib/github/history';
@@ -115,7 +116,7 @@
     load: loadHistoryFile,
     save: saveHistoryFile,
     fetch: (login, since) => fetchHistory(service, login, preferences.trackedRepositories, since),
-    onWarning: (message) => recordError('history', message),
+    onWarning: (message, details) => recordError('history', message, details),
     preferences: () => preferences,
   });
   let snapshot = $state<DashboardSnapshot>({
@@ -274,7 +275,7 @@
         if (active) cliInfo = info;
       },
       (e) => {
-        recordError('gh-cli', String(e));
+        recordError('gh-cli', String(e), requestDetails(e));
         if (active) cliInfoError = true;
       },
     );
@@ -390,8 +391,8 @@
       void history.open(login);
       initialized = true;
     } catch (e) {
-      setupError = String(e);
-      recordError('setup', setupError);
+      setupError = e instanceof Error ? e.message : String(e);
+      recordError('setup', setupError, requestDetails(e));
     } finally {
       loading = false;
     }
@@ -405,7 +406,7 @@
       completed = await fetchCompleted(service, $state.snapshot(preferences), Date.now());
       now = Date.now();
     } catch (e) {
-      showError('completed', String(e));
+      showError('completed', String(e), requestDetails(e));
     } finally {
       completedLoading = false;
     }
@@ -434,7 +435,8 @@
     error = '';
     try {
       snapshot = await refreshDashboard(service, preferences, snapshot);
-      for (const warning of snapshot.warnings) recordError('refresh-warning', warning);
+      for (const warning of snapshot.warnings)
+        recordError('refresh-warning', warning.message, warning.details);
       await prune();
       now = Date.now();
       refreshed = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -443,7 +445,7 @@
         history.record({ kind: 'attention-clear' });
       history.start();
     } catch (e) {
-      showError('refresh', String(e));
+      showError('refresh', String(e), requestDetails(e));
     } finally {
       loading = false;
     }
@@ -484,9 +486,9 @@
     if (initialized && screen === 'completed') void loadCompleted();
     else void (initialized ? refresh() : start());
   }
-  function showError(source: ErrorSource, message: string) {
+  function showError(source: ErrorSource, message: string, details?: GitHubRequestDetails) {
     error = message;
-    recordError(source, message);
+    recordError(source, message, details);
   }
   async function persist(next: AppState) {
     await saveState(next);
@@ -552,10 +554,10 @@
       return true;
     } catch (e) {
       if (kind === 'repo') {
-        recordError('settings', String(e));
+        recordError('settings', String(e), requestDetails(e));
         throw e;
       }
-      showError('settings', String(e));
+      showError('settings', String(e), requestDetails(e));
       return false;
     }
   }
@@ -1155,7 +1157,7 @@
           <summary
             >{snapshot.warnings.length} refresh issue{snapshot.warnings.length === 1 ? '' : 's'} · available
             results shown</summary
-          >{#each snapshot.warnings as warning}<p>{warning}</p>{/each}
+          >{#each snapshot.warnings as warning}<p>{warning.message}</p>{/each}
         </details>{/if}
       {#snippet card(item: ClassifiedPR, compact: boolean)}<PRCard
           bind:this={cards[item.pr.id]}
