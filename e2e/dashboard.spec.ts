@@ -2846,6 +2846,82 @@ test('title tag rules badge cards with tags extracted from their titles', async 
   await card.screenshot({ path: '.context/title-tags-card.png' });
 });
 
+test('the title tag filter narrows the board alongside the repository filter', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('multiRepo', '1');
+    const w = window as any,
+      invoke = w.__TAURI_INTERNALS__.invoke;
+    const titles: Record<number, string> = {
+      1: 'fix: BACK-12 reduce cache lookup latency',
+      2: 'Refresh session token handling (BACK-9)',
+      3: 'Add audit event retention BACK-12',
+    };
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      const result = await invoke(command, args);
+      for (const pr of result?.search?.nodes ?? []) pr.title = titles[pr.number] ?? pr.title;
+      return result;
+    };
+  });
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const trigger = page.getByRole('button', { name: 'All title tags 4', exact: true });
+  const menu = page.getByRole('group', { name: 'Title tags' });
+  const repositories = page.getByRole('group', { name: 'Repositories' });
+  // Without tags on the board there is nothing to filter by.
+  await expect(trigger).toHaveCount(0);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSettingsSection(page, 'Title tags');
+  await page
+    .getByRole('button', { name: 'Add rule: Ticket key anywhere in the title', exact: true })
+    .click();
+  await saveSettings(page);
+  await closeSettings(page);
+  await trigger.click();
+  await expect(menu.getByRole('button')).toHaveText(['All title tags4', 'BACK-91', 'BACK-122']);
+  // Menu entries keep the colour each tag has on its cards.
+  const cardTag = page.locator('.pr-card .badge.title-tag', { hasText: 'BACK-12' }).first();
+  await expect(menu.locator('.badge.title-tag', { hasText: 'BACK-12' })).toHaveAttribute(
+    'style',
+    (await cardTag.getAttribute('style'))!,
+  );
+  await page.screenshot({ path: '.context/title-tag-filter-menu.png' });
+  await menu.getByRole('button', { name: 'BACK-12 2', exact: true }).click();
+  await expect(menu).toBeHidden();
+  await expect(page.locator('.pr-card')).toHaveCount(2);
+  await expect(page.locator('.result-count')).toHaveText('2 pull requests');
+  // Each menu counts what the other filter leaves on the board.
+  await page.getByRole('button', { name: 'All repositories 2', exact: true }).click();
+  await expect(repositories.getByRole('button')).toHaveText([
+    'All repositories2',
+    'acme/platform1',
+    'acme/web1',
+  ]);
+  await repositories.getByRole('button', { name: 'acme/web 1', exact: true }).click();
+  await expect(page.locator('.pr-card')).toHaveText(/Add audit event retention/);
+  await page.getByRole('button', { name: 'BACK-12 1', exact: true }).click();
+  await expect(menu.getByRole('button')).toHaveText(['All title tags1', 'BACK-121']);
+  await page.keyboard.press('Escape');
+  await page.screenshot({ path: '.context/title-tag-filter.png' });
+  await page.getByRole('button', { name: 'Clear title tag filter', exact: true }).click();
+  await page.getByRole('button', { name: 'Clear repository filter', exact: true }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  // Removing the rule that found the selected tag clears the filter and hides the menu.
+  await trigger.click();
+  await menu.getByRole('button', { name: 'BACK-9 1', exact: true }).click();
+  await expect(page.locator('.pr-card')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSettingsSection(page, 'Title tags');
+  await page
+    .locator('#settings-section-title-tags')
+    .getByRole('button', { name: 'Remove', exact: true })
+    .click();
+  await saveSettings(page);
+  await closeSettings(page);
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect(trigger).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Clear title tag filter' })).toHaveCount(0);
+});
+
 test('a queued approved PR waits with its queue position and no Merge button', async ({ page }) => {
   await page.addInitScript(() => {
     const w = window as any,

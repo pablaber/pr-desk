@@ -38,6 +38,11 @@ The repository filter narrows the board to one repository on top of the source f
 counts every PR the source filter shows, so each layer of a stack counts. The choice lasts for the
 session and clears once no PR from that repository is on the desk.
 
+The title tag filter works the same way for the tags Settings → Title tags extracts from titles.
+It appears once some PR on the desk carries a tag, and a PR with several tags counts under each.
+Each of the two menus counts what the source filter and the other menu leave on the board. A
+selected tag clears once no PR on the desk carries it, including when its rule is removed.
+
 ## Step 1: hidden PRs
 
 These are checked in order before any column rule runs. A hidden PR appears in no column and is
