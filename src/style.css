@@ -429,7 +429,7 @@ i.waiting {
   font-size: 10px;
   color: #97a08f;
 }
-.repository-filter {
+.board-filter {
   position: relative;
   display: flex;
   align-items: center;
@@ -438,36 +438,43 @@ i.waiting {
   border: 1px solid #dce4d5;
   border-radius: 6px;
 }
-.repository-filter + .result-count {
+.board-filter + .board-filter {
+  margin-left: 6px;
+}
+.board-filter + .result-count {
   margin-left: 14px;
 }
-.filters .repository-filter > button {
+.filters .board-filter > button {
   display: flex;
   align-items: center;
   gap: 6px;
   color: #4f5e4c;
   padding: 5px 9px 5px 10px;
 }
-.repository-filter:has(.active) {
+.board-filter:has(.active) {
   background: #eaf0e5;
   border-color: #cddbc5;
 }
-.filters .repository-filter > button.active {
+.filters .board-filter > button.active {
   color: #3e613d;
   font-weight: 600;
   padding-right: 3px;
 }
-.filters .repository-filter > .repository-clear {
+/* A selected title tag keeps its badge without making the trigger taller than its neighbours. */
+.filters .board-filter > button > .badge {
+  margin-block: -3px;
+}
+.filters .board-filter > .filter-clear {
   padding: 5px 8px 5px 5px;
   color: #7c8a78;
 }
-.repository-filter .repository-name {
+.board-filter .filter-name {
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.repository-count {
+.filter-count {
   margin-left: auto;
   background: #eaf0e5;
   color: #6d8a69;
@@ -476,27 +483,27 @@ i.waiting {
   font-size: 10px;
   font-weight: 600;
 }
-.repository-menu {
+.filter-menu {
   right: 0;
   top: calc(100% + 6px);
   width: 260px;
   max-height: 360px;
   overflow-y: auto;
 }
-.repository-menu button {
+.filter-menu button {
   padding: 7px 8px;
 }
-.repository-menu button[aria-pressed='true'] {
+.filter-menu button[aria-pressed='true'] {
   background: #eef3ea;
   color: #294d36;
   font-weight: 600;
 }
-.repository-check {
+.filter-check {
   display: inline-flex;
   width: 12px;
   color: #3e613d;
 }
-.repository-menu hr {
+.filter-menu hr {
   border: 0;
   border-top: 1px solid #e8ede4;
   margin: 3px 2px;

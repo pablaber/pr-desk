@@ -14,6 +14,7 @@
   import Download from '@lucide/svelte/icons/download';
   import ClipboardCheck from '@lucide/svelte/icons/clipboard-check';
   import Clock from '@lucide/svelte/icons/clock';
+  import FolderGit2 from '@lucide/svelte/icons/folder-git-2';
   import CircleCheck from '@lucide/svelte/icons/circle-check';
   import Link from '@lucide/svelte/icons/link';
   import GitMerge from '@lucide/svelte/icons/git-merge';
@@ -21,6 +22,7 @@
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import PanelLeftClose from '@lucide/svelte/icons/panel-left-close';
   import PanelLeftOpen from '@lucide/svelte/icons/panel-left-open';
+  import Regex from '@lucide/svelte/icons/regex';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
   import SettingsIcon from '@lucide/svelte/icons/settings';
@@ -37,7 +39,7 @@
   import PRCard from './components/PRCard.svelte';
   import PRStack from './components/PRStack.svelte';
   import RefreshOverlay from './components/RefreshOverlay.svelte';
-  import RepositoryFilter from './components/RepositoryFilter.svelte';
+  import BoardFilter from './components/BoardFilter.svelte';
   import AllClear from './components/AllClear.svelte';
   import Snoozed from './components/Snoozed.svelte';
   import Completed from './components/Completed.svelte';
@@ -95,6 +97,7 @@
     type SnoozeOption,
   } from './lib/store/app-state';
   import { classify, sortPullRequests, type ClassifiedPR } from './lib/pr/classify';
+  import { titleTagColor, titleTags } from './lib/pr/title-tags';
   import { boardEntries } from './lib/pr/stacks';
   import { knownBotKey } from './lib/pr/bots';
   import { badgeCount } from './lib/pr/badge';
@@ -150,6 +153,7 @@
   let showHotkeys = $state(false);
   let sidebarCollapsed = $derived(preferences.settings.sidebarCollapsed);
   let repository = $state<string | null>(null);
+  let titleTag = $state<string | null>(null);
   let filter = $state<TrackingReason | 'all'>('all'),
     loading = $state(false),
     saving = $state(false),
@@ -225,9 +229,18 @@
   let sourceVisible = $derived(
     classified.filter((p) => filter === 'all' || sourceReasons(p.pr.reasons).includes(filter)),
   );
-  let visible = $derived(
-    repository ? sourceVisible.filter((p) => p.pr.repository === repository) : sourceVisible,
+  let tagNames = $derived(
+    new Map(
+      classified.map((p) => [
+        p.pr.id,
+        titleTags(p.pr.title, preferences.titleTagRules).map((t) => t.name),
+      ]),
+    ),
   );
+  const inRepository = (p: ClassifiedPR) => !repository || p.pr.repository === repository;
+  const hasTitleTag = (p: ClassifiedPR) => !titleTag || tagNames.get(p.pr.id)!.includes(titleTag);
+  let visible = $derived(sourceVisible.filter((p) => inRepository(p) && hasTitleTag(p)));
+  let boardHasTitleTags = $derived(classified.some((p) => tagNames.get(p.pr.id)!.length));
   let entries = $derived(boardEntries(visible, snapshot.prs));
   // A stack sits in its most urgent layer's column, so columns count the PRs they show.
   let columnSizes = $derived(
@@ -262,6 +275,11 @@
   // A repository with nothing left on the board, under any source filter, stops filtering it.
   $effect(() => {
     if (repository && !classified.some((p) => p.pr.repository === repository)) repository = null;
+  });
+  // Likewise for a title tag, including when the rules that found it are removed.
+  $effect(() => {
+    const tag = titleTag;
+    if (tag && !classified.some((p) => tagNames.get(p.pr.id)!.includes(tag))) titleTag = null;
   });
   let cliInfo = $state<GhCliInfo | null>(null);
   let cliInfoError = $state(false);
@@ -1145,10 +1163,21 @@
             class:selected={filter === f.value}
             aria-pressed={filter === f.value}
             onclick={() => (filter = f.value)}>{f.label}</button
-          >{/each}<RepositoryFilter
-          items={sourceVisible}
+          >{/each}{#if boardHasTitleTags}<BoardFilter
+            values={sourceVisible.filter(inRepository).map((p) => tagNames.get(p.pr.id)!)}
+            selected={titleTag}
+            onselect={(t) => (titleTag = t)}
+            icon={Regex}
+            singular="title tag"
+            plural="title tags"
+            tagColor={titleTagColor}
+          />{/if}<BoardFilter
+          values={sourceVisible.filter(hasTitleTag).map((p) => [p.pr.repository])}
           selected={repository}
           onselect={(r) => (repository = r)}
+          icon={FolderGit2}
+          singular="repository"
+          plural="repositories"
         /><span class="result-count"
           >{visible.length} pull request{visible.length === 1 ? '' : 's'}</span
         >
@@ -1218,13 +1247,17 @@
                           : 'Nothing here yet'}
                     </p>
                     <small
-                      >{repository
-                        ? 'Try another repository filter.'
-                        : filter !== 'all'
-                          ? 'Try another source filter.'
-                          : col.state === 'waiting'
-                            ? 'Track a repository or watch a PR in Settings.'
-                            : 'PRs will appear as their status changes.'}</small
+                      >{repository && titleTag
+                        ? 'Try other repository and title tag filters.'
+                        : repository
+                          ? 'Try another repository filter.'
+                          : titleTag
+                            ? 'Try another title tag filter.'
+                            : filter !== 'all'
+                              ? 'Try another source filter.'
+                              : col.state === 'waiting'
+                                ? 'Track a repository or watch a PR in Settings.'
+                                : 'PRs will appear as their status changes.'}</small
                     >
                   </div>{/each}
               </div>
