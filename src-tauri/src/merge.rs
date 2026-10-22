@@ -150,6 +150,12 @@ async fn view_settled(url: &str) -> Result<Value, String> {
     Ok(pr)
 }
 
+// gh reports an empty review decision when branch protection requires no review, and it
+// stays empty after an approval.
+fn review_satisfied(pr: &Value) -> bool {
+    matches!(pr["reviewDecision"].as_str(), Some("APPROVED" | ""))
+}
+
 fn validate_ready(
     pr: &Value,
     head_oid: &str,
@@ -160,7 +166,7 @@ fn validate_ready(
     if pr["state"] != "OPEN"
         || pr["isDraft"] != false
         || pr["headRefOid"] != head_oid
-        || pr["reviewDecision"] != "APPROVED"
+        || !review_satisfied(pr)
         || pr["mergeable"] != "MERGEABLE"
         || !["CLEAN", "HAS_HOOKS", "UNSTABLE"]
             .contains(&pr["mergeStateStatus"].as_str().unwrap_or(""))
@@ -478,6 +484,7 @@ mod tests {
             ("isDraft", json!(true)),
             ("headRefOid", json!("b".repeat(40))),
             ("reviewDecision", json!("REVIEW_REQUIRED")),
+            ("reviewDecision", Value::Null),
             ("mergeable", json!("UNKNOWN")),
             ("mergeStateStatus", json!("BLOCKED")),
             (
@@ -489,6 +496,19 @@ mod tests {
             pr[key] = value;
             assert!(validate_ready(&pr, &oid, "me", None).is_err(), "{key}");
         }
+    }
+
+    #[test]
+    fn ready_without_a_review_decision_when_no_review_is_required() {
+        let oid = "a".repeat(40);
+        let mut pr = ready();
+        pr["reviewDecision"] = json!("");
+        assert!(validate_ready(&pr, &oid, "me", None).is_ok());
+        // An approved bot PR in such a repository still reports no decision.
+        pr["author"] = json!({"login":"app/dependabot","is_bot":true});
+        assert!(validate_ready(&pr, &oid, "me", Some("dependabot[bot]")).is_ok());
+        pr["mergeStateStatus"] = json!("BLOCKED");
+        assert!(validate_ready(&pr, &oid, "me", Some("dependabot[bot]")).is_err());
     }
 
     #[test]

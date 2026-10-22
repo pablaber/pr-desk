@@ -134,7 +134,7 @@ export const dashboardRules: DashboardRule[] = [
         : s.checksRunning
           ? 'Checks running'
           : s.managed
-            ? s.pr.reviewDecision === 'APPROVED'
+            ? s.reviewSatisfied
               ? 'Waiting on merge requirements'
               : s.lastPushedByYou
                 ? 'Waiting for another reviewer'

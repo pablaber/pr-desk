@@ -112,12 +112,16 @@ test.beforeEach(async ({ page }) => {
       updatedAt: new Date(
         Date.now() - ([1 / 24, 10, 20, 30][number - 1] ?? 1 / 24) * 86400000,
       ).toISOString(),
-      reviewDecision:
-        number === 1 || (number === 7 && localStorage.getItem('botApproved'))
+      // GitHub reports no review decision for a PR in noReviewPrs, whose base requires no review.
+      reviewDecision: (
+        JSON.parse(localStorage.getItem('noReviewPrs') ?? '[]') as number[]
+      ).includes(number)
+        ? null
+        : number === 1 || (number === 7 && localStorage.getItem('botApproved'))
           ? 'APPROVED'
           : number === 2
             ? 'CHANGES_REQUESTED'
-            : null,
+            : 'REVIEW_REQUIRED',
       mergeable: 'MERGEABLE',
       // A PR listed in behindPrs, or #8, is up to date once its branch has been updated.
       mergeStateStatus:
@@ -3399,6 +3403,24 @@ test('bot PRs whose latest commit is yours wait for another reviewer', async ({ 
   await expect(card).not.toContainText('Waiting for your review');
   await expect(
     card.getByRole('button', { name: 'Approve and merge Bump lodash', exact: true }),
+  ).toHaveCount(0);
+});
+
+test('PRs merge without an approval when the base branch requires none', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('noReviewPrs', '[3, 7]');
+    localStorage.setItem('myCommitPrs', '[7]');
+  });
+  await trackBotPr(page);
+  const ready = page.locator('.column').nth(0);
+  await expect(
+    ready.getByRole('button', { name: 'Merge Add audit event retention', exact: true }),
+  ).toBeVisible();
+  const bot = ready.locator('.pr-card', { hasText: 'Bump lodash' });
+  await expect(bot).toContainText('Ready to merge');
+  await expect(bot.getByRole('button', { name: 'Merge Bump lodash', exact: true })).toBeVisible();
+  await expect(
+    bot.getByRole('button', { name: 'Approve and merge Bump lodash', exact: true }),
   ).toHaveCount(0);
 });
 

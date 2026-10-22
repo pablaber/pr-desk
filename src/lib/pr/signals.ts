@@ -45,14 +45,28 @@ export function deriveSignals(
       !(c.state === 'failed' && allowedFailures.includes(c.name)),
   );
   const nonBlocking = waitingOn.length + allowedFailures.length > 0;
+  // GitHub reports no review decision when branch protection requires no review.
+  const reviewSatisfied = pr.reviewDecision === 'APPROVED' || pr.reviewDecision === null;
   const approved =
     managed &&
     !pr.draft &&
-    pr.reviewDecision === 'APPROVED' &&
+    reviewSatisfied &&
     checks.every((c) => c.state === 'passing') &&
     pr.mergeable === 'MERGEABLE';
   // A PR already in the merge queue or with auto-merge on has nothing left for the user to do.
   const notQueued = pr.mergeQueue === null && !pr.autoMerge;
+  // The missing review is what makes GitHub report BLOCKED, so it is expected here; the
+  // in-app approve and merge revalidates readiness after approving. Every raw check must
+  // pass, so a non-blocking pending or allowed failed check still disqualifies the PR.
+  const approvable =
+    headByBot &&
+    !pr.draft &&
+    pr.reviewDecision !== 'APPROVED' &&
+    pr.reviewDecision !== 'CHANGES_REQUESTED' &&
+    pr.checks.every((c) => c.state === 'passing') &&
+    pr.mergeable === 'MERGEABLE' &&
+    notQueued &&
+    ['BLOCKED', 'CLEAN', 'HAS_HOOKS', 'UNSTABLE'].includes(pr.mergeStateStatus);
   return {
     pr,
     owned,
@@ -77,9 +91,12 @@ export function deriveSignals(
     behind: pr.mergeStateStatus === 'BEHIND',
     queued: pr.mergeQueue !== null,
     autoMerge: pr.autoMerge,
-    // Strict definition, which the in-app merge relies on.
+    reviewSatisfied,
+    // Strict definition, which the in-app merge relies on. A bot change that needs no review
+    // is still offered as approve and merge, so a person's approval is on record.
     ready:
       approved &&
+      !approvable &&
       notQueued &&
       !nonBlocking &&
       ['CLEAN', 'HAS_HOOKS', 'UNSTABLE'].includes(pr.mergeStateStatus),
@@ -91,18 +108,7 @@ export function deriveSignals(
       notQueued &&
       nonBlocking &&
       ['BLOCKED', 'CLEAN', 'HAS_HOOKS', 'UNSTABLE'].includes(pr.mergeStateStatus),
-    // The missing review is what makes GitHub report BLOCKED, so it is expected here; the
-    // in-app approve and merge revalidates readiness after approving. Every raw check must
-    // pass, so a non-blocking pending or allowed failed check still disqualifies the PR.
-    approvable:
-      headByBot &&
-      !pr.draft &&
-      pr.reviewDecision !== 'APPROVED' &&
-      pr.reviewDecision !== 'CHANGES_REQUESTED' &&
-      pr.checks.every((c) => c.state === 'passing') &&
-      pr.mergeable === 'MERGEABLE' &&
-      notQueued &&
-      ['BLOCKED', 'CLEAN', 'HAS_HOOKS', 'UNSTABLE'].includes(pr.mergeStateStatus),
+    approvable,
     // Checks are not required: an outdated branch is often why they fail.
     updatable:
       managed &&

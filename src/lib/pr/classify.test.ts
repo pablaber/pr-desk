@@ -107,12 +107,20 @@ describe('dashboard rules', () => {
     for (const changes of [
       { author: 'other' },
       { draft: true },
-      { reviewDecision: null },
+      { reviewDecision: 'REVIEW_REQUIRED' },
       { mergeable: 'UNKNOWN' },
       { mergeStateStatus: 'BLOCKED' },
       { checks: [{ name: 'CI', state: 'pending' as const }] },
     ])
       expect(run({ ...ready, ...changes }).state).toBe('waiting');
+  });
+  it('is ready without an approval when GitHub requires no review', () => {
+    const passing = { reviewDecision: null, checks: [{ name: 'CI', state: 'passing' as const }] };
+    expect(run(passing)).toMatchObject({ state: 'ready-to-merge', canMerge: true });
+    expect(run({ ...passing, mergeStateStatus: 'BLOCKED' })).toMatchObject({
+      state: 'waiting',
+      primary: 'Waiting on merge requirements',
+    });
   });
   it('queued and auto-merge PRs wait instead of offering a merge', () => {
     const approved: Partial<PullRequest> = {
@@ -380,6 +388,13 @@ describe('known bots', () => {
     });
     expect(bot({ reviewDecision: 'CHANGES_REQUESTED' }).state).toBe('needs-attention');
   });
+  it('offers a plain merge when no review is required and you pushed last', () => {
+    expect(bot({ reviewDecision: null, headAuthor: { login: 'me', name: 'Me' } })).toMatchObject({
+      state: 'ready-to-merge',
+      canMerge: true,
+      canApproveAndMerge: false,
+    });
+  });
   it('waits once approved but blocked, or while auto-merge is on', () => {
     expect(bot({ reviewDecision: 'APPROVED', mergeStateStatus: 'BLOCKED' })).toMatchObject({
       state: 'waiting',
@@ -451,8 +466,12 @@ describe('approve and merge', () => {
         waiting({ reviewDecision: null, mergeStateStatus: 'CLEAN', checks: [] }),
         'me',
         local,
-      )?.canApproveAndMerge,
-    ).toBe(true);
+      ),
+    ).toMatchObject({
+      primary: 'Ready to approve and merge',
+      canApproveAndMerge: true,
+      canMerge: false,
+    });
     expect(
       classify(
         waiting({

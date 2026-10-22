@@ -77,8 +77,8 @@ Each visible PR is reduced to a handful of booleans. The terms used in the rule 
 | **auto-merge**                 | auto-merge is enabled                                                                                                                                                                                                                                                                                                 |
 | **non-blocking pending**       | a check matching a Settings → Non-blocking checks rule for this repository is still pending                                                                                                                                                                                                                           |
 | **allowed failures**           | a check matching a Non-blocking checks rule with Allow failures on for this repository has failed                                                                                                                                                                                                                     |
-| **approved**                   | managed, not a draft, `reviewDecision` is `APPROVED`, every check passes (ignoring non-blocking pending ones and allowed failures), and `mergeable` is `MERGEABLE`                                                                                                                                                    |
-| **ready**                      | approved, not queued, no auto-merge, **no** non-blocking pending checks or allowed failures, and `mergeStateStatus` is `CLEAN`, `HAS_HOOKS` or `UNSTABLE`                                                                                                                                                             |
+| **approved**                   | managed, not a draft, `reviewDecision` is `APPROVED` or empty (GitHub leaves it empty when the base branch requires no review), every check passes (ignoring non-blocking pending ones and allowed failures), and `mergeable` is `MERGEABLE`                                                                          |
+| **ready**                      | approved, not approvable, not queued, no auto-merge, **no** non-blocking pending checks or allowed failures, and `mergeStateStatus` is `CLEAN`, `HAS_HOOKS` or `UNSTABLE`                                                                                                                                             |
 | **ready, non-blocking checks** | approved, not queued, no auto-merge, **some** non-blocking pending checks or allowed failures, and `mergeStateStatus` is `BLOCKED`, `CLEAN`, `HAS_HOOKS` or `UNSTABLE`                                                                                                                                                |
 | **updatable**                  | managed, not a draft, behind, `mergeable` is `MERGEABLE`, not queued, no auto-merge; checks may be in any state                                                                                                                                                                                                       |
 | **approvable**                 | latest commit by the bot, not a draft, `reviewDecision` is neither `APPROVED` nor `CHANGES_REQUESTED`, every check passes (non-blocking pending checks and allowed failures included), `mergeable` is `MERGEABLE`, not queued, no auto-merge, and `mergeStateStatus` is `BLOCKED`, `CLEAN`, `HAS_HOOKS` or `UNSTABLE` |
@@ -122,14 +122,14 @@ label; other matching rules (except the `waiting` catch-all) show as secondary s
 
 The Waiting fallback picks its label from the first that applies:
 
-| Condition                         | Label                         |
-| --------------------------------- | ----------------------------- |
-| draft (only your own reach here)  | Draft                         |
-| checks pending (not non-blocking) | Checks running                |
-| managed and approved on GitHub    | Waiting on merge requirements |
-| managed and last pushed by you    | Waiting for another reviewer  |
-| managed                           | Waiting for review            |
-| otherwise                         | No action needed              |
+| Condition                                   | Label                         |
+| ------------------------------------------- | ----------------------------- |
+| draft (only your own reach here)            | Draft                         |
+| checks pending (not non-blocking)           | Checks running                |
+| managed and approved, or no review required | Waiting on merge requirements |
+| managed and last pushed by you              | Waiting for another reviewer  |
+| managed                                     | Waiting for review            |
+| otherwise                                   | No action needed              |
 
 ### Consequences worth knowing
 
@@ -149,6 +149,10 @@ The Waiting fallback picks its label from the first that applies:
   author the latest commit on a PR that is not yours, it stops asking for your review: a bot PR
   waits as "Waiting for another reviewer". Someone else's approval makes it Ready to merge as
   usual.
+- When the base branch requires no review, GitHub reports no review decision, even after an
+  approval. Your own PRs there are Ready to merge without one. A bot PR whose latest commit is the
+  bot's is still offered as "Ready to approve and merge", so a person's approval is on record;
+  once someone else pushes to it, it is Ready to merge.
 - A bot PR is approvable only while the bot made its latest non-merge commit, whether GitHub links
   that commit to the App's `name[bot]` account or to no account at all. Once anyone else
   pushes to it, including you from a git email GitHub cannot link to your account, it needs a
