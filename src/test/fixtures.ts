@@ -17,7 +17,7 @@ export function pr(overrides: Partial<PullRequest> = {}): PullRequest {
     headRefName: 'feature',
     crossRepository: false,
     updatedAt: '2026-09-20T10:00:00Z',
-    reviewDecision: null,
+    reviewDecision: 'REVIEW_REQUIRED',
     mergeable: 'MERGEABLE',
     mergeStateStatus: 'CLEAN',
     mergeQueue: null,
