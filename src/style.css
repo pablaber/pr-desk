@@ -582,6 +582,30 @@ i.waiting {
 .pr-card.compact .merge-button {
   margin: 0 12px 12px;
 }
+/* Pinned cards lead their column under an indigo bar, with a pin beside the menu that unpins. */
+.pr-card.pinned {
+  border-color: #c4c8f0;
+  background: #f8f8ff;
+}
+.pr-card.pinned::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  border-radius: 7px 7px 0 0;
+  background: #6d71d6;
+  pointer-events: none;
+  z-index: 1;
+}
+.pr-card.pinned:hover {
+  border-color: #a9aee6;
+}
+.pr-card.pinned .card-main:hover {
+  background: #f3f4ff;
+}
+.pr-card.pinned .repo {
+  padding-right: 42px;
+}
 /* Stacked PRs share one container; a rail with a dot per layer runs down to the base branch. */
 .pr-stack {
   border: 1px solid #d6e0cf;
@@ -816,6 +840,19 @@ i.waiting {
   color: #939e8a;
   padding: 4px;
   font-size: 12px;
+}
+.pin-toggle {
+  position: absolute;
+  right: 29px;
+  top: 7px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #5b5fc7;
+  padding: 4px;
+}
+.pin-toggle:hover:not(:disabled) {
+  background: #eceefc;
 }
 /* Keep the trigger clickable above the backdrop so it still toggles the menu shut. */
 .menu-trigger[aria-expanded='true'] {

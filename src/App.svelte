@@ -241,7 +241,7 @@
   const hasTitleTag = (p: ClassifiedPR) => !titleTag || tagNames.get(p.pr.id)!.includes(titleTag);
   let visible = $derived(sourceVisible.filter((p) => inRepository(p) && hasTitleTag(p)));
   let boardHasTitleTags = $derived(classified.some((p) => tagNames.get(p.pr.id)!.length));
-  let entries = $derived(boardEntries(visible, snapshot.prs));
+  let entries = $derived(boardEntries(visible, snapshot.prs, preferences.pinnedPullRequests));
   // A stack sits in its most urgent layer's column, so columns count the PRs they show.
   let columnSizes = $derived(
     Object.fromEntries(
@@ -472,8 +472,8 @@
       await refresh(true);
     }
   }
-  // Watches and labels for finished or untracked PRs, and expired snoozes, are dropped once a
-  // refresh can tell.
+  // Watches, labels and pins for finished or untracked PRs, and expired snoozes, are dropped once
+  // a refresh can tell.
   async function prune() {
     const pruned = prunePreferences(
       $state.snapshot(preferences),
@@ -487,6 +487,7 @@
       next.watchedPullRequests = pruned.watchedPullRequests;
       next.labeledPullRequests = pruned.labeledPullRequests;
       next.snoozedPullRequests = pruned.snoozedPullRequests;
+      next.pinnedPullRequests = pruned.pinnedPullRequests;
     });
     // A Settings draft still holding a pruned watch would look dirty and bring it back on Save.
     if (settingsDraft)
@@ -707,6 +708,8 @@
         next.ignoredPullRequests[id] = { ignoredAt: new Date().toISOString() };
       if (action === 'snooze' && until && Date.parse(until) > Date.now())
         next.snoozedPullRequests[id] = { until };
+      if (action === 'pin') next.pinnedPullRequests[id] = { pinnedAt: new Date().toISOString() };
+      if (action === 'unpin') delete next.pinnedPullRequests[id];
     });
     if (action === 'watch' || action === 'unwatch') await refresh();
   }
@@ -839,6 +842,9 @@
       else if (hotkey.action === 'copy-pr') copyUrl(target.pr);
       else if (hotkey.action === 'ignore-pr') {
         if (!saving && !loading) action(target.pr.id, 'ignore');
+      } else if (hotkey.action === 'pin-pr') {
+        if (!saving && !loading)
+          action(target.pr.id, target.pr.id in preferences.pinnedPullRequests ? 'unpin' : 'pin');
       } else cards[target.pr.id]?.openSubmenu(hotkey.action === 'snooze-pr' ? 'snooze' : 'labels');
     }
   }
@@ -1201,6 +1207,7 @@
           busy={saving || loading}
           stale={snapshot.staleIds.includes(item.pr.id)}
           watching={preferences.watchedPullRequests.includes(item.pr.id)}
+          pinned={item.pr.id in preferences.pinnedPullRequests}
           labels={labelsFor(preferences, item.pr.id)}
           titleTagRules={preferences.titleTagRules}
           allLabels={preferences.labels}

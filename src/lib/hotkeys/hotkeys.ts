@@ -107,4 +107,10 @@ export const hotkeys: Hotkey[] = [
   { action: 'snooze-pr', section: 'pr-actions', key: 's', description: 'Snooze the hovered PR' },
   { action: 'ignore-pr', section: 'pr-actions', key: 'i', description: 'Ignore the hovered PR' },
   { action: 'label-pr', section: 'pr-actions', key: 'l', description: 'Label the hovered PR' },
+  {
+    action: 'pin-pr',
+    section: 'pr-actions',
+    key: 'p',
+    description: 'Pin or unpin the hovered PR',
+  },
 ];

@@ -120,7 +120,7 @@ it('defaults to five minutes and migrates reserved v1 settings without losing pr
     settings: { automaticRefreshMinutes: 0 },
   };
   expect(migrateState(legacy)).toMatchObject({
-    schemaVersion: 16,
+    schemaVersion: 17,
     watchedPullRequests: ['acme/api#1'],
     settings: { automaticRefreshMinutes: 5, snoozeOptions: defaultSnoozeOptions() },
   });
@@ -139,7 +139,7 @@ it('preserves Never and all valid intervals, and repairs invalid stored interval
         .automaticRefreshMinutes,
     ).toBe(5);
   }
-  expect(() => migrateState({ ...defaultState(), schemaVersion: 17 })).toThrow('Unsupported');
+  expect(() => migrateState({ ...defaultState(), schemaVersion: 18 })).toThrow('Unsupported');
 });
 
 it('migrates older preferences and validates ignored repositories', () => {
@@ -153,7 +153,7 @@ it('migrates older preferences and validates ignored repositories', () => {
         settings: { automaticRefreshMinutes: 0 },
       }),
     ).toMatchObject({
-      schemaVersion: 16,
+      schemaVersion: 17,
       ignoreRules: [],
       trackedRepositories: ['acme/api'],
       settings: { automaticRefreshMinutes: schemaVersion === 1 ? 5 : 0 },
@@ -177,6 +177,28 @@ it('migrates older preferences and validates ignored repositories', () => {
     expect(() =>
       migrateState({ ...defaultState(), schemaVersion: 4, ignoredRepositories }),
     ).toThrow();
+});
+
+it('starts older preferences with no pins and refuses to overwrite invalid saved pins', () => {
+  const pins = { 'acme/api#1': { pinnedAt: '2026-10-20T09:00:00Z' } };
+  expect(migrateState({ ...defaultState(), schemaVersion: 16 }).pinnedPullRequests).toEqual({});
+  expect(
+    migrateState({ ...defaultState(), schemaVersion: 16, pinnedPullRequests: pins })
+      .pinnedPullRequests,
+  ).toEqual({});
+  expect(migrateState({ ...defaultState(), pinnedPullRequests: pins }).pinnedPullRequests).toEqual(
+    pins,
+  );
+  for (const pinnedPullRequests of [
+    undefined,
+    null,
+    ['acme/api#1'],
+    { 'acme/api#1': true },
+    { 'acme/api#1': { pinnedAt: 'yesterday' } },
+  ])
+    expect(() => migrateState({ ...defaultState(), pinnedPullRequests })).toThrow(
+      'Invalid preferences file',
+    );
 });
 
 it('migrates snooze options and refuses to overwrite an invalid saved list', () => {
@@ -217,7 +239,7 @@ it('migrates all supported versions without losing independently saved preferenc
       settings: { automaticRefreshMinutes: 12, snoozeOptions: [] },
     };
     const migrated = migrateState(legacy);
-    expect(migrated.schemaVersion).toBe(16);
+    expect(migrated.schemaVersion).toBe(17);
     expect(migrated.checkRules).toEqual([]);
     expect(migrated.titleTagRules).toEqual([]);
     expect(migrated.ignoreRules).toEqual(
@@ -438,7 +460,7 @@ it('loads pre-v8 preferences without labels', () => {
       labels: [label('x', 'Ignored')],
       labeledPullRequests: { 'acme/api#1': ['x'] },
     });
-    expect(migrated).toMatchObject({ schemaVersion: 16, labels: [], labeledPullRequests: {} });
+    expect(migrated).toMatchObject({ schemaVersion: 17, labels: [], labeledPullRequests: {} });
   }
 });
 it('round-trips v8 labels and canonicalizes their assignments', () => {
@@ -634,7 +656,7 @@ it('rejects settings imports that are not valid exports', () => {
   expect(() => parseSettingsImport('nope')).toThrow("That isn't valid JSON.");
   for (const text of ['null', '5', '{}', exported({ app: 'other' }), exported({ kind: 'debug' })])
     expect(() => parseSettingsImport(text)).toThrow("This isn't a PR Desk settings export.");
-  expect(() => parseSettingsImport(exported({ schemaVersion: 17 }))).toThrow('newer PR Desk');
+  expect(() => parseSettingsImport(exported({ schemaVersion: 18 }))).toThrow('newer PR Desk');
   const invalid: Record<string, unknown>[] = [
     { trackedRepositories: ['no-owner'] },
     { trackedRepositories: [5] },

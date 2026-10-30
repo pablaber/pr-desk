@@ -40,6 +40,7 @@ it('unwatches and unlabels merged or closed PRs', () => {
     watchedPullRequests: [],
     labeledPullRequests: {},
     snoozedPullRequests: {},
+    pinnedPullRequests: {},
   });
 });
 
@@ -63,6 +64,7 @@ it('unlabels untracked PRs only when discovery was complete', () => {
     watchedPullRequests: ['acme/api#1', 'acme/api#2'],
     labeledPullRequests: { 'acme/api#1': ['l'] },
     snoozedPullRequests: {},
+    pinnedPullRequests: {},
   });
   expect(
     prunePreferences(local(), snapshot({ sources, discoveryComplete: false }), now),
@@ -136,4 +138,31 @@ it('keeps live snoozes on PRs whose state is unknown', () => {
       now,
     ),
   ).toBeNull();
+});
+
+it('unpins merged, closed and untracked PRs and keeps pins whose state is unknown', () => {
+  const state = local();
+  const pin = { pinnedAt: '2026-10-20T09:00:00Z' };
+  state.pinnedPullRequests = {
+    'acme/api#1': pin,
+    'acme/api#2': pin,
+    'acme/api#3': pin,
+    'acme/api#4': pin,
+    'acme/api#5': pin,
+  };
+  const pruned = prunePreferences(
+    state,
+    snapshot({
+      prs: [
+        pr({ id: 'acme/api#1', state: 'MERGED' }),
+        pr({ id: 'acme/api#2', number: 2, state: 'CLOSED' }),
+        pr({ id: 'acme/api#3', number: 3, state: 'MERGED' }),
+        pr({ id: 'acme/api#4', number: 4 }),
+      ],
+      sources: { owned: ['acme/api#1', 'acme/api#2', 'acme/api#3', 'acme/api#4'] },
+      staleIds: ['acme/api#3'],
+    }),
+    now,
+  );
+  expect(pruned?.pinnedPullRequests).toEqual({ 'acme/api#3': pin, 'acme/api#4': pin });
 });

@@ -77,8 +77,11 @@ may skip.
   watched PRs in one dashboard.
 - Groups stacked PRs — each based on the branch of another open PR — into one stack card,
   newest layer first down to the base branch, in the column of its most urgent layer.
-- Acts on the hovered card from the keyboard: O opens the PR on GitHub, S snoozes, L labels
-  and I ignores it.
+- Acts on the hovered card from the keyboard: O opens the PR on GitHub, S snoozes, L labels,
+  P pins or unpins and I ignores it.
+- Pins PRs to the top of their column from the card menu or with P. Pinned cards carry an
+  indigo bar and a pin beside the menu that unpins them; a refresh unpins PRs that were merged,
+  closed, or are no longer tracked.
 - Filters by source and by repository — the repository menu shows how many cards each
   repository has on the board — and supports snoozing or individually ignoring PRs. Individually ignored
   PRs are listed under Settings → Ignored pull requests, where each can be unignored.
@@ -121,7 +124,7 @@ may skip.
   choose Off in Settings to hide it.
 - Exports your configuration to the clipboard as JSON and imports it from pasted text or a
   `.json` file (Settings → Import & export); importing replaces the configuration after a
-  confirmation, and leaves snoozes, ignored PRs and label assignments alone.
+  confirmation, and leaves snoozes, ignored PRs, pins and label assignments alone.
 - Copies debug info as JSON (Settings → Troubleshooting for the whole board, or a card's menu
   for one PR): each PR's normalized GitHub state, matched dashboard rules, derived signals and
   why it landed in its column or was hidden, alongside preferences, refresh warnings and the

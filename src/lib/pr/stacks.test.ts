@@ -85,3 +85,40 @@ describe('stacked pull requests', () => {
       ]).map((e) => e.id),
     ).toEqual(['acme/api#8', 'stack:acme/api#1', 'acme/api#7']));
 });
+describe('pinned pull requests', () => {
+  const pin = { pinnedAt: '2026-09-20T09:00:00Z' };
+  const prs = [
+    layer(7, 'main', { updatedAt: '2026-09-01T10:00:00Z' }),
+    layer(8, 'main', { updatedAt: '2026-09-10T10:00:00Z' }),
+    layer(9, 'main', { checks: [{ name: 'CI', state: 'failed' }] }),
+  ];
+  const ids = (pins: Record<string, typeof pin>) =>
+    boardEntries(shown(prs), prs, pins).map((e) => [e.id, e.pinned]);
+  it('leads with pinned entries, keeping the usual order within each group', () => {
+    expect(ids({})).toEqual([
+      ['acme/api#9', false],
+      ['acme/api#8', false],
+      ['acme/api#7', false],
+    ]);
+    expect(ids({ 'acme/api#7': pin })).toEqual([
+      ['acme/api#7', true],
+      ['acme/api#9', false],
+      ['acme/api#8', false],
+    ]);
+    expect(ids({ 'acme/api#7': pin, 'acme/api#8': pin })).toEqual([
+      ['acme/api#8', true],
+      ['acme/api#7', true],
+      ['acme/api#9', false],
+    ]);
+  });
+  it('pins a stack when any of its visible layers is pinned', () => {
+    const chain = [layer(1, 'main'), layer(2, 'branch-1')];
+    const all = [layer(5, 'main', { updatedAt: '2026-09-01T10:00:00Z' }), ...chain];
+    expect(
+      boardEntries(shown(all), all, { 'acme/api#2': pin }).map((e) => [e.id, e.pinned]),
+    ).toEqual([
+      ['stack:acme/api#1', true],
+      ['acme/api#5', false],
+    ]);
+  });
+});

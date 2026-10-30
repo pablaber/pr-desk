@@ -6,9 +6,10 @@ export interface PrunedPreferences {
   watchedPullRequests: string[];
   labeledPullRequests: Record<string, string[]>;
   snoozedPullRequests: AppState['snoozedPullRequests'];
+  pinnedPullRequests: AppState['pinnedPullRequests'];
 }
 
-// Watches, labels and snoozes only matter while a PR is live, so a refresh drops them for PRs
+// Watches, labels, pins and snoozes only matter while a PR is live, so a refresh drops them for PRs
 // that finished, and drops snoozes whose time is up. Anything whose state cannot be known — a
 // failed fetch or discovery — is kept.
 export function prunePreferences(
@@ -22,7 +23,7 @@ export function prunePreferences(
   );
   const tracked = new Set(Object.values(snapshot.sources).flat());
   // A repository ignore rule hides a PR without untracking it; removing the rule must not
-  // have lost its labels.
+  // have lost its labels or pin.
   const untracked = (id: string) =>
     snapshot.discoveryComplete &&
     !tracked.has(id) &&
@@ -30,6 +31,9 @@ export function prunePreferences(
   const watchedPullRequests = local.watchedPullRequests.filter((id) => !finished.has(id));
   const labeledPullRequests = Object.fromEntries(
     Object.entries(local.labeledPullRequests).filter(([id]) => !finished.has(id) && !untracked(id)),
+  );
+  const pinnedPullRequests = Object.fromEntries(
+    Object.entries(local.pinnedPullRequests).filter(([id]) => !finished.has(id) && !untracked(id)),
   );
   const snoozedPullRequests = Object.fromEntries(
     Object.entries(local.snoozedPullRequests).filter(
@@ -39,8 +43,9 @@ export function prunePreferences(
   if (
     watchedPullRequests.length === local.watchedPullRequests.length &&
     Object.keys(labeledPullRequests).length === Object.keys(local.labeledPullRequests).length &&
+    Object.keys(pinnedPullRequests).length === Object.keys(local.pinnedPullRequests).length &&
     Object.keys(snoozedPullRequests).length === Object.keys(local.snoozedPullRequests).length
   )
     return null;
-  return { watchedPullRequests, labeledPullRequests, snoozedPullRequests };
+  return { watchedPullRequests, labeledPullRequests, snoozedPullRequests, pinnedPullRequests };
 }

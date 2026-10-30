@@ -42,9 +42,10 @@ describe('resolveHotkey', () => {
     expect(resolveHotkey(press('s'))?.action).toBe('snooze-pr');
     expect(resolveHotkey(press('i'))?.action).toBe('ignore-pr');
     expect(resolveHotkey(press('l'))?.action).toBe('label-pr');
+    expect(resolveHotkey(press('p'))?.action).toBe('pin-pr');
     expect(resolveHotkey(press('S', { shiftKey: true }))?.action).toBe('open-snoozed');
     expect(resolveHotkey(press('o', { metaKey: true }))).toBeNull();
-    for (const key of ['o', 's', 'i', 'l'])
+    for (const key of ['o', 's', 'i', 'l', 'p'])
       expect(resolveHotkey(press(key), { tagName: 'INPUT' })).toBeNull();
   });
 

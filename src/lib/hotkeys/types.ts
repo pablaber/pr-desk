@@ -11,6 +11,7 @@ export type HotkeyAction =
   | 'snooze-pr'
   | 'ignore-pr'
   | 'label-pr'
+  | 'pin-pr'
   | 'refresh'
   | 'zoom-in'
   | 'zoom-out'
