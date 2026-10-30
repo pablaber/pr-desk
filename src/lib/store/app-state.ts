@@ -41,7 +41,7 @@ export interface PRLabel {
 export type DockBadgeMode = 'off' | 'ready-to-merge' | 'needs-attention' | 'both';
 export type InterfaceScale = 90 | 100 | 115 | 130;
 export interface AppState {
-  schemaVersion: 16;
+  schemaVersion: 17;
   trackedRepositories: string[];
   ignoreRules: IgnoreRule[];
   checkRules: CheckRule[];
@@ -50,6 +50,7 @@ export interface AppState {
   knownBots: string[];
   ignoredPullRequests: Record<string, { ignoredAt: string }>;
   snoozedPullRequests: Record<string, { until: string }>;
+  pinnedPullRequests: Record<string, { pinnedAt: string }>;
   labels: PRLabel[];
   labeledPullRequests: Record<string, string[]>;
   settings: {
@@ -74,7 +75,7 @@ const DEFAULT_WEEKLY_GOAL = 10;
 const defaultStreakDays = (): number[] => [1, 2, 3, 4, 5];
 const defaultKnownBots = (): string[] => ['dependabot[bot]', 'renovate[bot]'];
 export const defaultState = (): AppState => ({
-  schemaVersion: 16,
+  schemaVersion: 17,
   trackedRepositories: [],
   ignoreRules: [],
   checkRules: [],
@@ -83,6 +84,7 @@ export const defaultState = (): AppState => ({
   knownBots: defaultKnownBots(),
   ignoredPullRequests: {},
   snoozedPullRequests: {},
+  pinnedPullRequests: {},
   labels: [],
   labeledPullRequests: {},
   settings: {
@@ -111,8 +113,9 @@ export function migrateState(value: unknown): AppState {
     labels?: unknown;
     labeledPullRequests?: unknown;
     knownBots?: unknown;
+    pinnedPullRequests?: unknown;
   };
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].includes(stored.schemaVersion))
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].includes(stored.schemaVersion))
     throw new Error(
       'Unsupported preferences version. Your saved configuration has been left intact.',
     );
@@ -138,7 +141,8 @@ export function migrateState(value: unknown): AppState {
     watchedPullRequests: stored.watchedPullRequests,
     ignoredPullRequests: stored.ignoredPullRequests,
     snoozedPullRequests: stored.snoozedPullRequests,
-    schemaVersion: 16,
+    pinnedPullRequests: readStoredPinnedPullRequests(stored),
+    schemaVersion: 17,
     knownBots: readStoredKnownBots(stored),
     ignoreRules: readStoredIgnoreRules(stored),
     checkRules: readStoredCheckRules(stored),
@@ -161,6 +165,23 @@ export function migrateState(value: unknown): AppState {
 const DOCK_BADGE_MODES: DockBadgeMode[] = ['off', 'ready-to-merge', 'needs-attention', 'both'];
 export function isDockBadgeMode(value: unknown): value is DockBadgeMode {
   return DOCK_BADGE_MODES.includes(value as DockBadgeMode);
+}
+function readStoredPinnedPullRequests(stored: {
+  schemaVersion: number;
+  pinnedPullRequests?: unknown;
+}): AppState['pinnedPullRequests'] {
+  if (stored.schemaVersion < 17) return {};
+  const pins = stored.pinnedPullRequests;
+  if (
+    !pins ||
+    typeof pins !== 'object' ||
+    Array.isArray(pins) ||
+    Object.values(pins).some(
+      (pin) => typeof pin?.pinnedAt !== 'string' || Number.isNaN(Date.parse(pin.pinnedAt)),
+    )
+  )
+    throw new Error('Invalid preferences file. Your saved configuration has been left intact.');
+  return pins as AppState['pinnedPullRequests'];
 }
 // Like the snooze options, an invalid stored mode stops loading so the file is never overwritten.
 function readStoredDockBadge(stored: { schemaVersion: number; settings?: unknown }): DockBadgeMode {
@@ -603,7 +624,7 @@ export function draftDiffers(draft: PreferenceDraft, state: AppState): boolean {
   );
 }
 
-// Configuration only: per-PR state (ignored, snoozed, labeled PRs) stays on the Mac it belongs to.
+// Configuration only: per-PR state (ignored, snoozed, pinned, labeled PRs) stays on the Mac it belongs to.
 export type SettingsConfig = Pick<
   AppState,
   | 'trackedRepositories'
@@ -668,6 +689,7 @@ export function parseSettingsImport(text: string): SettingsConfig {
       settings: value.settings,
       ignoredPullRequests: {},
       snoozedPullRequests: {},
+      pinnedPullRequests: {},
       labeledPullRequests: {},
     });
     return {

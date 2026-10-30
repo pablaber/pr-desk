@@ -1,5 +1,6 @@
 import { sortPullRequests, type ClassifiedPR } from './classify';
 import type { DashboardState, PullRequest } from './types';
+import type { AppState } from '../store/app-state';
 export interface BoardEntry {
   id: string;
   // The most urgent PR in the entry; it decides the column and the position within it.
@@ -7,6 +8,8 @@ export interface BoardEntry {
   // Newest layer first, base-most layer last. A single card has exactly one item.
   items: ClassifiedPR[];
   stack: { repository: string; base: string } | null;
+  // A stack is pinned when any of its visible layers is.
+  pinned: boolean;
 }
 const urgency: Record<DashboardState, number> = {
   'needs-attention': 0,
@@ -46,8 +49,13 @@ function stackRoot(pr: PullRequest, parents: Map<string, PullRequest>) {
   return root;
 }
 // Hidden and filtered-out PRs still link the layers around them, so stacks are built from every
-// fetched PR while only the visible ones are shown.
-export function boardEntries(visible: ClassifiedPR[], all: PullRequest[]): BoardEntry[] {
+// fetched PR while only the visible ones are shown. Pinned entries lead their column, each group
+// keeping the usual order.
+export function boardEntries(
+  visible: ClassifiedPR[],
+  all: PullRequest[],
+  pins: AppState['pinnedPullRequests'] = {},
+): BoardEntry[] {
   const parents = stackParents(all);
   const children = new Map<string, PullRequest[]>();
   for (const pr of all) {
@@ -62,7 +70,9 @@ export function boardEntries(visible: ClassifiedPR[], all: PullRequest[]): Board
     groups.set(root.id, group);
   }
   const entries = [...groups.values()].map(({ root, items }): BoardEntry => {
-    if (items.length === 1) return { id: items[0].pr.id, lead: items[0], items, stack: null };
+    const pinned = items.some((item) => item.pr.id in pins);
+    if (items.length === 1)
+      return { id: items[0].pr.id, lead: items[0], items, stack: null, pinned };
     const byId = new Map(items.map((item) => [item.pr.id, item]));
     const ordered: ClassifiedPR[] = [];
     const walk = (pr: PullRequest) => {
@@ -77,7 +87,8 @@ export function boardEntries(visible: ClassifiedPR[], all: PullRequest[]): Board
       lead: [...items].sort(byUrgency)[0],
       items: ordered.reverse(),
       stack: { repository: root.repository, base: root.baseRefName },
+      pinned,
     };
   });
-  return entries.sort((a, b) => byUrgency(a.lead, b.lead));
+  return entries.sort((a, b) => Number(b.pinned) - Number(a.pinned) || byUrgency(a.lead, b.lead));
 }

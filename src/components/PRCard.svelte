@@ -8,6 +8,8 @@
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import GitMerge from '@lucide/svelte/icons/git-merge';
   import GitPullRequestArrow from '@lucide/svelte/icons/git-pull-request-arrow';
+  import Pin from '@lucide/svelte/icons/pin';
+  import PinOff from '@lucide/svelte/icons/pin-off';
   import PRDetails from './PRDetails.svelte';
   import LabelChoices from './LabelChoices.svelte';
   import SnoozeChoices from './SnoozeChoices.svelte';
@@ -26,6 +28,7 @@
     snoozeOptions,
     stale,
     watching,
+    pinned,
     labels,
     titleTagRules,
     allLabels,
@@ -43,6 +46,7 @@
     snoozeOptions: SnoozeOption[];
     stale: boolean;
     watching: boolean;
+    pinned: boolean;
     labels: PRLabel[];
     titleTagRules: TitleTagRule[];
     allLabels: PRLabel[];
@@ -59,6 +63,7 @@
   const snoozeHotkey = hotkeyFor('snooze-pr');
   const labelHotkey = hotkeyFor('label-pr');
   const ignoreHotkey = hotkeyFor('ignore-pr');
+  const pinHotkey = hotkeyFor('pin-pr');
   let menu = $state(false),
     submenu = $state<'snooze' | 'labels' | null>(null);
   let at = $state<{ x: number; y: number } | null>(null);
@@ -152,6 +157,7 @@
 <article
   class="pr-card"
   class:compact
+  class:pinned
   data-pr-id={card.pr.id}
   bind:this={cardEl}
   oncontextmenu={(e) => {
@@ -185,6 +191,15 @@
       }
     }}><Ellipsis size={14} /></button
   >
+  {#if pinned}
+    <button
+      disabled={busy}
+      class="pin-toggle"
+      title="Unpin"
+      aria-label={`Unpin ${card.pr.title}`}
+      onclick={() => act('unpin')}><Pin size={13} /></button
+    >
+  {/if}
   {#if card.canMerge}
     <button
       class="merge-button"
@@ -254,6 +269,14 @@
       >
       <button onclick={() => act(watching ? 'unwatch' : 'watch')}
         >{watching ? 'Stop watching' : 'Watch PR'}</button
+      >
+      <button
+        aria-keyshortcuts={pinHotkey ? ariaKeyShortcut(pinHotkey) : null}
+        onclick={() => act(pinned ? 'unpin' : 'pin')}
+        >{pinned ? 'Unpin' : 'Pin to top'}
+        {#if pinned}<PinOff size={12} />{:else}<Pin size={12} />{/if}{@render hint(
+          pinHotkey,
+        )}</button
       >
       <div class="submenu-anchor">
         <button

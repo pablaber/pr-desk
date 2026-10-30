@@ -11,7 +11,7 @@ mirrors it:
 | Signals → rules and column | `src/lib/pr/dashboard-rules.ts` |
 | Sorting within a column    | `src/lib/pr/classify.ts`        |
 | Card badges and extras     | `src/lib/pr/card-view-model.ts` |
-| Stacked PR grouping        | `src/lib/pr/stacks.ts`          |
+| Stacked PR grouping, pins  | `src/lib/pr/stacks.ts`          |
 | Check state normalization  | `src/lib/github/normalize.ts`   |
 
 Update this page whenever any of those change.
@@ -226,6 +226,11 @@ The common situations, from your point of view:
 | Waiting         | newest update first                                     |
 
 GitHub does not expose when a PR entered a state, so `updatedAt` approximates time in state.
+
+Pinned cards come first in their column, in the order above, followed by the unpinned cards in the
+same order. A pin moves with the PR when its column changes, and a stack is pinned when any of its
+visible layers is. Snoozes, ignores and filters still hide a pinned PR; its pin is kept. A refresh
+unpins PRs that were merged, closed, or are no longer tracked.
 
 ## Stacks
 

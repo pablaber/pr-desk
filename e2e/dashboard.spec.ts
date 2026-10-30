@@ -1114,6 +1114,46 @@ test('snooze, ignore, restore, watch, tracked repositories and persistence', asy
   expect(persisted.watchedPullRequests).toEqual(['acme/platform#5']);
 });
 
+test('pinned PRs lead their column, persist, and unpin once merged', async ({ page }) => {
+  await page.goto('/');
+  const attention = page.locator('.column').nth(1);
+  const titles = () => attention.locator('.pr-card strong').allTextContents();
+  await expect
+    .poll(titles)
+    .toEqual(['Simplify deployment configuration', 'Refresh session token handling']);
+  await page
+    .getByRole('button', { name: 'Actions for Refresh session token handling', exact: true })
+    .click();
+  await page.getByRole('button', { name: /^Pin to top/ }).click();
+  await expect
+    .poll(titles)
+    .toEqual(['Refresh session token handling', 'Simplify deployment configuration']);
+  await expect(attention.locator('.pr-card.pinned')).toHaveCount(1);
+  // P pins the hovered card; pinned cards keep the usual column order among themselves.
+  await attention.locator('.pr-card', { hasText: 'Simplify deployment configuration' }).hover();
+  await page.keyboard.press('p');
+  await expect(attention.locator('.pr-card.pinned')).toHaveCount(2);
+  await expect
+    .poll(titles)
+    .toEqual(['Simplify deployment configuration', 'Refresh session token handling']);
+  await page.screenshot({ path: '.context/pinned.png', fullPage: true });
+  await page
+    .getByRole('button', { name: 'Unpin Simplify deployment configuration', exact: true })
+    .click();
+  await expect
+    .poll(titles)
+    .toEqual(['Refresh session token handling', 'Simplify deployment configuration']);
+  await page.reload();
+  await expect(attention.locator('.pr-card.pinned')).toHaveText(/Refresh session token handling/);
+  const pins = () =>
+    page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('prefs')!).pinnedPullRequests));
+  expect(await pins()).toEqual(['acme/platform#2']);
+  await page.evaluate(() => localStorage.setItem('mergedPrs', '[2]'));
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect.poll(pins).toEqual([]);
+  await expect(page.locator('.pr-card.pinned')).toHaveCount(0);
+});
+
 test('an approved human PR in a tracked repository moves from review attention to waiting', async ({
   page,
 }) => {
@@ -1772,6 +1812,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'Snooze the hovered PR',
     'Ignore the hovered PR',
     'Label the hovered PR',
+    'Pin or unpin the hovered PR',
     'Refresh pull requests',
     'Increase interface size',
     'Decrease interface size',
@@ -1793,6 +1834,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'S',
     'I',
     'L',
+    'P',
     '⌘+R',
     '⌘+=',
     '⌘+-',
@@ -1811,6 +1853,7 @@ test('the shortcut list opens with ?, lists every hotkey, and closes again', asy
     'S',
     'I',
     'L',
+    'P',
     'Command plus R',
     'Command plus =',
     'Command plus -',
@@ -2081,7 +2124,7 @@ test('copies settings, then imports edited JSON from the textarea or a file', as
   await page.getByRole('button', { name: 'Copy settings' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Settings copied' })).toBeVisible();
   const exported = await copied();
-  expect(exported).toMatchObject({ app: 'pr-desk', kind: 'settings', schemaVersion: 16 });
+  expect(exported).toMatchObject({ app: 'pr-desk', kind: 'settings', schemaVersion: 17 });
   expect(exported).not.toHaveProperty('snoozedPullRequests');
 
   const json = page.getByRole('textbox', { name: 'Settings JSON' });
@@ -2144,7 +2187,7 @@ test('the card menu shows the hover hotkeys', async ({ page }) => {
     .getByRole('button', { name: /^Actions for/ })
     .click();
   const menu = page.getByRole('group', { name: 'PR actions' });
-  await expect(menu.locator('.menu-hotkey')).toHaveText(['O', 'C', 'S', 'L', 'I']);
+  await expect(menu.locator('.menu-hotkey')).toHaveText(['O', 'C', 'P', 'S', 'L', 'I']);
   await page.screenshot({ path: '.context/card-menu-hotkeys.png' });
 });
 
@@ -2585,7 +2628,7 @@ test('legacy repository ignores migrate and future preferences are never overwri
     .click();
   await saveSettings(page);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!));
-  expect(saved.schemaVersion).toBe(16);
+  expect(saved.schemaVersion).toBe(17);
   expect(saved.ignoreRules).toEqual([]);
   expect(saved.ignoredPullRequests).toHaveProperty('acme/platform#2');
   expect(saved.settings.snoozeOptions).toEqual([]);
