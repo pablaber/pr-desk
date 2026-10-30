@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.0](https://github.com/pablaber/pr-desk/compare/v1.23.0...v1.24.0) (2026-10-30)
+
+
+### Features
+
+* pin pull requests to the top of their column ([#163](https://github.com/pablaber/pr-desk/issues/163)) ([b2e2d93](https://github.com/pablaber/pr-desk/commit/b2e2d935f2c1d45250dea90e5bd4f66cb40a42a0))
+
 ## [1.23.0](https://github.com/pablaber/pr-desk/compare/v1.22.0...v1.23.0) (2026-10-22)
 
 
