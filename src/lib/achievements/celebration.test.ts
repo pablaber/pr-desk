@@ -81,9 +81,11 @@ describe('streak chip', () => {
   it('is left out when the streak is 0', () => {
     // Nothing shipped today and yesterday was missed, so no streak runs.
     expect(chips([at(12)])).toEqual([]);
-    // Today is not a streak day, and nothing shipped on the one before.
+  });
+
+  it('counts a merge on a day that is not a streak day', () => {
     const onlyMonday = { ...preferences, settings: { ...preferences.settings, streakDays: [1] } };
-    expect(texts([at(15, 9)], [], onlyMonday)).toEqual(['1st today']);
+    expect(texts([at(15, 9)], [], onlyMonday)).toEqual(['1st today', '1-day streak']);
   });
 });
 

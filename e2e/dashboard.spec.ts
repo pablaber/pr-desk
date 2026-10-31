@@ -913,7 +913,7 @@ test('the Completed settings change the goal and streak days and update the pane
   const goal = dialog.getByRole('spinbutton', { name: 'Weekly goal' });
   await expect(goal).toHaveValue('10');
   await expect(
-    dialog.getByText("Days you don't pick never break or extend a streak."),
+    dialog.getByText("Days you don't pick never break a streak, but shipping on one extends it."),
   ).toBeVisible();
 
   // An invalid goal is refused with a message, and the saved one comes back.
@@ -928,8 +928,7 @@ test('the Completed settings change the goal and streak days and update the pane
     .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('prefs')!).settings.weeklyGoal))
     .toBe(8);
 
-  // Thursday stops being a streak day, so today no longer matters and the streak is seven days:
-  // Wed 14, Tue 13, Mon 12, Fri 9, Wed 7, Tue 6 and Mon 5.
+  // Thursday stops being a streak day, but both Thursdays shipped, so they still extend the streak.
   const days = dialog.getByRole('group', { name: 'Streak days' });
   for (const name of ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'])
     await expect(days.getByLabel(name)).toBeChecked();
@@ -956,13 +955,13 @@ test('the Completed settings change the goal and streak days and update the pane
 
   await expect(week.locator('.goal-count')).toHaveText('8 of 8 merged');
   await expect(week.getByText('Goal reached · last week 11')).toBeVisible();
-  await expect(week.locator('.goal-streak')).toHaveText('7-day streak');
+  await expect(week.locator('.goal-streak')).toHaveText('9-day streak');
 
   // Both settings survive a restart.
   await page.reload();
   await page.keyboard.press('Shift+C');
   await expect(week.locator('.goal-count')).toHaveText('8 of 8 merged');
-  await expect(week.locator('.goal-streak')).toHaveText('7-day streak');
+  await expect(week.locator('.goal-streak')).toHaveText('9-day streak');
 });
 
 test('the first day of history explains that nothing earlier counts', async ({ page }) => {

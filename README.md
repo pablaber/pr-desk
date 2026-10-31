@@ -144,7 +144,7 @@ may skip.
   current streak, last week's total, and personal records for the most PRs in a day and in a week,
   the longest streak and the fastest merge. A first-day notice explains that nothing earlier counts.
   Settings → Completed sets the goal (1 to 999, default 10) and the streak days (default Monday to
-  Friday); days you don't pick never break or extend a streak. Edit goal on the panel opens them.
+  Friday); days you don't pick never break a streak, but shipping on one extends it. Edit goal on the panel opens them.
 - Awards achievements on Completed for what you ship, review and tidy up (first PR shipped,
   streaks, weekly goals met, approvals, same-day reviews, bot PRs merged, repositories, and
   in-app actions such as Close as stale and Update branch), each with levels you keep once
