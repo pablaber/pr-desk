@@ -21,16 +21,15 @@ function doneDays(shipped: Fact[]) {
 const isStreakDay = (day: number, streakDays: number[]) =>
   streakDays.includes(new Date(day).getDay());
 
-// Days you did not pick neither break nor extend a streak, and an empty today only means it is
-// not over yet, so the streak then runs through the previous streak day.
+// Any day that shipped extends a streak, but only an empty streak day breaks it. An empty today
+// only means it is not over yet, so the streak then runs through the previous day.
 export function currentStreak(facts: HistoryFacts, streakDays: number[], now: number): number {
   const done = doneDays(shippedThrough(facts, now));
   const today = addDays(now, 0);
   let streak = 0;
   for (let day = today; day >= facts.trackingSince; day = addDays(day, -1)) {
-    if (!isStreakDay(day, streakDays)) continue;
     if (done.has(day)) streak++;
-    else if (day !== today) break;
+    else if (isStreakDay(day, streakDays) && day !== today) break;
   }
   return streak;
 }
@@ -43,10 +42,9 @@ export function streakProgress(facts: HistoryFacts, streakDays: number[], now: n
   const reached: number[] = [];
   let run = 0;
   for (let day = addDays(facts.trackingSince, 0); day <= today; day = addDays(day, 1)) {
-    if (!isStreakDay(day, streakDays)) continue;
     const at = done.get(day);
     if (at === undefined) {
-      run = 0;
+      if (isStreakDay(day, streakDays)) run = 0;
       continue;
     }
     run++;
@@ -76,7 +74,7 @@ export interface PersonalRecords {
   // Local midnight of the day, or of the Monday that starts the week.
   day: { count: number; start: number } | null;
   week: { count: number; start: number } | null;
-  // The longest run of streak days.
+  // The longest streak.
   streak: number;
   // Your own PR that merged soonest after it was opened. PRs of unknown age are skipped.
   fastest: { duration: number; fact: Fact } | null;
