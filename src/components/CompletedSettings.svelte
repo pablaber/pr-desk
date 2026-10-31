@@ -95,8 +95,8 @@
       {/each}
     </div>
     <p class="refresh-help">
-      Days you don't pick never break or extend a streak. Pick at least one. Default: Monday to
-      Friday.
+      Days you don't pick never break a streak, but shipping on one extends it. Pick at least one.
+      Default: Monday to Friday.
     </p>
     {#if daysError}<p class="refresh-validation" role="alert">{daysError}</p>{/if}
   </fieldset>

@@ -58,19 +58,27 @@ describe('currentStreak', () => {
     expect(currentStreak(facts([]), WEEKDAYS, now)).toBe(0);
   });
 
-  it('skips days that are not streak days, whether or not they shipped', () => {
-    // Fri 9 and Mon 12 with a quiet weekend between; a Saturday merge adds nothing.
-    const week = facts([at(9, 9), at(9, 10, 8), at(9, 12), at(9, 13), at(9, 14), at(9, 15, 9)]);
-    expect(currentStreak(week, WEEKDAYS, now)).toBe(5);
+  it('skips quiet days that are not streak days', () => {
+    // Fri 9 and Mon 12 with a quiet weekend between.
     expect(currentStreak(facts([at(9, 9), at(9, 12)]), WEEKDAYS, at(9, 12, 20))).toBe(2);
+    // Streak on Mon, Wed, Fri only: a quiet Tuesday neither breaks nor extends it.
+    const mwf = [1, 3, 5];
+    expect(currentStreak(facts([at(9, 9), at(9, 12), at(9, 14)]), mwf, now)).toBe(3);
+    expect(currentStreak(facts([at(9, 9), at(9, 14)]), mwf, now)).toBe(1);
   });
 
-  it('skips a non-streak day in the middle without extending the streak', () => {
-    // Streak on Mon, Wed, Fri only: Tuesday is ignored in both directions.
-    const mwf = [1, 3, 5];
-    const run = facts([at(9, 9), at(9, 12), at(9, 14)]);
-    expect(currentStreak(run, mwf, now)).toBe(3);
-    expect(currentStreak(facts([at(9, 9), at(9, 14)]), mwf, now)).toBe(1);
+  it('extends the streak with days that are not streak days but shipped', () => {
+    // A Saturday merge between Fri 9 and Mon 12 adds a day.
+    const week = facts([at(9, 9), at(9, 10, 8), at(9, 12), at(9, 13), at(9, 14), at(9, 15, 9)]);
+    expect(currentStreak(week, WEEKDAYS, now)).toBe(6);
+    // A Tuesday merge on a Mon, Wed, Fri streak counts too.
+    expect(currentStreak(facts([at(9, 12), at(9, 13), at(9, 14)]), [1, 3, 5], now)).toBe(3);
+  });
+
+  it('counts today when it shipped even though it is not a streak day', () => {
+    // Friday 16 shipped, Thursday 15 did not.
+    expect(currentStreak(facts([at(9, 16), at(9, 17, 9)]), WEEKDAYS, at(9, 17, 10))).toBe(2);
+    expect(currentStreak(facts([at(9, 14), at(9, 17, 9)]), WEEKDAYS, at(9, 17, 10))).toBe(1);
   });
 
   it('runs through the previous streak day when today is not a streak day', () => {
@@ -125,10 +133,16 @@ describe('streakProgress', () => {
     expect(longest).toHaveLength(4);
   });
 
-  it('bridges days that are not streak days', () => {
+  it('bridges quiet days that are not streak days', () => {
     const progress = streakProgress(facts([at(9, 9), at(9, 12)]), WEEKDAYS, now);
     expect(progress).toEqual([at(9, 9), at(9, 12)]);
-    expect(streakProgress(facts([at(9, 9), at(9, 10), at(9, 13)]), WEEKDAYS, now)).toHaveLength(1);
+  });
+
+  it('counts days that are not streak days but shipped', () => {
+    const progress = streakProgress(facts([at(9, 9), at(9, 10), at(9, 12)]), WEEKDAYS, now);
+    expect(progress).toEqual([at(9, 9), at(9, 10), at(9, 12)]);
+    // An empty Monday still breaks a run that a Saturday extended.
+    expect(streakProgress(facts([at(9, 9), at(9, 10), at(9, 13)]), WEEKDAYS, now)).toHaveLength(2);
   });
 
   it('starts on the tracking day, not before', () => {
