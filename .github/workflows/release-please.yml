@@ -121,6 +121,12 @@ jobs:
           fi
           # A duplicate import is not an error; the post-build checks catch a broken chain.
           security import "$cer" || echo 'Intermediate already present in the default keychain.'
+      # Remove once https://github.com/actions/runner-images/issues/14924 is fixed: stapler's HTTP/3
+      # connection to Apple drops on macos-15 runners, and tauri-action hides a failed app staple.
+      - name: Block UDP 443 so stapler falls back to HTTPS
+        run: |
+          echo 'block return out quick proto udp from any to any port 443' | sudo pfctl -f -
+          sudo pfctl -E
       - name: Build, sign, notarize and attach macOS bundles to the existing release
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
