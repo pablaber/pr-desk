@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.0](https://github.com/pablaber/pr-desk/compare/v1.24.0...v1.25.0) (2026-11-02)
+
+
+### Features
+
+* let shipping on non-streak days extend a streak ([#165](https://github.com/pablaber/pr-desk/issues/165)) ([39ea688](https://github.com/pablaber/pr-desk/commit/39ea68848f5f27b1fdac03fb8ceef48234d10488))
+
 ## [1.24.0](https://github.com/pablaber/pr-desk/compare/v1.23.0...v1.24.0) (2026-10-30)
 
 
