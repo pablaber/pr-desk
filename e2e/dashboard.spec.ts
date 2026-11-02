@@ -3489,6 +3489,19 @@ test('cards show one Checks badge coloured by check status', async ({ page }) =>
   await page.screenshot({ path: '.context/checks-badges.png', fullPage: true });
 });
 
+test('cards count active unresolved conversations in a badge', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('.pr-card')).toHaveCount(4);
+  const badge = (title: string) =>
+    page.locator('.pr-card', { hasText: title }).locator('.badge.threads');
+  await expect(badge('Refresh session token handling')).toHaveText('3');
+  await expect(badge('Refresh session token handling')).toHaveAttribute(
+    'title',
+    '3 unresolved conversations',
+  );
+  await expect(badge('Reduce cache lookup latency')).toHaveCount(0);
+});
+
 async function trackBotPr(page: Page) {
   await page.goto('/');
   await page.evaluate(() => localStorage.setItem('botPr', '1'));

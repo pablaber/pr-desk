@@ -256,6 +256,7 @@ These do not affect the column:
 | ----------------- | --------------------------------------------------------------------------------------------------- |
 | Secondary status  | other matching non-catch-all rules; "Checks failed" on any PR with a failed check; outdated threads |
 | Checks badge      | at least one check; red if any failed, otherwise amber if any are pending, otherwise green          |
+| Threads badge     | at least one active thread on any PR; shows the count, amber                                        |
 | Approved badge    | `reviewDecision` is `APPROVED`                                                                      |
 | Changes badge     | `reviewDecision` is `CHANGES_REQUESTED`, unless the Updated badge replaces it                       |
 | Updated badge     | updated since your changes (blue, "Updated since changes")                                          |

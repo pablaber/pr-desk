@@ -764,7 +764,8 @@ i.waiting {
 }
 .badge.staleness,
 .badge.review,
-.badge.checks {
+.badge.checks,
+.badge.threads {
   font-weight: 600;
 }
 .badge.review.approved,
@@ -773,7 +774,8 @@ i.waiting {
   border-color: #b8d8bf;
   background: #eaf5ed;
 }
-.badge.checks.pending {
+.badge.checks.pending,
+.badge.threads {
   color: #8a6d1f;
   border-color: #ecd9a1;
   background: #fdf6e3;
