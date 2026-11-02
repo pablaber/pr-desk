@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.0](https://github.com/pablaber/pr-desk/compare/v1.25.0...v1.26.0) (2026-11-02)
+
+
+### Features
+
+* show unresolved conversation count on pr cards ([#169](https://github.com/pablaber/pr-desk/issues/169)) ([2c36211](https://github.com/pablaber/pr-desk/commit/2c36211205ae21fef70274dbd89562fe47d594bb))
+
 ## [1.25.0](https://github.com/pablaber/pr-desk/compare/v1.24.0...v1.25.0) (2026-11-02)
 
 
