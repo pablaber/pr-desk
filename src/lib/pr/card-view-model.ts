@@ -27,6 +27,10 @@ function checksStatus(checks: ClassifiedPR['pr']['checks']): ChecksStatus | null
   if (checks.some((c) => c.state === 'pending')) return 'pending';
   return 'passing';
 }
+function threadsBadge(count: number) {
+  if (count === 0) return null;
+  return { count, label: `${count} unresolved conversation${count === 1 ? '' : 's'}` };
+}
 // Your own PR follows the owned rules even in a tracked repository, so Mine replaces Tracked repo
 // on the card and in the source filters.
 export function sourceReasons(reasons: TrackingReason[]) {
@@ -67,6 +71,7 @@ export function cardViewModel(item: ClassifiedPR, now: number) {
           ? { label: 'Changes requested', tone: 'changes-requested' }
           : null,
     checksBadge: checksStatus(checks),
+    threadsBadge: threadsBadge(item.pr.activeUnresolvedThreads),
     staleness: stalenessLevel(item.pr.updatedAt, now),
     age,
     secondary: secondary.join(' · '),

@@ -145,3 +145,17 @@ describe('checks badge', () => {
     expect(cardViewModel(item, now).checksBadge).toBe(expected);
   });
 });
+describe('threads badge', () => {
+  const badge = (overrides: Partial<PullRequest>) =>
+    cardViewModel(classify(pr(overrides), 'me', defaultState(), now)!, now).threadsBadge;
+  it.each([
+    [0, null],
+    [1, { count: 1, label: '1 unresolved conversation' }],
+    [3, { count: 3, label: '3 unresolved conversations' }],
+  ])('shows for %i active threads: %j', (activeUnresolvedThreads, expected) => {
+    expect(badge({ activeUnresolvedThreads })).toEqual(expected);
+  });
+  it('ignores outdated threads', () => expect(badge({ outdatedUnresolvedThreads: 2 })).toBeNull());
+  it('shows on other people’s PRs', () =>
+    expect(badge({ author: 'other', activeUnresolvedThreads: 2 })?.count).toBe(2));
+});

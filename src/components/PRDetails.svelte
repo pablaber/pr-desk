@@ -9,6 +9,7 @@
   import GitPullRequestArrow from '@lucide/svelte/icons/git-pull-request-arrow';
   import Hourglass from '@lucide/svelte/icons/hourglass';
   import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+  import MessageSquare from '@lucide/svelte/icons/message-square';
   import ThumbsUp from '@lucide/svelte/icons/thumbs-up';
   import UserRound from '@lucide/svelte/icons/user-round';
   import X from '@lucide/svelte/icons/x';
@@ -73,6 +74,11 @@
         />{:else if card.checksBadge === 'pending'}<LoaderCircle size={10} />{:else}<X
           size={10}
         />{/if} Checks</span
+    >{/if}{#if card.threadsBadge}<span
+      class="badge threads"
+      title={card.threadsBadge.label}
+      aria-label={card.threadsBadge.label}
+      ><MessageSquare size={10} /> {card.threadsBadge.count}</span
     >{/if}{#if card.staleness}<span class="badge staleness {card.staleness}"
       ><Hourglass size={10} /> Stale</span
     >{/if}{#each labels as label (label.id)}<span class="badge label"
