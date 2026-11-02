@@ -74,16 +74,17 @@ Inside the `release` job:
 1. **Stage the App Store Connect notarization key** — checks every credential is
    present, decodes the `.p8` to `$RUNNER_TEMP/AuthKey.p8`, and exports its path.
 2. **Install Apple's Developer ID G2 intermediate certificate** — see below.
-3. **`tauri-apps/tauri-action`** — builds, signs the app with the hardened runtime
+3. **Block UDP 443** — see [Stapling on macos-15 runners](#stapling-on-macos-15-runners).
+4. **`tauri-apps/tauri-action`** — builds, signs the app with the hardened runtime
    and a secure timestamp, notarizes it, staples the ticket into the bundle, then
    signs the DMG.
-4. **`scripts/notarize-macos.sh`** — notarizes and staples the DMG itself, then
+5. **`scripts/notarize-macos.sh`** — notarizes and staples the DMG itself, then
    verifies both artifacts.
-5. **Replace the uploaded DMG** — `gh release upload --clobber`, because stapling
+6. **Replace the uploaded DMG** — `gh release upload --clobber`, because stapling
    changes the DMG's bytes after `tauri-action` already uploaded it.
-6. **Homebrew metadata** — `scripts/update-homebrew.mjs` hashes the local DMG and
+7. **Homebrew metadata** — `scripts/update-homebrew.mjs` hashes the local DMG and
    asserts the uploaded asset's digest matches.
-7. **Updater artifacts** — verify, then publish `latest.json` last; see below.
+8. **Updater artifacts** — verify, then publish `latest.json` last; see below.
 
 `update-homebrew` requires `needs.release.result == 'success'`, so any signing,
 notarization or verification failure leaves the tap pointing at the previous
@@ -287,6 +288,18 @@ is what turns that into a hard failure. It checks:
 Checking for the exact `source=Notarized Developer ID` string matters: a local
 Gatekeeper override ("Open Anyway") would also make `spctl` exit zero, but reports
 a different source.
+
+## Stapling on macos-15 runners
+
+`xcrun stapler` fetches tickets from `api.apple-cloudkit.com` over HTTP/3. On `macos-15` runners
+that connection can drop after about 7 seconds, and both `stapler staple` and `stapler validate`
+then fail with `NSURLErrorDomain Code=-1005` and Error 68
+([actions/runner-images#14924](https://github.com/actions/runner-images/issues/14924)).
+
+The `release` job blocks outbound UDP 443 before the build, as GitHub suggests in that issue, so
+`stapler` falls back to HTTPS. Tauri ignores `stapler`'s exit status and discards its output, so a
+dropped app staple only shows up later as `The app has no stapled notarization ticket`. Remove the
+step once the issue is fixed.
 
 ## The G2 intermediate
 
