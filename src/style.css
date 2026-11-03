@@ -780,6 +780,14 @@ i.waiting {
   border-color: #ecd9a1;
   background: #fdf6e3;
 }
+.badge.checks.pending .lucide {
+  animation: refresh-spin 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .badge.checks.pending .lucide {
+    animation: none;
+  }
+}
 .badge.review.changes-requested,
 .badge.checks.failed {
   color: #a33a2f;
