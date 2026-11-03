@@ -1207,9 +1207,9 @@ test('a PR you requested changes on waits for the author, then returns once they
             },
           ],
         };
-        pr.recentCommits.nodes[0].commit.oid = (
-          localStorage.getItem('authorPushed') ? 'b' : 'a'
-        ).repeat(40);
+        const head = (localStorage.getItem('authorPushed') ? 'b' : 'a').repeat(40);
+        pr.commits.nodes[0].commit.oid = head;
+        pr.recentCommits.nodes[0].commit.oid = head;
       }
       return result;
     };

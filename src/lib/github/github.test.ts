@@ -552,6 +552,37 @@ it('records who requested changes and whether a non-merge commit followed', () =
   ).toEqual([{ login: 'reviewer', pushedSince: true }]);
   expect(requests([['fix', 1]], null)).toEqual([{ login: 'reviewer', pushedSince: true }]);
   expect(requests([['merge', 2]], 'merge')).toEqual([{ login: 'reviewer', pushedSince: false }]);
+  expect(
+    requests(
+      [
+        ['fix', 1],
+        ['merge', 2],
+      ],
+      'merge',
+    ),
+  ).toEqual([{ login: 'reviewer', pushedSince: false }]);
+  expect(
+    requests(
+      [
+        ['older', 2],
+        ['merge', 2],
+      ],
+      'older',
+    ),
+  ).toEqual([{ login: 'reviewer', pushedSince: false }]);
+  expect(
+    requests(
+      [
+        ['older', 2],
+        ['next', 1],
+        ['merge', 2],
+      ],
+      'older',
+    ),
+  ).toEqual([{ login: 'reviewer', pushedSince: true }]);
+  expect(requests([['fix', 1]], 'rebased-away')).toEqual([
+    { login: 'reviewer', pushedSince: true },
+  ]);
   expect(requests([['fix', 1]], 'fix', 'APPROVED')).toEqual([]);
   delete input.latestOpinionatedReviews;
   expect(normalize(input).changeRequests).toEqual([]);

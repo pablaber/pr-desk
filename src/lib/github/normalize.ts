@@ -35,17 +35,25 @@ function headAuthor(raw: RawPR): PullRequest['headAuthor'] {
   const author = latestChange(raw)?.author;
   return { login: author?.user?.login ?? '', name: author?.name ?? '' };
 }
-// Only the last three commits are fetched, so after three branch updates in a row the head
-// stands in. A rebase rewrites the reviewed commit, so it counts as a change, as does a review
-// GitHub can no longer tie to a commit.
+// Only the last three commits are fetched, so a reviewed commit older than those counts as a
+// change. So does a rebase, which rewrites the reviewed commit, and a review GitHub can no longer
+// tie to a commit.
+function changedSince(raw: RawPR, reviewed: string | undefined) {
+  const recent = raw.recentCommits?.nodes ?? [];
+  const index = recent.findIndex((n) => n.commit.oid === reviewed);
+  if (index === -1) {
+    const head = raw.commits.nodes[0]?.commit.oid;
+    return head !== undefined && head !== reviewed;
+  }
+  return recent.slice(index + 1).some((n) => n.commit.parents?.totalCount === 1);
+}
 function changeRequests(raw: RawPR): PullRequest['changeRequests'] {
-  const latest = latestChange(raw)?.oid ?? raw.commits.nodes[0]?.commit.oid;
   return (raw.latestOpinionatedReviews?.nodes ?? []).flatMap((review) =>
     review.state === 'CHANGES_REQUESTED' && review.author?.login
       ? [
           {
             login: review.author.login,
-            pushedSince: latest !== undefined && review.commit?.oid !== latest,
+            pushedSince: changedSince(raw, review.commit?.oid),
           },
         ]
       : [],
