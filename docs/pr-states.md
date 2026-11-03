@@ -168,9 +168,9 @@ The Waiting fallback picks its label from the first that applies:
 - Once you request changes on someone else's PR, it waits on the author instead of asking for
   your review. When they commit after your review it needs attention again as "Updated since you
   requested changes", until you review it. Merge commits, such as updating the branch, do not
-  count, but a rebase does, because it rewrites the commit you reviewed. Only the last three
-  commits are looked at; if all three are merge commits, the head commit stands in. A personal
-  review re-request outranks both.
+  count, whether they landed before or after your review, but a rebase does, because it rewrites
+  the commit you reviewed. Only the last three commits are looked at; a review of anything older
+  counts as updated. A personal review re-request outranks both.
 - "Waiting for your review" is a status: when a higher rule such as "Checks failed" is primary,
   it still shows beneath it.
 - Thread and changes-requested rules apply only to owned PRs, not bot PRs.
