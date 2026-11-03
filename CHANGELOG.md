@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.27.0](https://github.com/pablaber/pr-desk/compare/v1.26.1...v1.27.0) (2026-11-03)
+
+
+### Features
+
+* queue pr actions so merging no longer blocks the app ([#175](https://github.com/pablaber/pr-desk/issues/175)) ([36d8334](https://github.com/pablaber/pr-desk/commit/36d833432ffd4b84c0f371e2f12f6700f5bf9ef9))
+* spin the checks icon while checks are running ([#173](https://github.com/pablaber/pr-desk/issues/173)) ([f5c2d59](https://github.com/pablaber/pr-desk/commit/f5c2d59e64b82893325f9fefc148250b8cd6643f))
+
 ## [1.26.1](https://github.com/pablaber/pr-desk/compare/v1.26.0...v1.26.1) (2026-11-03)
 
 
