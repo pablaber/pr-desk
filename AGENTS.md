@@ -66,6 +66,7 @@ Inspect the generated screenshot and include the updated image in the change.
 | `src-tauri/src/menu.rs`             | macOS menu: Tauri's default plus Check for Updates…, which only emits an event to the frontend                        |
 | `src/lib/github/`                   | `queries.ts` GraphQL text, `normalize.ts` raw → domain, `refresh.ts` orchestration/concurrency, `client.ts` transport |
 | `src/lib/pr/`                       | `signals.ts` → `dashboard-rules.ts` → `classify.ts` → `card-view-model.ts`                                            |
+| `src/lib/actions/`                  | `queue.svelte.ts` confirmed PR actions, one at a time and paused by a failure; `execute.ts` recheck, then mutate      |
 | `src/lib/store/app-state.ts`        | versioned preferences and all input validation                                                                        |
 | `src/lib/history/`                  | `history.json` per-login log; ingest and sync scheduling; `facts.ts` (display-time facts), `activity.ts` (buckets)    |
 | `src/lib/achievements/`             | `catalog.ts` declarative achievements; `evaluate.ts` levels, unlock dates and view models; `record.ts` storing them   |
@@ -117,6 +118,11 @@ Inspect the generated screenshot and include the updated image in the change.
   metadata and signed archives from GitHub Releases natively, and must keep working when
   `gh` authentication fails. Its scheduling and state live in `src/lib/updates/`; it never
   touches preferences, and the app restarts only once `saving` is clear.
+- Confirmed GitHub actions run through the in-memory queue in `src/lib/actions/`, one at a time in
+  confirmation order, never under `saving`, so only the affected card is locked. A failure stays
+  at the head and holds the rest until the user retries, skips or clears. Each action rechecks the
+  PR when it starts, because that may be long after it was confirmed. The updater waits for a
+  running queue but not a paused one, which could otherwise hold a restart forever.
 - Local history lives in its own `history.json` store (never `preferences.json`, never in the
   settings export), synced in the background through the read-only `DeskHistorySearch` query.
   Its sync never touches `loading` or `saving` or the dashboard's own queries, and the updater

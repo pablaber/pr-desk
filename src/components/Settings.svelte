@@ -22,6 +22,7 @@
   import ArrowDownUp from '@lucide/svelte/icons/arrow-down-up';
   import BellDot from '@lucide/svelte/icons/bell-dot';
   import Bot from '@lucide/svelte/icons/bot';
+  import type { Snippet } from 'svelte';
   import Bug from '@lucide/svelte/icons/bug';
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import Eye from '@lucide/svelte/icons/eye';
@@ -98,6 +99,7 @@
     oncopyerror,
     oncopysettings,
     onimportsettings,
+    queueDock,
   }: {
     open: boolean;
     login: string;
@@ -139,6 +141,7 @@
     oncopyerror: (error: SessionError) => void;
     oncopysettings: () => void;
     onimportsettings: (config: SettingsConfig) => Promise<boolean>;
+    queueDock: Snippet;
   } = $props();
   const groups: {
     label: string;
@@ -732,6 +735,7 @@
       </div>
     {/if}
   </div>
-  <!-- The open dialog sits in the top layer above the app's toasts, so it shows its own. -->
+  <!-- The open dialog sits in the top layer above the app's toasts and queue, so it shows its own. -->
   <Toaster />
+  {#if open}{@render queueDock()}{/if}
 </dialog>

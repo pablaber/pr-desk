@@ -719,6 +719,53 @@ i.waiting {
 .merge-button.update-branch-button:focus-visible {
   outline-color: #488066;
 }
+/* Sits where the action button was, so a queued card keeps its height. */
+.queue-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 15px 15px;
+  padding: 7px 10px;
+  border: 1px solid #dfe5dc;
+  border-radius: 6px;
+  background: #f6f8f6;
+  color: #5d6a5e;
+  font-size: 12px;
+  font-weight: 600;
+}
+.queue-chip.running {
+  border-color: #cfe3d4;
+  background: #eaf4ec;
+  color: #294d36;
+}
+.queue-chip.running .lucide {
+  animation: refresh-spin 0.9s linear infinite;
+}
+.queue-chip.failed {
+  border-color: #f3cdc8;
+  background: #fdf3f1;
+  color: #912018;
+}
+.pr-card.compact .queue-chip {
+  margin: 0 12px 12px;
+}
+.pr-card.queued .card-main {
+  opacity: 0.55;
+}
+@media (prefers-reduced-motion: reduce) {
+  .queue-chip.running .lucide {
+    animation: none;
+  }
+}
+/* The queue dock floats over the bottom of the page, so the last cards must scroll clear of it,
+   and toasts in the same corner sit above it. */
+.app-shell:has(.action-queue) main {
+  padding-bottom: 72px;
+}
+:root:has(.action-queue) .toasts {
+  bottom: 84px;
+}
 .repo {
   font-size: 10px;
   color: #7b8a73;
@@ -1701,7 +1748,7 @@ fieldset:disabled .segmented-control input {
 }
 
 /* Background requests keep action icons steady while retaining the interaction guard. */
-.board.silent-refresh .menu-trigger:disabled {
+.board.silent-refresh .pr-card:not(.queued) .menu-trigger:disabled {
   opacity: 1;
 }
 
