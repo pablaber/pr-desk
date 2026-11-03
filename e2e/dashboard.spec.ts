@@ -3486,6 +3486,13 @@ test('cards show one Checks badge coloured by check status', async ({ page }) =>
   await expect(badge('Add audit event retention')).toHaveText('Checks');
   await expect(badge('Add audit event retention')).toHaveClass(/pending/);
   await expect(badge('Add audit event retention')).toHaveAttribute('title', 'Checks running');
+  const icon = (title: string) => badge(title).locator('svg');
+  await expect(icon('Add audit event retention')).toHaveCSS('animation-name', 'refresh-spin');
+  await expect(icon('Reduce cache lookup latency')).toHaveCSS('animation-name', 'none');
+  await expect(icon('Refresh session token handling')).toHaveCSS('animation-name', 'none');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(icon('Add audit event retention')).toHaveCSS('animation-name', 'none');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.screenshot({ path: '.context/checks-badges.png', fullPage: true });
 });
 
