@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.1](https://github.com/pablaber/pr-desk/compare/v1.26.0...v1.26.1) (2026-11-03)
+
+
+### Bug Fixes
+
+* stop reporting updates when a reviewed merge commit is still the head ([#171](https://github.com/pablaber/pr-desk/issues/171)) ([3f6a41f](https://github.com/pablaber/pr-desk/commit/3f6a41ff5a41a97ab884ba45ab392fda0f019623))
+
 ## [1.26.0](https://github.com/pablaber/pr-desk/compare/v1.25.0...v1.26.0) (2026-11-02)
 
 
