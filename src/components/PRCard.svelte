@@ -2,12 +2,15 @@
   import { tick } from 'svelte';
   import ArrowUpRight from '@lucide/svelte/icons/arrow-up-right';
   import Bug from '@lucide/svelte/icons/bug';
+  import CircleAlert from '@lucide/svelte/icons/circle-alert';
+  import Clock from '@lucide/svelte/icons/clock';
   import Copy from '@lucide/svelte/icons/copy';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import GitMerge from '@lucide/svelte/icons/git-merge';
   import GitPullRequestArrow from '@lucide/svelte/icons/git-pull-request-arrow';
+  import LoaderCircle from '@lucide/svelte/icons/loader-circle';
   import Pin from '@lucide/svelte/icons/pin';
   import PinOff from '@lucide/svelte/icons/pin-off';
   import PRDetails from './PRDetails.svelte';
@@ -16,6 +19,7 @@
   import { ariaKeyShortcut, compactKeys } from '../lib/hotkeys/format';
   import { hotkeyFor } from '../lib/hotkeys/match';
   import { cardViewModel } from '../lib/pr/card-view-model';
+  import type { QueuedAction } from '../lib/actions/types';
   import type { Hotkey } from '../lib/hotkeys/types';
   import type { ClassifiedPR } from '../lib/pr/classify';
   import type { LabelOp } from '../lib/pr/labels';
@@ -33,6 +37,8 @@
     titleTagRules,
     allLabels,
     busy,
+    queued,
+    queuePosition,
     onopen,
     oncopy,
     oncopydebuginfo,
@@ -51,6 +57,8 @@
     titleTagRules: TitleTagRule[];
     allLabels: PRLabel[];
     busy: boolean;
+    queued: QueuedAction | undefined;
+    queuePosition: number;
     onopen: (url: string) => void;
     oncopy: (pr: PullRequest) => void;
     oncopydebuginfo: (pr: PullRequest) => void;
@@ -70,13 +78,15 @@
   let cardEl: HTMLElement;
   let submenuEl = $state<HTMLElement>();
   let card = $derived(cardViewModel(item, now));
+  // Queued for a GitHub action: the card can still be opened, but nothing else can change it.
+  let locked = $derived(busy || !!queued);
   function close() {
     menu = false;
     submenu = null;
     at = null;
   }
   export async function openSubmenu(which: 'snooze' | 'labels') {
-    if (busy) return;
+    if (locked) return;
     menu = true;
     submenu = which;
     if (which !== 'snooze') return;
@@ -121,9 +131,14 @@
     };
   }
   function act(action: string, until?: string) {
-    if (busy) return;
+    if (locked) return;
     close();
     onaction(card.pr.id, action, until);
+  }
+  // These only ask for confirmation and run from the queue, so a refresh need not hold them up.
+  function request(action: string) {
+    close();
+    onaction(card.pr.id, action);
   }
   // Menus open beside their row or at the cursor, so cards low or far right on the board
   // would push them past the window; shift them back by however much they overflow. A
@@ -158,11 +173,12 @@
   class="pr-card"
   class:compact
   class:pinned
+  class:queued={!!queued}
   data-pr-id={card.pr.id}
   bind:this={cardEl}
   oncontextmenu={(e) => {
     e.preventDefault();
-    if (busy) return;
+    if (locked) return;
     const r = cardEl.getBoundingClientRect();
     at = { x: e.clientX - r.left - cardEl.clientLeft, y: e.clientY - r.top - cardEl.clientTop };
     submenu = null;
@@ -179,7 +195,7 @@
     <PRDetails {item} {now} {stale} {labels} {titleTagRules} {compact} />
   </button>
   <button
-    disabled={busy}
+    disabled={locked}
     class="menu-trigger"
     aria-label={`Actions for ${card.pr.title}`}
     aria-expanded={menu}
@@ -193,38 +209,53 @@
   >
   {#if pinned}
     <button
-      disabled={busy}
+      disabled={locked}
       class="pin-toggle"
       title="Unpin"
       aria-label={`Unpin ${card.pr.title}`}
       onclick={() => act('unpin')}><Pin size={13} /></button
     >
   {/if}
-  {#if card.canMerge}
-    <button
-      class="merge-button"
-      disabled={busy || stale}
-      onclick={() => act('merge')}
-      aria-label={`Merge ${card.pr.title}`}><GitMerge size={14} /> Merge…</button
-    >
-  {/if}
-  {#if card.canUpdateBranch}
-    <button
-      class="merge-button update-branch-button"
-      disabled={busy || stale}
-      onclick={() => act('update-branch')}
-      aria-label={`Update branch for ${card.pr.title}`}
-      ><GitPullRequestArrow size={14} /> Update branch…</button
-    >
-  {/if}
-  {#if card.canApproveAndMerge}
-    <button
-      class="merge-button"
-      disabled={busy || stale}
-      onclick={() => act('approve-merge')}
-      aria-label={`Approve and merge ${card.pr.title}`}
-      ><GitMerge size={14} /> Approve and merge…</button
-    >
+  {#if queued}
+    <div class="queue-chip {queued.status}">
+      {#if queued.status === 'running'}<LoaderCircle size={13} />
+        {queued.kind === 'update-branch'
+          ? 'Updating branch…'
+          : queued.kind === 'close-stale'
+            ? 'Closing…'
+            : queued.kind === 'approve-merge'
+              ? 'Approving and merging…'
+              : 'Merging…'}
+      {:else if queued.status === 'failed'}<CircleAlert size={13} /> Failed · see queue
+      {:else}<Clock size={13} /> Queued · {queuePosition}{/if}
+    </div>
+  {:else}
+    {#if card.canMerge}
+      <button
+        class="merge-button"
+        disabled={stale}
+        onclick={() => request('merge')}
+        aria-label={`Merge ${card.pr.title}`}><GitMerge size={14} /> Merge…</button
+      >
+    {/if}
+    {#if card.canUpdateBranch}
+      <button
+        class="merge-button update-branch-button"
+        disabled={stale}
+        onclick={() => request('update-branch')}
+        aria-label={`Update branch for ${card.pr.title}`}
+        ><GitPullRequestArrow size={14} /> Update branch…</button
+      >
+    {/if}
+    {#if card.canApproveAndMerge}
+      <button
+        class="merge-button"
+        disabled={stale}
+        onclick={() => request('approve-merge')}
+        aria-label={`Approve and merge ${card.pr.title}`}
+        ><GitMerge size={14} /> Approve and merge…</button
+      >
+    {/if}
   {/if}
   {#if menu}
     <!-- The backdrop swallows the dismissing click so it cannot also open the PR behind it. -->
@@ -323,7 +354,7 @@
         {/if}
       </div>
       {#if card.staleness === 'high'}
-        <button class="danger" onclick={() => act('close-stale')}>Close as stale…</button>
+        <button class="danger" onclick={() => request('close-stale')}>Close as stale…</button>
       {/if}
       <button
         class="danger"

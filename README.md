@@ -13,7 +13,12 @@ a merge queue may need to be merged on GitHub, and GitHub stacks merge from the 
 checks all pass and that GitHub can merge have an **Approve and merge…** button that approves
 the confirmed commit, then merges it. Your PRs and known-bot PRs that branch protection holds
 back as behind their base branch show "Behind main" in Needs attention with an **Update branch…**
-button that merges the base branch into the PR, pinned to the confirmed commit. Cards with checks carry a Checks badge: green when all pass, amber while any are running, red when any fail.
+button that merges the base branch into the PR, pinned to the confirmed commit. Confirmed actions
+run from a queue, one at a time in the order you confirmed them, so you can keep working and queue
+more while one runs: only the affected cards are locked, and a dock at the bottom of the window
+shows progress and what is waiting. If an action fails, the queue pauses there until you retry it,
+skip it or clear the queue; it is not saved, so anything waiting is dropped if PR Desk quits.
+Cards with checks carry a Checks badge: green when all pass, amber while any are running, red when any fail.
 
 ## Installation
 
@@ -51,7 +56,7 @@ PR Desk checks for a new release at launch and every 24 hours while it is open; 
 an **Update available** card appears in the sidebar above Settings, without interrupting
 you. Nothing downloads until you choose **Update and restart**: PR Desk downloads the
 release, verifies its signature, installs it, and restarts once any preference save or
-confirmed GitHub action has finished. **Later** keeps the offer for the session. If an
+confirmed GitHub action has finished; a paused queue does not hold it back. **Later** keeps the offer for the session. If an
 install fails, the running version is left in place.
 
 Update checks and downloads fetch public assets from

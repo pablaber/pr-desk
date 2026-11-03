@@ -40,6 +40,8 @@ test.beforeEach(async ({ page }) => {
       closedResources: number[];
       restarts: number;
       finishDownload: () => void;
+      // Set while a confirmed GitHub action waits on holdActions; calling it lets the action finish.
+      releaseAction: () => void;
       callbacks: Record<number, (message: unknown) => void>;
       eventListeners: { event: string; handler: number }[];
       emitTauriEvent: (event: string) => void;
@@ -68,6 +70,15 @@ test.beforeEach(async ({ page }) => {
     // With multiRepo set, #3 lives in a second repository.
     const repo = (number: number) =>
       localStorage.getItem('multiRepo') && number === 3 ? 'acme/web' : 'acme/platform';
+    const heldAction = () =>
+      localStorage.getItem('holdActions')
+        ? new Promise<void>((resolve) => (w.releaseAction = resolve))
+        : Promise.resolve();
+    // A merged or closed PR comes back from later queries no longer open.
+    const land = (url: string) => {
+      const landed = JSON.parse(localStorage.getItem('mergedPrs') ?? '[]') as number[];
+      localStorage.setItem('mergedPrs', JSON.stringify([...landed, Number(url.split('/').pop())]));
+    };
     const raw = (number: number) => ({
       number,
       url: `https://github.com/${repo(number)}/pull/${number}`,
@@ -272,24 +283,29 @@ test.beforeEach(async ({ page }) => {
           const calls = JSON.parse(localStorage.getItem('mergeCalls') ?? '[]');
           calls.push(args);
           localStorage.setItem('mergeCalls', JSON.stringify(calls));
+          await heldAction();
           if (localStorage.getItem('mergeFailure'))
             throw new Error('Merge rejected by repository rules');
           await new Promise((resolve) => setTimeout(resolve, 200));
+          land(args.url);
           return;
         }
         if (command === 'approve_and_merge_pr') {
           const calls = JSON.parse(localStorage.getItem('approveMergeCalls') ?? '[]');
           calls.push(args);
           localStorage.setItem('approveMergeCalls', JSON.stringify(calls));
+          await heldAction();
           if (localStorage.getItem('approveMergeFailure'))
             throw new Error('Approved on GitHub, but the merge failed.');
           await new Promise((resolve) => setTimeout(resolve, 200));
+          land(args.url);
           return;
         }
         if (command === 'update_pr_branch') {
           const calls = JSON.parse(localStorage.getItem('updateCalls') ?? '[]');
           calls.push(args);
           localStorage.setItem('updateCalls', JSON.stringify(calls));
+          await heldAction();
           await new Promise((resolve) => setTimeout(resolve, 200));
           return;
         }
@@ -298,6 +314,7 @@ test.beforeEach(async ({ page }) => {
           calls.push(args.url);
           localStorage.setItem('closeCalls', JSON.stringify(calls));
           if (localStorage.getItem('closeFailure')) throw new Error('Repository access denied');
+          land(args.url);
           return;
         }
         if (command !== 'github') throw new Error(`Unexpected command ${command}`);
@@ -2313,7 +2330,7 @@ test('close as stale requires confirmation, supports Escape and Enter, and remov
     .toEqual([expect.objectContaining({ kind: 'stale-closed', pr: 'acme/platform#4' })]);
 });
 
-test('close as stale keeps the PR and displays failures', async ({ page }) => {
+test('close as stale keeps the PR and shows failures in the queue', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => localStorage.setItem('closeFailure', 'true'));
   const actions = page.getByRole('button', {
@@ -2322,10 +2339,13 @@ test('close as stale keeps the PR and displays failures', async ({ page }) => {
   await actions.click();
   await page.getByRole('button', { name: 'Close as stale…', exact: true }).click();
   await page.keyboard.press('Enter');
-  const dialog = page.getByRole('dialog', { name: 'Close as stale?' });
-  await expect(dialog.getByRole('alert')).toContainText('Repository access denied');
-  await dialog.getByRole('button', { name: 'Cancel' }).click();
-  await expect(actions).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Close as stale?' })).toBeHidden();
+  const queue = page.getByRole('region', { name: 'Action queue' });
+  await expect(queue.getByRole('alert')).toContainText('Repository access denied');
+  await expect(actions).toBeDisabled();
+  await queue.getByRole('button', { name: 'Clear queue', exact: true }).click();
+  await expect(queue).toHaveCount(0);
+  await expect(actions).toBeEnabled();
 });
 for (const manualTrigger of ['button', 'shortcut', 'none'] as const) {
   test(`background refresh with manual trigger: ${manualTrigger}`, async ({ page }) => {
@@ -3165,9 +3185,10 @@ test('ready PRs merge only after confirmation with the selected method', async (
   await merge.click();
   await dialog.getByLabel('Merge method').selectOption('rebase');
   await dialog.getByRole('button', { name: 'Confirm merge', exact: true }).click();
-  await expect(dialog.getByRole('button', { name: 'Merging…' })).toBeDisabled();
-  await expect(dialog.getByRole('status')).toHaveText('Merging…');
   await expect(dialog).toBeHidden();
+  await expect(page.getByRole('region', { name: 'Action queue' })).toContainText(
+    'Merging acme/platform #1',
+  );
   const celebration = page.getByRole('status').filter({ hasText: 'Merged' });
   await expect(celebration).toContainText('acme/platform #1');
   await expect(celebration.locator('.chip')).toHaveText([
@@ -3210,7 +3231,7 @@ test('ready PRs merge only after confirmation with the selected method', async (
   await expect(page.locator('.nav-dot')).toHaveCount(0);
 });
 
-test('merge failures keep the dialog and card available', async ({ page }) => {
+test('merge failures pause the queue and keep the card', async ({ page }) => {
   await page.goto('/');
   await page.evaluate(() => localStorage.setItem('mergeFailure', '1'));
   await page
@@ -3218,10 +3239,15 @@ test('merge failures keep the dialog and card available', async ({ page }) => {
     .click();
   const dialog = page.getByRole('dialog', { name: 'Merge pull request?' });
   await dialog.getByRole('button', { name: 'Confirm merge', exact: true }).click();
-  await expect(dialog.getByRole('alert')).toContainText('Merge rejected by repository rules');
+  await expect(dialog).toBeHidden();
+  const queue = page.getByRole('region', { name: 'Action queue' });
+  await expect(queue.getByRole('alert')).toContainText('Merge rejected by repository rules');
+  await expect(queue).toContainText('Queue paused');
   await expect(page.locator('.pr-card')).toHaveCount(4);
+  await expect(page.locator('.pr-card', { hasText: 'Reduce cache lookup latency' })).toContainText(
+    'Failed · see queue',
+  );
   await expect(page.getByRole('status').filter({ hasText: 'Merged' })).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeEnabled();
 });
 
 test('merge rechecks reject a changed commit or newly pending checks', async ({ page }) => {
@@ -3250,9 +3276,11 @@ test('merge rechecks reject a changed commit or newly pending checks', async ({ 
       .click();
     const dialog = page.getByRole('dialog', { name: 'Merge pull request?' });
     await dialog.getByRole('button', { name: 'Confirm merge', exact: true }).click();
-    await expect(dialog.getByRole('alert')).toContainText('changed or is no longer ready');
+    const queue = page.getByRole('region', { name: 'Action queue' });
+    await expect(queue.getByRole('alert')).toContainText('changed or is no longer ready');
     expect(await page.evaluate(() => localStorage.getItem('mergeCalls'))).toBeNull();
-    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await queue.getByRole('button', { name: 'Clear queue', exact: true }).click();
+    await expect(queue).toHaveCount(0);
   }
 });
 
@@ -3456,16 +3484,16 @@ test('known bot PRs need attention until approved, then merge with the bot decla
   const dialog = page.getByRole('dialog', { name: 'Merge pull request?' });
   await dialog.getByRole('button', { name: 'Confirm merge', exact: true }).click();
   await expect(dialog).toBeHidden();
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mergeCalls') ?? '[]'))).toEqual(
-    [
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('mergeCalls') ?? '[]')))
+    .toEqual([
       {
         url: 'https://github.com/acme/platform/pull/7',
         headOid: 'a'.repeat(40),
         method: 'squash',
         bot: 'dependabot[bot]',
       },
-    ],
-  );
+    ]);
 });
 
 test('cards show one Checks badge coloured by check status', async ({ page }) => {
@@ -3541,9 +3569,8 @@ test('bot PRs waiting for review approve and merge after confirmation', async ({
   await page.screenshot({ path: '.context/approve-merge-confirmation.png', fullPage: true });
   await dialog.getByLabel('Merge method').selectOption('merge');
   await dialog.getByRole('button', { name: 'Approve and merge', exact: true }).click();
-  await expect(dialog.getByRole('button', { name: 'Approving and merging…' })).toBeDisabled();
-  await expect(dialog.getByRole('status')).toHaveText('Approving and merging…');
   await expect(dialog).toBeHidden();
+  await expect(card).toContainText('Approving and merging…');
   await expect(page.getByRole('status').filter({ hasText: 'Merged' })).toContainText(
     'acme/platform #7',
   );
@@ -3606,20 +3633,21 @@ test('machine-user known bots approve and merge with their login declared', asyn
   const dialog = page.getByRole('dialog', { name: 'Approve and merge pull request?' });
   await dialog.getByRole('button', { name: 'Approve and merge', exact: true }).click();
   await expect(dialog).toBeHidden();
-  expect(
-    await page.evaluate(() => JSON.parse(localStorage.getItem('approveMergeCalls') ?? '[]')),
-  ).toMatchObject([{ bot: 'release-user' }]);
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('approveMergeCalls') ?? '[]')))
+    .toMatchObject([{ bot: 'release-user' }]);
 });
 
-test('approve and merge failures keep the dialog and card available', async ({ page }) => {
+test('approve and merge failures pause the queue and keep the card', async ({ page }) => {
   await trackBotPr(page);
   await page.evaluate(() => localStorage.setItem('approveMergeFailure', '1'));
   await page.getByRole('button', { name: 'Approve and merge Bump lodash', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Approve and merge pull request?' });
   await dialog.getByRole('button', { name: 'Approve and merge', exact: true }).click();
-  await expect(dialog.getByRole('alert')).toContainText('the merge failed');
+  await expect(dialog).toBeHidden();
+  const queue = page.getByRole('region', { name: 'Action queue' });
+  await expect(queue.getByRole('alert')).toContainText('the merge failed');
   await expect(page.locator('.pr-card', { hasText: 'Bump lodash' })).toHaveCount(1);
-  await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeEnabled();
 });
 
 test('approve and merge waits while GitHub recomputes mergeability', async ({ page }) => {
@@ -3650,16 +3678,24 @@ test('approve and merge waits while GitHub recomputes mergeability', async ({ pa
     await page.getByRole('button', { name: 'Approve and merge Bump lodash', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Approve and merge pull request?' });
     await dialog.getByRole('button', { name: 'Approve and merge', exact: true }).click();
+    await expect(dialog).toBeHidden();
+    const queue = page.getByRole('region', { name: 'Action queue' });
     if (!behind) {
-      await expect(dialog.getByRole('status')).toHaveText('Waiting for GitHub to recheck the PR…');
-      await expect(dialog).toBeHidden();
+      await expect(queue.getByRole('status')).toHaveText(/Waiting for GitHub to recheck the PR…/);
+      await expect(queue).toHaveCount(0);
       expect(
         await page.evaluate(() => JSON.parse(localStorage.getItem('approveMergeCalls') ?? '[]')),
       ).toHaveLength(1);
       // The merged card leaves the board; bring it back to try the PR that falls behind.
-      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.evaluate(() => localStorage.removeItem('mergedPrs'));
+      await expect(async () => {
+        await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+        await expect(
+          page.getByRole('button', { name: 'Approve and merge Bump lodash', exact: true }),
+        ).toBeVisible({ timeout: 1000 });
+      }).toPass();
     } else {
-      await expect(dialog.getByRole('alert')).toContainText('now behind its base branch');
+      await expect(queue.getByRole('alert')).toContainText('now behind its base branch');
       expect(
         await page.evaluate(() => JSON.parse(localStorage.getItem('approveMergeCalls') ?? '[]')),
       ).toHaveLength(1);
@@ -3683,17 +3719,17 @@ test('bot PRs behind their base update the branch after confirmation', async ({ 
   await expect(dialog.getByLabel('Merge method')).toHaveCount(0);
   await page.screenshot({ path: '.context/update-branch-confirmation.png', fullPage: true });
   await dialog.getByRole('button', { name: 'Update branch', exact: true }).click();
-  await expect(dialog.getByRole('status')).toHaveText('Updating branch…');
   await expect(dialog).toBeHidden();
-  expect(
-    await page.evaluate(() => JSON.parse(localStorage.getItem('updateCalls') ?? '[]')),
-  ).toEqual([
-    {
-      url: 'https://github.com/acme/platform/pull/7',
-      headOid: 'a'.repeat(40),
-      bot: 'dependabot[bot]',
-    },
-  ]);
+  await expect(card).toContainText('Updating branch…');
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('updateCalls') ?? '[]')))
+    .toEqual([
+      {
+        url: 'https://github.com/acme/platform/pull/7',
+        headOid: 'a'.repeat(40),
+        bot: 'dependabot[bot]',
+      },
+    ]);
   // The refresh after updating shows the branch up to date, so approval is offered again.
   await expect(card).not.toContainText('Behind main');
   await expect(
@@ -3710,6 +3746,268 @@ test('update branch is offered on your own PRs but not on others’', async ({ p
   const others = page.locator('.pr-card', { hasText: 'Simplify deployment configuration' });
   await expect(others).not.toContainText('Behind main');
   await expect(others.locator('.merge-button')).toHaveCount(0);
+});
+
+const mergedNumbers = (page: Page) =>
+  page.evaluate(() =>
+    (JSON.parse(localStorage.getItem('mergeCalls') ?? '[]') as { url: string }[]).map((call) =>
+      Number(call.url.split('/').pop()),
+    ),
+  );
+
+async function confirmMerge(page: Page, title: string, confirm = 'Confirm merge') {
+  await page.getByRole('button', { name: `Merge ${title}`, exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Merge pull request?' });
+  await dialog.getByRole('button', { name: confirm, exact: true }).click();
+  await expect(dialog).toBeHidden();
+}
+
+// Lets the action holding the queue finish, once the next one is known to have started.
+async function releaseAction(page: Page) {
+  await page.evaluate(() => (window as any).releaseAction());
+}
+
+test.describe('action queue', () => {
+  const first = 'Reduce cache lookup latency';
+  const second = 'Add audit event retention';
+  const cardFor = (page: Page, title: string) => page.locator('.pr-card', { hasText: title });
+  const queueOf = (page: Page) => page.getByRole('region', { name: 'Action queue' });
+
+  test.beforeEach(async ({ page }) => {
+    // #3 needs no review here, so two of the mock's PRs are ready to merge.
+    await page.addInitScript(() => {
+      localStorage.setItem('noReviewPrs', '[3]');
+      localStorage.setItem('holdActions', '1');
+    });
+    await page.goto('/');
+  });
+
+  test('a merge locks only its own card and leaves the app usable', async ({ page }) => {
+    await confirmMerge(page, first);
+    const queue = queueOf(page);
+    await expect(queue).toContainText('Merging acme/platform #1');
+    await expect(queue).not.toContainText(' of ');
+    await expect(queue.getByRole('progressbar')).toBeVisible();
+
+    const merging = cardFor(page, first);
+    await expect(merging).toContainText('Merging…');
+    await expect(page.locator('.merge-button', { hasText: 'Merge…' })).toHaveCount(1);
+    await expect(
+      page.getByRole('button', { name: `Actions for ${first}`, exact: true }),
+    ).toBeDisabled();
+    // The card can still be opened on GitHub, which changes nothing.
+    await page.getByRole('button', { name: `Open ${first} on GitHub`, exact: true }).click();
+    expect(await page.evaluate(() => (window as any).opened)).toEqual([
+      'https://github.com/acme/platform/pull/1',
+    ]);
+    // Its shortcuts are refused along with its menu.
+    await merging.hover();
+    await page.keyboard.press('p');
+    await page.mouse.move(0, 0);
+    await expect(merging).not.toHaveClass(/pinned/);
+
+    // Everything else works: another card's menu saves preferences, and navigation is free.
+    await expect(page.getByRole('button', { name: `Merge ${second}`, exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: `Actions for ${second}`, exact: true }).click();
+    await page.getByRole('button', { name: 'Pin to top', exact: true }).click();
+    await expect(cardFor(page, second)).toHaveClass(/pinned/);
+    await page.getByRole('button', { name: /^Snoozed/ }).click();
+    await expect(queue).toBeVisible();
+    await page.getByRole('button', { name: /^Dashboard/ }).click();
+    await page.screenshot({ path: '.context/action-queue-running.png' });
+
+    await releaseAction(page);
+    await expect(queue).toHaveCount(0);
+    await expect(merging).toHaveCount(0);
+    await expect(page.getByRole('status').filter({ hasText: 'Merged' })).toContainText(
+      'acme/platform #1',
+    );
+  });
+
+  test('actions run in the order they were confirmed, with one celebration at the end', async ({
+    page,
+  }) => {
+    await page.evaluate(() => localStorage.setItem('botPr', '1'));
+    await trackPlatformRepository(page);
+
+    await confirmMerge(page, first);
+    await page.getByRole('button', { name: 'Update branch for Update dependency vite' }).click();
+    const update = page.getByRole('dialog', { name: 'Update branch?' });
+    await update.getByRole('button', { name: 'Add to queue', exact: true }).click();
+    await confirmMerge(page, second, 'Add to queue');
+
+    const queue = queueOf(page);
+    await expect(queue).toContainText('1 of 3');
+    await expect(cardFor(page, first)).toContainText('Merging…');
+    await expect(cardFor(page, 'Update dependency vite')).toContainText('Queued · 1');
+    await expect(cardFor(page, second)).toContainText('Queued · 2');
+    await queue.getByRole('button', { expanded: false }).click();
+    await expect(queue.locator('li')).toHaveText([
+      /Reduce cache lookup latency.*Merge · acme\/platform #1/,
+      /Update dependency vite.*Update branch · acme\/platform #8/,
+      /Add audit event retention.*Merge · acme\/platform #3/,
+    ]);
+    await page.screenshot({ path: '.context/action-queue-expanded.png' });
+    expect(await mergedNumbers(page)).toEqual([1]);
+    expect(await page.evaluate(() => localStorage.getItem('updateCalls'))).toBeNull();
+
+    // A merge with more to come gets a toast, not the celebration.
+    await releaseAction(page);
+    await expect(page.locator('.toast:visible')).toHaveText('Merged acme/platform #1');
+    await expect(page.locator('.merge-celebration')).toHaveCount(0);
+    await expect(queue).toContainText('2 of 3');
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('updateCalls')))
+      .not.toBeNull();
+    expect(await mergedNumbers(page)).toEqual([1]);
+
+    await releaseAction(page);
+    await expect.poll(() => mergedNumbers(page)).toEqual([1, 3]);
+    await expect(queue).toContainText('3 of 3');
+    await releaseAction(page);
+
+    await expect(queue).toHaveCount(0);
+    const celebration = page.locator('.merge-celebration');
+    await expect(celebration).toContainText('2 pull requests');
+    await expect(celebration.locator('.chip').first()).toBeVisible();
+  });
+
+  test('a new merge can be confirmed during a background refresh', async ({ page }) => {
+    await page.evaluate(() => {
+      const w = window as any;
+      const original = w.__TAURI_INTERNALS__.invoke;
+      w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+        const result = await original(command, args);
+        if (command === 'github' && args.query?.includes('DeskSearch')) await w.searchHeld;
+        return result;
+      };
+      w.searchHeld = new Promise<void>((resolve) => (w.releaseSearch = resolve));
+    });
+    await confirmMerge(page, first);
+    await page.evaluate(() => localStorage.setItem('mergeFailure', '1'));
+    await releaseAction(page);
+    await expect(queueOf(page).getByRole('alert')).toBeVisible();
+    // The failure started a silent refresh, which the held search keeps running.
+    await confirmMerge(page, second, 'Add to queue');
+    await expect(cardFor(page, second)).toContainText('Queued · 1');
+    await page.evaluate(() => (window as any).releaseSearch());
+  });
+
+  test('a failure pauses everything behind it until it is retried', async ({ page }) => {
+    await confirmMerge(page, first);
+    await confirmMerge(page, second, 'Add to queue');
+    await page.evaluate(() => localStorage.setItem('mergeFailure', '1'));
+    await releaseAction(page);
+
+    const queue = queueOf(page);
+    await expect(queue).toContainText('Queue paused');
+    await expect(queue).toContainText('1 waiting behind a failed action');
+    await expect(queue.getByRole('alert')).toContainText('Merge rejected by repository rules');
+    await expect(cardFor(page, first)).toContainText('Failed · see queue');
+    await expect(cardFor(page, second)).toContainText('Queued · 1');
+    await page.screenshot({ path: '.context/action-queue-paused.png' });
+    await page.waitForTimeout(300);
+    expect(await mergedNumbers(page)).toEqual([1]);
+
+    await page.evaluate(() => {
+      localStorage.removeItem('mergeFailure');
+      localStorage.removeItem('holdActions');
+    });
+    await queue.getByRole('button', { name: 'Retry', exact: true }).click();
+    await expect(queue).toHaveCount(0);
+    expect(await mergedNumbers(page)).toEqual([1, 1, 3]);
+    await expect(page.locator('.merge-celebration')).toContainText('2 pull requests');
+  });
+
+  test('skipping a failure resumes the rest and frees its card', async ({ page }) => {
+    await confirmMerge(page, first);
+    await confirmMerge(page, second, 'Add to queue');
+    await page.evaluate(() => localStorage.setItem('mergeFailure', '1'));
+    await releaseAction(page);
+    const queue = queueOf(page);
+    await expect(queue.getByRole('alert')).toBeVisible();
+
+    await page.evaluate(() => {
+      localStorage.removeItem('mergeFailure');
+      localStorage.removeItem('holdActions');
+    });
+    await queue.getByRole('button', { name: 'Skip', exact: true }).click();
+    await expect(queue).toHaveCount(0);
+    expect(await mergedNumbers(page)).toEqual([1, 3]);
+    await expect(page.getByRole('button', { name: `Merge ${first}`, exact: true })).toBeEnabled();
+    await expect(cardFor(page, second)).toHaveCount(0);
+  });
+
+  test('clearing a failure drops everything waiting', async ({ page }) => {
+    await confirmMerge(page, first);
+    await confirmMerge(page, second, 'Add to queue');
+    await page.evaluate(() => localStorage.setItem('mergeFailure', '1'));
+    await releaseAction(page);
+    const queue = queueOf(page);
+    await queue.getByRole('button', { name: 'Clear queue', exact: true }).click();
+    await expect(queue).toHaveCount(0);
+    await page.waitForTimeout(300);
+    expect(await mergedNumbers(page)).toEqual([1]);
+    await expect(page.getByRole('button', { name: `Merge ${first}`, exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: `Merge ${second}`, exact: true })).toBeEnabled();
+  });
+
+  test('a waiting action can be removed, but not the running one', async ({ page }) => {
+    await confirmMerge(page, first);
+    await confirmMerge(page, second, 'Add to queue');
+    const queue = queueOf(page);
+    await queue.getByRole('button', { expanded: false }).click();
+    await expect(queue.locator('li').first().getByRole('button')).toHaveCount(0);
+    await queue.getByRole('button', { name: `Remove ${second} from the queue` }).click();
+    await expect(queue.locator('li')).toHaveCount(1);
+    await expect(page.getByRole('button', { name: `Merge ${second}`, exact: true })).toBeEnabled();
+    await releaseAction(page);
+    await expect(queue).toHaveCount(0);
+    expect(await mergedNumbers(page)).toEqual([1]);
+  });
+
+  test('a refresh that read a PR before it merged does not bring it back', async ({ page }) => {
+    await confirmMerge(page, first);
+    await expect.poll(() => mergedNumbers(page)).toEqual([1]);
+    await page.evaluate(() => {
+      const w = window as any;
+      const original = w.__TAURI_INTERNALS__.invoke;
+      // The search reads the board now, and only answers once the merge has landed.
+      w.searchHeld = new Promise<void>((resolve) => (w.releaseSearch = resolve));
+      w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+        const result = await original(command, args);
+        if (command === 'github' && args.query?.includes('DeskSearch')) await w.searchHeld;
+        return result;
+      };
+    });
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await page.evaluate(() => (window as any).releaseAction());
+    await expect(queueOf(page)).toHaveCount(0);
+    await expect(cardFor(page, first)).toHaveCount(0);
+    // From here the card must never reappear, not even until the refresh after it corrects things.
+    await page.evaluate(() => {
+      const w = window as any;
+      w.cardCameBack = false;
+      new MutationObserver(() => {
+        if (document.querySelector('[data-pr-id="acme/platform#1"]')) w.cardCameBack = true;
+      }).observe(document.body, { childList: true, subtree: true });
+      w.releaseSearch();
+    });
+    await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => (window as any).cardCameBack)).toBe(false);
+  });
+
+  test('Settings shows the queue above its dialog', async ({ page }) => {
+    await confirmMerge(page, first);
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    const settings = page.getByRole('dialog', { name: 'Settings' });
+    await expect(settings.getByRole('region', { name: 'Action queue' })).toBeVisible();
+    await expect(queueOf(page)).toHaveCount(1);
+    await page.screenshot({ path: '.context/action-queue-settings.png' });
+    await releaseAction(page);
+    await expect(queueOf(page)).toHaveCount(0);
+  });
 });
 
 test('approve and merge is not offered on bot PRs with failing checks', async ({ page }) => {

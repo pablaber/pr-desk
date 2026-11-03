@@ -7,9 +7,10 @@
   import type { PullRequest } from '../lib/pr/types';
   let {
     pr,
+    count = 1,
     chips = [],
     ondone,
-  }: { pr: PullRequest; chips?: CelebrationChip[]; ondone: () => void } = $props();
+  }: { pr: PullRequest; count?: number; chips?: CelebrationChip[]; ondone: () => void } = $props();
   const icons = { today: GitMerge, streak: Flame, unlock: Medal };
 </script>
 
@@ -25,7 +26,11 @@
   <div class="burst">
     <span class="ring"></span><span class="ring later"></span>
     <span class="disc"><Check size={64} /></span>
-    <span class="caption"><strong>Merged</strong>{pr.repository} #{pr.number}</span>
+    <span class="caption"
+      ><strong>Merged</strong>{count > 1
+        ? `${count} pull requests`
+        : `${pr.repository} #${pr.number}`}</span
+    >
     {#if chips.length > 0}
       <span class="chips">
         {#each chips as chip (chip.text)}

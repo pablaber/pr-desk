@@ -42,6 +42,10 @@ function service(): GitHubService {
     getHistoryPullRequests: vi.fn(async () => []),
     validateRepository: vi.fn(async () => {}),
     getPullRequest: vi.fn(async () => pr()),
+    closeStalePullRequest: vi.fn(async () => {}),
+    mergePullRequest: vi.fn(async () => {}),
+    approveAndMergePullRequest: vi.fn(async () => {}),
+    updatePullRequestBranch: vi.fn(async () => {}),
   };
 }
 describe('GitHub adapter', () => {

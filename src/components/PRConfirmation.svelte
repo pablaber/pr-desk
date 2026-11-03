@@ -1,20 +1,16 @@
 <script lang="ts">
-  import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+  import type { PRActionKind } from '../lib/actions/types';
   import type { PullRequest } from '../lib/pr/types';
   let {
     pr,
     action,
-    busy,
-    error,
-    status,
+    queueActive,
     onconfirm,
     oncancel,
   }: {
     pr: PullRequest | null;
-    action: 'close-stale' | 'merge' | 'approve-merge' | 'update-branch';
-    busy: boolean;
-    error: string;
-    status: string;
+    action: PRActionKind;
+    queueActive: boolean;
     onconfirm: (method: string) => void;
     oncancel: () => void;
   } = $props();
@@ -40,7 +36,7 @@
   aria-describedby="pr-confirmation-description"
   oncancel={(event) => {
     event.preventDefault();
-    if (!busy) oncancel();
+    oncancel();
   }}
 >
   <h2 id="pr-confirmation-title">
@@ -66,7 +62,7 @@
     <p>{pr?.repository} #{pr?.number}</p>
     <label
       >Merge method
-      <select bind:value={method} disabled={busy}>
+      <select bind:value={method}>
         <option value="squash">Squash and merge</option>
         <option value="merge">Create a merge commit</option>
         <option value="rebase">Rebase and merge</option>
@@ -89,14 +85,8 @@
       updated in {pr ? Math.floor((Date.now() - Date.parse(pr.updatedAt)) / 86400000) : 0} days.
     </blockquote>
   {/if}
-  {#if busy && status}
-    <p class="pr-confirmation-status" role="status">
-      <LoaderCircle size={16} class="pr-confirmation-spinner" />{status}
-    </p>
-  {/if}
-  {#if error}<p role="alert">{error}</p>{/if}
   <div class="pr-confirmation-actions">
-    <button disabled={busy} onclick={oncancel}>Cancel</button>
+    <button onclick={oncancel}>Cancel</button>
     <button
       bind:this={confirm}
       class={merging
@@ -104,22 +94,15 @@
         : updating
           ? 'update-branch-button'
           : 'destructive-button'}
-      disabled={busy}
       onclick={() => onconfirm(method)}
-      >{merging
-        ? busy
+      >{queueActive
+        ? 'Add to queue'
+        : merging
           ? approving
-            ? 'Approving and merging…'
-            : 'Merging…'
-          : approving
             ? 'Approve and merge'
             : 'Confirm merge'
-        : updating
-          ? busy
-            ? 'Updating…'
-            : 'Update branch'
-          : busy
-            ? 'Closing…'
+          : updating
+            ? 'Update branch'
             : 'Close as stale'}</button
     >
   </div>
@@ -168,30 +151,6 @@
     padding: 12px;
     background: #f5f6f8;
     border-radius: 6px;
-  }
-  [role='alert'] {
-    color: #b42318;
-  }
-  .pr-confirmation-status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 16px;
-    font-weight: 600;
-  }
-  .pr-confirmation-status :global(.pr-confirmation-spinner) {
-    flex: none;
-    animation: pr-confirmation-spin 0.9s linear infinite;
-  }
-  @keyframes pr-confirmation-spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .pr-confirmation-status :global(.pr-confirmation-spinner) {
-      animation: none;
-    }
   }
   .pr-confirmation-actions {
     display: flex;

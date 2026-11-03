@@ -91,6 +91,15 @@ export interface GitHubService {
   getHistoryPullRequests(search: string, login: string): Promise<RawHistoryPR[]>;
   validateRepository(repo: string): Promise<void>;
   getPullRequest(id: string, seed?: RawPR): Promise<PullRequest>;
+  closeStalePullRequest(id: string): Promise<void>;
+  mergePullRequest(id: string, headOid: string, method: string, bot?: string): Promise<void>;
+  approveAndMergePullRequest(
+    id: string,
+    headOid: string,
+    method: string,
+    bot: string,
+  ): Promise<void>;
+  updatePullRequestBranch(id: string, headOid: string, bot?: string): Promise<void>;
 }
 
 export interface GhCliInfo {

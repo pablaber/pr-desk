@@ -33,6 +33,11 @@
   // The app's CSP blocks data URLs, so keep the logo as a bundled file.
   import appIcon from '../src-tauri/icons/source.svg?no-inline';
   import PRConfirmation from './components/PRConfirmation.svelte';
+  import ActionQueueDock from './components/ActionQueueDock.svelte';
+  import { capability, executeAction } from './lib/actions/execute';
+  import { ActionQueue } from './lib/actions/queue.svelte';
+  import type { PRActionKind, QueuedAction } from './lib/actions/types';
+  import type { Unlock } from './lib/achievements/types';
   import MergeCelebration from './components/MergeCelebration.svelte';
   import { sourceReasons, stalenessLevel } from './lib/pr/card-view-model';
   import type { PullRequest } from './lib/pr/types';
@@ -61,7 +66,6 @@
   import { celebrationChips, type CelebrationChip } from './lib/achievements/celebration';
   import { HistoryLog } from './lib/history/history.svelte';
   import { loadHistoryFile, saveHistoryFile } from './lib/history/store';
-  import { settledPullRequest } from './lib/github/mergeability';
   import {
     defaultState,
     loadState,
@@ -99,7 +103,6 @@
   import { classify, sortPullRequests, type ClassifiedPR } from './lib/pr/classify';
   import { titleTagColor, titleTags } from './lib/pr/title-tags';
   import { boardEntries } from './lib/pr/stacks';
-  import { knownBotKey } from './lib/pr/bots';
   import { badgeCount } from './lib/pr/badge';
   import { buildDebugInfo } from './lib/debug/debug-info';
   import {
@@ -144,12 +147,8 @@
   let settingsDirty = $derived(settingsDraft !== null && draftDiffers(settingsDraft, preferences));
   let settingsView = $derived(settingsDraft ? { ...preferences, ...settingsDraft } : preferences);
   let actionPR = $state<PullRequest | null>(null);
-  let actionError = $state('');
-  let merged = $state<{ pr: PullRequest; chips: CelebrationChip[] } | null>(null);
-  let actionStatus = $state('');
-  let pendingAction = $state<'close-stale' | 'merge' | 'approve-merge' | 'update-branch'>(
-    'close-stale',
-  );
+  let merged = $state<{ pr: PullRequest; count: number; chips: CelebrationChip[] } | null>(null);
+  let pendingAction = $state<PRActionKind>('close-stale');
   let showHotkeys = $state(false);
   let sidebarCollapsed = $derived(preferences.settings.sidebarCollapsed);
   let repository = $state<string | null>(null);
@@ -159,14 +158,36 @@
     saving = $state(false),
     initialized = $state(false);
   let silentRefresh = $state(false);
+  const queue = new ActionQueue({
+    run: (entry, report) =>
+      executeAction(entry, report, {
+        service,
+        login: () => login,
+        preferences: () => preferences,
+      }),
+    onDone: finishAction,
+    onFailed: ({ kind, error }) => {
+      recordError(kind, error);
+      void refresh(true);
+    },
+    onDrained: finishQueue,
+  });
+  // The merges of the current batch, celebrated together once the queue empties.
+  let batch: { last: PullRequest | null; count: number; unlocks: Unlock[] } = {
+    last: null,
+    count: 0,
+    unlocks: [],
+  };
+  // PRs merged or closed while a refresh runs; it may have read them before they landed.
+  let landedDuringRefresh = new Set<string>();
   // The bundle's version is what the updater compares, and a test build can override it, so the
   // build-time package.json value only stands in until it loads (and outside Tauri).
   let version = $state(buildVersion);
   const updates = new UpdateService({
     check,
     relaunch: () => invoke('relaunch_app'),
-    // Every preference write and confirmed GitHub action runs under saving; reads can be abandoned.
-    busy: () => saving || history.busy,
+    // Preference writes and running GitHub actions must finish; reads can be abandoned.
+    busy: () => saving || history.busy || queue.busy,
     onError: (message) => recordError('updates', message),
     // npm run dev has no Tauri at all, and npm run tauri dev serves from Vite's dev server.
     enabled: isTauri() && !import.meta.env.DEV,
@@ -451,8 +472,10 @@
     loading = true;
     silentRefresh = silent;
     error = '';
+    landedDuringRefresh = new Set();
     try {
-      snapshot = await refreshDashboard(service, preferences, snapshot);
+      const next = await refreshDashboard(service, preferences, snapshot);
+      snapshot = { ...next, prs: next.prs.filter((pr) => !landedDuringRefresh.has(pr.id)) };
       for (const warning of snapshot.warnings)
         recordError('refresh-warning', warning.message, warning.details);
       await prune();
@@ -678,13 +701,13 @@
     confirmClose = settingsOpen = false;
   }
   async function action(id: string, action: string, until?: string) {
+    if (queue.has(id)) return;
     if (
       action === 'close-stale' ||
       action === 'merge' ||
       action === 'approve-merge' ||
       action === 'update-branch'
     ) {
-      if (saving || loading) return;
       const pr = snapshot.prs.find((pr) => pr.id === id);
       if (
         pr &&
@@ -694,7 +717,6 @@
             classify(pr, login, preferences, Date.now())?.[capability[action]])
       ) {
         pendingAction = action;
-        actionError = '';
         actionPR = pr;
       }
       return;
@@ -718,83 +740,37 @@
       Object.assign(next, applyLabelOp(next, op));
     });
   }
-  const capability = {
-    merge: 'canMerge',
-    'approve-merge': 'canApproveAndMerge',
-    'update-branch': 'canUpdateBranch',
-  } as const;
-  async function confirmAction(method: string) {
-    if (!actionPR || saving || loading) return;
-    const pr = actionPR;
-    const updating = pendingAction === 'update-branch';
-    saving = true;
-    actionError = '';
-    try {
-      if (pendingAction !== 'close-stale') {
-        const merge = pendingAction === 'merge';
-        actionStatus = updating
-          ? 'Checking the PR still needs updating…'
-          : 'Checking the PR is still ready…';
-        const fresh = await settledPullRequest(
-          () => service.getPullRequest(pr.id),
-          () => (actionStatus = 'Waiting for GitHub to recheck the PR…'),
-        );
-        // A single-PR lookup carries no tracking reasons; the card's own reasons decide bot status.
-        const freshResult = classify(
-          { ...fresh, reasons: pr.reasons },
-          login,
-          preferences,
-          Date.now(),
-        );
-        if (fresh.headOid !== pr.headOid || !freshResult?.[capability[pendingAction]])
-          throw new Error(
-            updating
-              ? 'This PR changed or no longer needs a branch update. Cancel and refresh before trying again.'
-              : fresh.headOid === pr.headOid && freshResult?.canUpdateBranch
-                ? 'This PR is now behind its base branch. Cancel and update the branch before merging.'
-                : 'This PR changed or is no longer ready to merge. Cancel and refresh before trying again.',
-          );
-        actionStatus = updating
-          ? 'Updating branch…'
-          : merge
-            ? 'Merging…'
-            : 'Approving and merging…';
-        if (updating)
-          await service.updatePullRequestBranch(
-            pr.id,
-            pr.headOid,
-            freshResult.bot ? knownBotKey(fresh) : undefined,
-          );
-        else if (merge)
-          await service.mergePullRequest(
-            pr.id,
-            pr.headOid,
-            method,
-            freshResult.bot ? knownBotKey(fresh) : undefined,
-          );
-        else
-          await service.approveAndMergePullRequest(pr.id, pr.headOid, method, knownBotKey(fresh));
-      } else {
-        actionStatus = 'Closing and leaving a comment…';
-        await service.closeStalePullRequest(pr.id);
-      }
-      // An updated PR stays open while its checks re-run, so refresh rather than drop it.
-      if (!updating) snapshot.prs = snapshot.prs.filter((item) => item.id !== pr.id);
-      const unlocks = history.record({ kind: pendingAction, pr });
-      if (pendingAction === 'merge' || pendingAction === 'approve-merge')
-        merged = {
-          pr,
-          chips: celebrationChips(history.account, login, preferences, unlocks, Date.now()),
-        };
-      actionPR = null;
-    } catch (e) {
-      actionError = String(e);
-      recordError(pendingAction, actionError);
-    } finally {
-      saving = false;
-      actionStatus = '';
+  function confirmAction(method: string) {
+    if (!actionPR) return;
+    queue.enqueue(pendingAction, actionPR, method);
+    actionPR = null;
+  }
+  function finishAction({ kind, pr }: QueuedAction) {
+    // An updated PR stays open while its checks re-run, so refresh rather than drop it.
+    const updating = kind === 'update-branch';
+    if (!updating) {
+      snapshot.prs = snapshot.prs.filter((item) => item.id !== pr.id);
+      landedDuringRefresh.add(pr.id);
     }
-    if (updating && !actionPR) await refresh();
+    const unlocks = history.record({ kind, pr });
+    if (kind === 'merge' || kind === 'approve-merge') {
+      batch.last = pr;
+      batch.count++;
+      batch.unlocks.push(...unlocks);
+      if (queue.entries.length) showToast(GitMerge, `Merged ${pr.repository} #${pr.number}`);
+    }
+    // The refresh when the queue empties covers the last action.
+    if (updating && queue.entries.length) void refresh(true);
+  }
+  function finishQueue() {
+    if (batch.last)
+      merged = {
+        pr: batch.last,
+        count: batch.count,
+        chips: celebrationChips(history.account, login, preferences, batch.unlocks, Date.now()),
+      };
+    batch = { last: null, count: 0, unlocks: [] };
+    void refresh(true);
   }
   async function restore(kind: 'ignored' | 'snoozed', id: string) {
     await change((next) => {
@@ -934,6 +910,18 @@
 
 <svelte:head><title>PR Desk</title></svelte:head>
 <svelte:window onkeydown={handleHotkey} />
+{#snippet queueDock()}
+  {#if queue.entries.length}
+    <ActionQueueDock
+      entries={queue.entries}
+      done={queue.done}
+      onretry={() => queue.retry()}
+      onskip={() => queue.skip()}
+      onclear={() => queue.clear()}
+      onremove={(key) => queue.remove(key)}
+    />
+  {/if}
+{/snippet}
 {#snippet navButton(
   label: string,
   Icon: typeof LayoutGrid,
@@ -1205,6 +1193,8 @@
           {now}
           snoozeOptions={preferences.settings.snoozeOptions}
           busy={saving || loading}
+          queued={queue.entry(item.pr.id)}
+          queuePosition={queue.position(item.pr.id)}
           stale={snapshot.staleIds.includes(item.pr.id)}
           watching={preferences.watchedPullRequests.includes(item.pr.id)}
           pinned={item.pr.id in preferences.pinnedPullRequests}
@@ -1279,6 +1269,7 @@
     {/if}
   </main>
   {#if refreshOverlay}<RefreshOverlay />{/if}
+  {#if !(settingsOpen && initialized)}{@render queueDock()}{/if}
 </div>
 <!-- Settings shows the toasts itself while open, since its modal dialog covers this one. -->
 {#if !(settingsOpen && initialized)}<Toaster />{/if}
@@ -1321,6 +1312,7 @@
     oncopyerror={copyError}
     oncopysettings={copySettings}
     onimportsettings={importSettings}
+    {queueDock}
   />
 {/if}
 <UnsavedChanges
@@ -1345,16 +1337,17 @@
 <PRConfirmation
   action={pendingAction}
   pr={actionPR}
-  busy={saving || loading}
-  error={actionError}
-  status={actionStatus}
+  queueActive={queue.entries.length > 0}
   onconfirm={confirmAction}
-  oncancel={() => {
-    if (!saving) actionPR = null;
-  }}
+  oncancel={() => (actionPR = null)}
 />
 {#if merged}
   {#key merged.pr.id}
-    <MergeCelebration pr={merged.pr} chips={merged.chips} ondone={() => (merged = null)} />
+    <MergeCelebration
+      pr={merged.pr}
+      count={merged.count}
+      chips={merged.chips}
+      ondone={() => (merged = null)}
+    />
   {/key}
 {/if}
