@@ -815,6 +815,18 @@ i.waiting {
 .badge.threads {
   font-weight: 600;
 }
+/* The login is cut rather than the count, so "+2" stays readable; the badge's title has them all. */
+.approver-names {
+  display: inline-flex;
+  gap: 3px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.approver-login {
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .badge.review.approved,
 .badge.checks.passing {
   color: #326443;

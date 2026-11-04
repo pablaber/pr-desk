@@ -32,6 +32,9 @@ export interface PullRequest {
   // Reviewers whose latest approve or request-changes review requests changes, and whether a
   // non-merge commit has landed since that review.
   changeRequests: { login: string; pushedSince: boolean }[];
+  // Reviewers whose latest approve or request-changes review approves. Display only: GitHub's
+  // reviewDecision decides whether the PR counts as approved.
+  approvers: string[];
   reasons: TrackingReason[];
 }
 export interface CompletedPR {

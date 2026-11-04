@@ -59,6 +59,11 @@ function changeRequests(raw: RawPR): PullRequest['changeRequests'] {
       : [],
   );
 }
+function approvers(raw: RawPR): PullRequest['approvers'] {
+  return (raw.latestOpinionatedReviews?.nodes ?? []).flatMap((review) =>
+    review.state === 'APPROVED' && review.author?.login ? [review.author.login] : [],
+  );
+}
 export function normalize(raw: RawPR): PullRequest {
   return {
     id: `${raw.repository.nameWithOwner.toLowerCase()}#${raw.number}`,
@@ -96,6 +101,7 @@ export function normalize(raw: RawPR): PullRequest {
       normalizeCheck,
     ),
     changeRequests: changeRequests(raw),
+    approvers: approvers(raw),
     reasons: [],
   };
 }

@@ -591,3 +591,23 @@ it('records who requested changes and whether a non-merge commit followed', () =
   delete input.latestOpinionatedReviews;
   expect(normalize(input).changeRequests).toEqual([]);
 });
+it('lists the reviewers whose latest review approves', () => {
+  const input = raw();
+  const review = (state: string, login: string | null) => ({
+    state,
+    author: login ? { login } : null,
+    commit: null,
+  });
+  input.latestOpinionatedReviews = {
+    nodes: [
+      review('APPROVED', 'alice'),
+      review('CHANGES_REQUESTED', 'bob'),
+      review('DISMISSED', 'carol'),
+      review('APPROVED', null),
+      review('APPROVED', 'dana'),
+    ],
+  };
+  expect(normalize(input).approvers).toEqual(['alice', 'dana']);
+  delete input.latestOpinionatedReviews;
+  expect(normalize(input).approvers).toEqual([]);
+});
