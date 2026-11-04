@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.28.0](https://github.com/pablaber/pr-desk/compare/v1.27.0...v1.28.0) (2026-11-04)
+
+
+### Features
+
+* show who approved a pull request ([#176](https://github.com/pablaber/pr-desk/issues/176)) ([42b9d03](https://github.com/pablaber/pr-desk/commit/42b9d03bb4f372df34dc0dc6b117707b76464fde))
+
 ## [1.27.0](https://github.com/pablaber/pr-desk/compare/v1.26.1...v1.27.0) (2026-11-03)
 
 
