@@ -141,6 +141,12 @@ test.beforeEach(async ({ page }) => {
         !localStorage.getItem('updateCalls')
           ? 'BEHIND'
           : 'CLEAN',
+      latestOpinionatedReviews: {
+        nodes:
+          number === 1
+            ? [{ state: 'APPROVED', author: { login: 'sam' }, commit: { oid: 'a'.repeat(40) } }]
+            : [],
+      },
       reviewRequests: connection(
         number === 4 ? [{ requestedReviewer: { __typename: 'User', login: 'alex' } }] : [],
       ),
@@ -1023,7 +1029,8 @@ test('cards show green approval and red changes-requested badges', async ({ page
   await page.goto('/');
   const card = (title: string) => page.locator('.pr-card').filter({ hasText: title });
   const approved = card('Reduce cache lookup latency').locator('.badge.review');
-  await expect(approved).toHaveText('Approved');
+  await expect(approved).toHaveText('Approved · sam');
+  await expect(approved).toHaveAttribute('title', 'Approved by sam');
   await expect(approved).toHaveCSS('color', 'rgb(50, 100, 67)');
   const changes = card('Refresh session token handling').locator('.badge.review');
   await expect(changes).toHaveText('Changes requested');
@@ -1049,7 +1056,7 @@ test('each card badge carries its own icon', async ({ page }) => {
     ['Tracked repo', 'folder-git-2'],
     ['Watching', 'eye'],
     ['Bot', 'bot'],
-    ['Approved', 'thumbs-up'],
+    ['Approved · sam', 'thumbs-up'],
     ['Changes requested', 'file-diff'],
     ['Stale', 'hourglass'],
   ]) {
@@ -1202,6 +1209,67 @@ test('an approved human PR in a tracked repository moves from review attention t
   await expect(card).not.toContainText('Waiting for your review');
   await expect(card.getByRole('button', { name: /^Merge / })).toHaveCount(0);
   await page.screenshot({ path: '.context/approved-human-pr.png', fullPage: true });
+});
+
+test('review badges name approvers in every review state', async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as any,
+      invoke = w.__TAURI_INTERNALS__.invoke;
+    const reviews: Record<number, [string | null, string[]]> = {
+      1: ['APPROVED', ['a-very-long-reviewer-login-of-39-chars-', 'bob', 'carol']],
+      2: ['CHANGES_REQUESTED', ['jordan']],
+      3: ['REVIEW_REQUIRED', ['priya']],
+      4: [null, ['dana']],
+    };
+    w.__TAURI_INTERNALS__.invoke = async (command: string, args: any) => {
+      const result = await invoke(command, args);
+      for (const pr of result?.search?.nodes ?? []) {
+        const [reviewDecision, logins] = reviews[pr.number];
+        pr.reviewDecision = reviewDecision;
+        pr.latestOpinionatedReviews = {
+          nodes: logins.map((login) => ({
+            state: 'APPROVED',
+            author: { login },
+            commit: { oid: 'a'.repeat(40) },
+          })),
+        };
+      }
+      return result;
+    };
+  });
+  await page.goto('/');
+  const badge = (title: string) =>
+    page.locator('.pr-card').filter({ hasText: title }).locator('.badge.review');
+  const many = badge('Reduce cache lookup latency');
+  await expect(many).toHaveText('Approved · a-very-long-reviewer-login-of-39-chars- +2');
+  await expect(many).toHaveClass(/approved/);
+  await expect(many).toHaveAttribute(
+    'title',
+    'Approved by a-very-long-reviewer-login-of-39-chars-, bob, carol',
+  );
+  const cardBox = (await page
+    .locator('.pr-card')
+    .filter({ hasText: 'Reduce cache' })
+    .boundingBox())!;
+  const badgeBox = (await many.boundingBox())!;
+  expect(badgeBox.x + badgeBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
+  // Only the login is cut: it overflows its own box, and the count sits after it inside the badge.
+  const login = many.locator('.approver-login');
+  await expect(login).toHaveCSS('text-overflow', 'ellipsis');
+  expect(await login.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  const names = (await many.locator('.approver-names').boundingBox())!;
+  expect(names.x + names.width).toBeLessThanOrEqual(badgeBox.x + badgeBox.width);
+  const required = badge('Add audit event retention');
+  await expect(required).toHaveText('1 approval · priya');
+  await expect(required).toHaveClass(/partial/);
+  await expect(required.locator('svg.lucide-thumbs-up')).toHaveCount(1);
+  const noReview = badge('Simplify deployment configuration');
+  await expect(noReview).toHaveText('Approved · dana');
+  await expect(noReview).toHaveClass(/approved/);
+  const changes = badge('Refresh session token handling');
+  await expect(changes).toHaveText('Changes requested');
+  await expect(changes).toHaveAttribute('title', 'Approved by jordan');
+  await page.screenshot({ path: '.context/approver-badges.png', fullPage: true });
 });
 
 test('a PR you requested changes on waits for the author, then returns once they push', async ({

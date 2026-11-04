@@ -60,11 +60,17 @@
       >{tag.name}</span
     >{/each}{#each compact ? [] : card.badges as badge (badge.kind)}{@const Icon =
       sourceIcons[badge.kind]}<span class="badge"><Icon size={10} /> {badge.label}</span
-    >{/each}{#if card.reviewBadge}<span class="badge review {card.reviewBadge.tone}"
-      >{#if card.reviewBadge.tone === 'approved'}<ThumbsUp size={10} />{:else}<FileDiff
+    >{/each}{#if card.reviewBadge}<span
+      class="badge review {card.reviewBadge.tone}"
+      title={card.reviewBadge.title}
+      >{#if card.reviewBadge.tone === 'approved' || card.reviewBadge.tone === 'partial'}<ThumbsUp
           size={10}
-        />{/if}
-      {card.reviewBadge.label}</span
+        />{:else}<FileDiff size={10} />{/if}
+      {card.reviewBadge.label}{#if card.reviewBadge.names}<span class="approver-names"
+          >{' '}·
+          <span class="approver-login">{card.reviewBadge.names.first}</span
+          >{#if card.reviewBadge.names.more}{' '}+{card.reviewBadge.names.more}{/if}</span
+        >{/if}</span
     >{/if}{#if card.checksBadge}<span
       class="badge checks {card.checksBadge}"
       title={checksTitles[card.checksBadge]}

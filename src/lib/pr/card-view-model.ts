@@ -31,6 +31,34 @@ function threadsBadge(count: number) {
   if (count === 0) return null;
   return { count, label: `${count} unresolved conversation${count === 1 ? '' : 's'}` };
 }
+interface ReviewBadge {
+  label: string;
+  tone: 'approved' | 'partial' | 'changes-requested' | 'updated';
+  // The first approver and how many more; the title lists them all.
+  names?: { first: string; more: number };
+  title?: string;
+}
+function reviewBadge(item: ClassifiedPR): ReviewBadge | null {
+  const { approvers, reviewDecision } = item.pr;
+  const title = approvers.length ? `Approved by ${approvers.join(', ')}` : undefined;
+  if (item.updatedSinceYourChanges)
+    return { label: 'Updated since changes', tone: 'updated', title };
+  if (reviewDecision === 'CHANGES_REQUESTED')
+    return { label: 'Changes requested', tone: 'changes-requested', title };
+  const names = approvers.length ? { first: approvers[0], more: approvers.length - 1 } : undefined;
+  // GitHub reports no decision when the base branch requires no review, even after an approval.
+  if (reviewDecision === 'APPROVED' || (reviewDecision === null && approvers.length))
+    return { label: 'Approved', tone: 'approved', names, title };
+  // GitHub still wants more reviews, so this must not read as approved.
+  if (approvers.length)
+    return {
+      label: `${approvers.length} approval${approvers.length === 1 ? '' : 's'}`,
+      tone: 'partial',
+      names,
+      title,
+    };
+  return null;
+}
 // Your own PR follows the owned rules even in a tracked repository, so Mine replaces Tracked repo
 // on the card and in the source filters.
 export function sourceReasons(reasons: TrackingReason[]) {
@@ -63,13 +91,7 @@ export function cardViewModel(item: ClassifiedPR, now: number) {
     badges: [...sourceReasons(item.pr.reasons), ...(item.bot ? ['bot' as const] : [])].map(
       (kind) => ({ kind, label: sourceLabels[kind] }),
     ),
-    reviewBadge: item.updatedSinceYourChanges
-      ? { label: 'Updated since changes', tone: 'updated' }
-      : item.pr.reviewDecision === 'APPROVED'
-        ? { label: 'Approved', tone: 'approved' }
-        : item.pr.reviewDecision === 'CHANGES_REQUESTED'
-          ? { label: 'Changes requested', tone: 'changes-requested' }
-          : null,
+    reviewBadge: reviewBadge(item),
     checksBadge: checksStatus(checks),
     threadsBadge: threadsBadge(item.pr.activeUnresolvedThreads),
     staleness: stalenessLevel(item.pr.updatedAt, now),

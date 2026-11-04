@@ -30,6 +30,100 @@ describe('review badges', () => {
     expect(item.state).not.toBe('ready-to-merge');
     expect(cardViewModel(item, now).reviewBadge?.label).toBe('Approved');
   });
+  it.each([
+    [
+      'APPROVED',
+      ['alice'],
+      {
+        label: 'Approved',
+        tone: 'approved',
+        names: { first: 'alice', more: 0 },
+        title: 'Approved by alice',
+      },
+    ],
+    [
+      'APPROVED',
+      ['alice', 'bob', 'carol'],
+      {
+        label: 'Approved',
+        tone: 'approved',
+        names: { first: 'alice', more: 2 },
+        title: 'Approved by alice, bob, carol',
+      },
+    ],
+    [
+      null,
+      ['alice'],
+      {
+        label: 'Approved',
+        tone: 'approved',
+        names: { first: 'alice', more: 0 },
+        title: 'Approved by alice',
+      },
+    ],
+    [
+      'REVIEW_REQUIRED',
+      ['alice'],
+      {
+        label: '1 approval',
+        tone: 'partial',
+        names: { first: 'alice', more: 0 },
+        title: 'Approved by alice',
+      },
+    ],
+    [
+      'REVIEW_REQUIRED',
+      ['alice', 'bob'],
+      {
+        label: '2 approvals',
+        tone: 'partial',
+        names: { first: 'alice', more: 1 },
+        title: 'Approved by alice, bob',
+      },
+    ],
+    [
+      'CHANGES_REQUESTED',
+      ['alice'],
+      { label: 'Changes requested', tone: 'changes-requested', title: 'Approved by alice' },
+    ],
+  ] as const)(
+    'names approvers when the decision is %s: %j',
+    (reviewDecision, approvers, expected) => {
+      const item = classify(
+        pr({ reviewDecision, approvers: [...approvers] }),
+        'me',
+        defaultState(),
+        now,
+      )!;
+      expect(cardViewModel(item, now).reviewBadge).toEqual(expected);
+    },
+  );
+  it('shows plain Approved when GitHub cannot name the approver', () => {
+    const item = classify(pr({ reviewDecision: 'APPROVED' }), 'me', defaultState(), now)!;
+    const badge = cardViewModel(item, now).reviewBadge;
+    expect(badge?.label).toBe('Approved');
+    expect(badge?.names).toBeUndefined();
+    expect(badge?.title).toBeUndefined();
+  });
+  it('keeps approvers on hover when the author has pushed since your changes', () => {
+    const item = classify(
+      pr({
+        author: 'other',
+        reasons: ['tracked-repository'],
+        reviewDecision: 'CHANGES_REQUESTED',
+        changeRequests: [{ login: 'me', pushedSince: true }],
+        approvers: ['alice'],
+      }),
+      'me',
+      defaultState(),
+      now,
+    )!;
+    expect(cardViewModel(item, now).reviewBadge).toEqual({
+      label: 'Updated since changes',
+      tone: 'updated',
+      title: 'Approved by alice',
+    });
+  });
   it('replaces changes requested once the author pushes after yours', () => {
     const item = classify(
       pr({

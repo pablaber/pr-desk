@@ -252,15 +252,20 @@ because GitHub would merge those with it; merge the bottom layer first.
 
 These do not affect the column:
 
-| Extra             | Shown when                                                                                          |
-| ----------------- | --------------------------------------------------------------------------------------------------- |
-| Secondary status  | other matching non-catch-all rules; "Checks failed" on any PR with a failed check; outdated threads |
-| Checks badge      | at least one check; red if any failed, otherwise amber if any are pending, otherwise green          |
-| Threads badge     | at least one active thread on any PR; shows the count, amber                                        |
-| Approved badge    | `reviewDecision` is `APPROVED`                                                                      |
-| Changes badge     | `reviewDecision` is `CHANGES_REQUESTED`, unless the Updated badge replaces it                       |
-| Updated badge     | updated since your changes (blue, "Updated since changes")                                          |
-| Staleness         | not updated for more than 7 days (low), 14 days (medium), or 28 days (high, red)                    |
-| Stale data marker | the last refresh could not fetch this PR, so it shows previous results                              |
+| Extra             | Shown when                                                                                                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Secondary status  | other matching non-catch-all rules; "Checks failed" on any PR with a failed check; outdated threads                                                                       |
+| Checks badge      | at least one check; red if any failed, otherwise amber if any are pending, otherwise green                                                                                |
+| Threads badge     | at least one active thread on any PR; shows the count, amber                                                                                                              |
+| Approved badge    | `reviewDecision` is `APPROVED`, or empty with at least one approval; names the first approver, cut with an ellipsis if long, and how many more, with all of them on hover |
+| Approvals badge   | at least one approval while `reviewDecision` is anything else, such as `REVIEW_REQUIRED`; neutral, "1 approval · name"                                                    |
+| Changes badge     | `reviewDecision` is `CHANGES_REQUESTED`, unless the Updated badge replaces it; approvers on hover                                                                         |
+| Updated badge     | updated since your changes (blue, "Updated since changes"); approvers on hover                                                                                            |
+| Staleness         | not updated for more than 7 days (low), 14 days (medium), or 28 days (high, red)                                                                                          |
+| Stale data marker | the last refresh could not fetch this PR, so it shows previous results                                                                                                    |
+
+Approvers come from each reviewer's latest approve or request-changes review, which can include
+someone whose approval GitHub does not count, such as a reviewer without write access. Only
+`reviewDecision` decides whether a PR counts as approved.
 
 For any single PR, the card menu's debug info copies the matched rules, signals and hidden reason.
